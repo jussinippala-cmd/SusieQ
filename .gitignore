@@ -1,0 +1,11 @@
+# Photos and binary files
+photos/
+files/
+guides/
+
+# macOS
+.DS_Store
+
+# PlatformIO build artifacts
+.pio/
+.vscode/

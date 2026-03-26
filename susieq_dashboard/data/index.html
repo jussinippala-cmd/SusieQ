@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SusieQ Dashboard</title>
+<style>
+  :root {
+    --bg:      #0d1117;
+    --card:    #161b22;
+    --border:  #30363d;
+    --text:    #e6edf3;
+    --muted:   #8b949e;
+    --green:   #3fb950;
+    --yellow:  #d29922;
+    --red:     #f85149;
+    --blue:    #58a6ff;
+    --orange:  #db6d28;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  #status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  #dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background 0.4s;
+  }
+  #dot.live { background: var(--green); }
+
+  /* ── GPS time bar ──────────────────────────────────────────────── */
+  #gps-time-bar {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 16px 4px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  #gps-time-local {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  #gps-time-utc {
+    font-size: 0.85rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Tab navigation ──────────────────────────────────────────────── */
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 12px;
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    padding: 10px 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: color 0.2s, border-color 0.2s;
+    font-family: inherit;
+  }
+
+  .tab.active {
+    color: var(--text);
+    border-bottom-color: var(--blue);
+  }
+
+  .tab-panel { display: none; padding: 12px; max-width: 900px; margin: 0 auto; }
+  .tab-panel.active { display: block; }
+
+  /* ── Cards ───────────────────────────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card h2 {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    align-self: flex-start;
+  }
+
+  .card canvas { display: block; }
+
+  /* ── SVG Wind Compass ─────────────────────────────────────────────── */
+  .wind-compass-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  #wind-compass {
+    display: block;
+  }
+
+  /* Arrow smooth rotation */
+  #wind-arrow-group {
+    transform-origin: 140px 140px;
+    transform: rotate(0deg);
+    transition: transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  /* Boat speed (GPS SOG) row */
+  .boat-speed-row {
+    margin-top: 10px;
+    font-size: 1.0rem;
+    color: #8b949e;
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+  .boat-speed-row strong {
+    color: #e6edf3;
+    font-size: 1.3rem;
+  }
+
+  /* Wind min/max history row */
+  .wind-history {
+    display: flex;
+    gap: 20px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    padding: 5px 14px;
+    background: #21262d;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .wind-history span strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  /* ── Tanks layout ──────────────────────────────────────────────────── */
+  .tanks-inner {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    align-items: flex-end;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .tank-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tank-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  /* ── Bar gauges (water / fuel) ────────────────────────────────────── */
+  .bar-track {
+    width: 56px;
+    height: 140px;
+    background: #21262d;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--border);
+  }
+
+  .bar-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    border-radius: 0 0 8px 8px;
+    transition: height 0.8s ease;
+  }
+
+  .bar-fill.water { background: linear-gradient(to top, #1c5fa5, #58a6ff); }
+  .bar-fill.fuel  { background: linear-gradient(to top, #7d4e0f, #db6d28); }
+
+  .bar-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .bar-unit {
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .bar-secondary {
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1;
+  }
+
+  /* ── Battery card ─────────────────────────────────────────────────── */
+  .batt-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 0.8rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .stat span:first-child {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .stat span:last-child {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  /* ── Solar mini strip ─────────────────────────────────────────────── */
+  #solar-strip {
+    width: 100%;
+    background: #161b22;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  #solar-strip span { color: var(--muted); }
+  #solar-strip strong { color: var(--text); margin-left: 4px; }
+
+  .charge-badge {
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .charge-bulk    { background: #1b3a4b; color: #58a6ff; }
+  .charge-absorb  { background: #3d2b00; color: #d29922; }
+  .charge-float   { background: #0f3a1e; color: #3fb950; }
+  .charge-off     { background: #2d2d2d; color: #8b949e; }
+
+  /* ── Energy flow diagram (Victron-style) ──────────────────────────── */
+  .energy-flow {
+    width: 100%;
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .flow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 64px;
+  }
+
+  .flow-icon { font-size: 1.6rem; line-height: 1; }
+
+  .flow-label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  .flow-watt {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .flow-arrow-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .flow-arrow-track {
+    width: 100%;
+    height: 4px;
+    background: #30363d;
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .flow-arrow-fill {
+    height: 100%;
+    border-radius: 2px;
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    animation: flowPulse 1.4s linear infinite;
+  }
+
+  .flow-arrow-fill.solar-color { background: linear-gradient(to right, transparent, #d29922, transparent); }
+  .flow-arrow-fill.load-color  { background: linear-gradient(to right, transparent, #f85149, transparent); }
+  .flow-arrow-fill.charge-color{ background: linear-gradient(to right, transparent, #3fb950, transparent); }
+
+  @keyframes flowPulse {
+    0%   { left: -60%; }
+    100% { left: 120%; }
+  }
+
+  .flow-arrow-label {
+    font-size: 0.6rem;
+    color: var(--muted);
+  }
+
+  /* ── Battery SVG gauge ────────────────────────────────────────────── */
+  .battery-gauge-wrap {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 4px;
+  }
+
+  #battery-gauge {
+    width: 100%;
+    max-width: 320px;
+    display: block;
+  }
+
+  /* ── Weather card ─────────────────────────────────────────────────── */
+  .weather-rows {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .weather-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .weather-row:last-child { border-bottom: none; }
+
+  .weather-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .weather-label .emoji { font-size: 1rem; }
+
+  .weather-value {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .pressure-trend {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 2px;
+    text-align: right;
+  }
+
+  .water-temp-big {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--blue);
+    line-height: 1;
+    text-align: center;
+  }
+
+  .water-temp-unit {
+    font-size: 1rem;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  /* ── Satama: camera + distance ────────────────────────────────────── */
+  .cam-frame {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #21262d;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+  }
+
+  .cam-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .cam-offline {
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+
+  .distance-big {
+    font-size: 4rem;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .distance-unit {
+    font-size: 1.2rem;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .proximity-bar-track {
+    width: 100%;
+    height: 12px;
+    background: #21262d;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .proximity-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.4s ease, background 0.4s ease;
+  }
+
+  .bow-status-row {
+    display: flex;
+    gap: 16px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    align-items: center;
+  }
+
+  .bow-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background 0.4s;
+    display: inline-block;
+  }
+  .bow-dot.online { background: var(--green); }
+
+  /* ── Stale overlay ────────────────────────────────────────────────── */
+  .stale { opacity: 0.35; transition: opacity 0.4s; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⛵ SusieQ</h1>
+  <div id="status">
+    <div id="dot"></div>
+    <span id="status-text">Yhdistetään…</span>
+  </div>
+</header>
+
+<div id="gps-time-bar">
+  <span id="gps-time-local">--:--:--</span>
+  <span id="gps-time-utc">UTC --:--:--</span>
+</div>
+
+<nav class="tab-bar">
+  <button class="tab active" data-tab="wind">Tuuli</button>
+  <button class="tab" data-tab="battery">Akku</button>
+  <button class="tab" data-tab="tanks">Tankit</button>
+  <button class="tab" data-tab="weather">Sää</button>
+  <button class="tab" data-tab="satama">Satama</button>
+</nav>
+
+<div id="tab-wind" class="tab-panel active">
+  <div class="card" id="card-wind">
+    <h2>Tuuli</h2>
+    <div class="wind-compass-wrap">
+
+      <!-- SVG Compass: tick ring + boat silhouette + rotating arrow + speed text -->
+      <svg id="wind-compass" viewBox="0 0 280 280" width="280" height="280">
+
+        <!-- Outer ring background fill -->
+        <circle cx="140" cy="140" r="130" fill="#1a1f27"/>
+        <circle cx="140" cy="140" r="108" fill="#161b22"/>
+
+        <!-- Tick marks (drawn by JS into this group) -->
+        <g id="compass-ticks"></g>
+
+        <!-- Inner content circle border -->
+        <circle cx="140" cy="140" r="108" fill="none" stroke="#30363d" stroke-width="1.5"/>
+
+        <!-- Boat silhouette: top-down hull, pointing up, semi-transparent -->
+        <path d="M140,74 C155,88 159,108 152,126 Q146,134 140,136 Q134,134 128,126 C121,108 125,88 140,74 Z"
+              fill="#e6edf3" opacity="0.18"/>
+        <!-- Mast line -->
+        <line x1="140" y1="77" x2="140" y2="133" stroke="#e6edf3" stroke-width="1" opacity="0.12"/>
+
+        <!-- Wind direction arrow – sits outside tick ring, points inward -->
+        <g id="wind-arrow-group">
+          <polygon points="140,28 131,6 149,6" fill="#58a6ff" opacity="0.95"/>
+        </g>
+
+        <!-- Speed value (large, centered below boat) -->
+        <text id="wind-speed-text"
+              x="140" y="172"
+              text-anchor="middle"
+              font-size="50" font-weight="700" fill="#e6edf3"
+              font-family="-apple-system, BlinkMacSystemFont, sans-serif"
+              letter-spacing="-1">—</text>
+
+        <!-- m/s unit -->
+        <text x="140" y="192"
+              text-anchor="middle"
+              font-size="13" fill="#8b949e"
+              font-family="-apple-system, BlinkMacSystemFont, sans-serif">m/s</text>
+
+        <!-- Beaufort text -->
+        <text id="wind-beaufort-svg"
+              x="140" y="212"
+              text-anchor="middle"
+              font-size="11" font-weight="600" fill="#3fb950"
+              font-family="-apple-system, BlinkMacSystemFont, sans-serif">—</text>
+
+        <!-- Center pivot dot -->
+        <circle cx="140" cy="140" r="3" fill="#30363d"/>
+
+      </svg>
+
+      <!-- 10-min min/max row -->
+      <div class="wind-history">
+        <span>10 min ↓ <strong id="wind-min">—</strong> m/s</span>
+        <span>↑ <strong id="wind-max">—</strong> m/s</span>
+      </div>
+
+      <!-- Veneen nopeus (GPS SOG) -->
+      <div class="boat-speed-row" id="boat-speed-row">
+        vauhti <strong id="boat-speed-val">—</strong> solmua
+      </div>
+
+    </div>
+  </div>
+</div><!-- #tab-wind -->
+
+<div id="tab-battery" class="tab-panel">
+  <div class="card" id="card-battery">
+    <h2>Akku</h2>
+    <div class="battery-gauge-wrap">
+      <svg id="battery-gauge" viewBox="0 0 300 100">
+        <!-- Body outline -->
+        <rect x="2" y="8" width="272" height="84" rx="10" fill="#21262d" stroke="#30363d" stroke-width="2"/>
+        <!-- Terminal nub -->
+        <rect x="274" y="32" width="18" height="36" rx="5" fill="#30363d"/>
+        <!-- Fill bar -->
+        <rect id="batt-fill-bar" x="8" y="14" width="0" height="72" rx="7" fill="#3fb950"
+              style="transition: width 0.8s ease, fill 0.6s ease"/>
+        <!-- Percentage text -->
+        <text id="batt-pct-text" x="138" y="66" text-anchor="middle"
+              font-size="42" font-weight="700" fill="#e6edf3"
+              font-family="-apple-system, BlinkMacSystemFont, sans-serif">—%</text>
+      </svg>
+    </div>
+    <div class="batt-stats">
+      <div class="stat">
+        <span>Jännite</span>
+        <span id="batt-v">—</span>
+      </div>
+      <div class="stat">
+        <span>Virta</span>
+        <span id="batt-a">—</span>
+      </div>
+      <div class="stat">
+        <span>Teho</span>
+        <span id="batt-w">—</span>
+      </div>
+      <div class="stat">
+        <span>Lähde</span>
+        <span id="batt-src">—</span>
+      </div>
+    </div>
+    <div id="solar-strip" style="display:none">
+      <span>Aurinko<strong id="sol-pv">—</strong> W</span>
+      <span>PV<strong id="sol-v">—</strong> V</span>
+      <span id="charge-badge" class="charge-badge charge-off">—</span>
+    </div>
+    <!-- Energy flow diagram -->
+    <div class="energy-flow" id="energy-flow" style="display:none">
+      <div class="flow-node">
+        <div class="flow-icon">☀️</div>
+        <div class="flow-label">Aurinko</div>
+        <div class="flow-watt" id="flow-solar-w">— W</div>
+      </div>
+      <div class="flow-arrow-wrap">
+        <div class="flow-arrow-track">
+          <div class="flow-arrow-fill solar-color" id="flow-arrow-solar"></div>
+        </div>
+        <div class="flow-arrow-label" id="flow-label-solar">→</div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-icon">🔋</div>
+        <div class="flow-label">Akku</div>
+        <div class="flow-watt" id="flow-batt-w">— W</div>
+      </div>
+      <div class="flow-arrow-wrap">
+        <div class="flow-arrow-track">
+          <div class="flow-arrow-fill load-color" id="flow-arrow-load"></div>
+        </div>
+        <div class="flow-arrow-label" id="flow-label-load">→</div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-icon">⚡</div>
+        <div class="flow-label">Kulutus</div>
+        <div class="flow-watt" id="flow-load-w">— W</div>
+      </div>
+    </div>
+  </div>
+</div><!-- #tab-battery -->
+
+<div id="tab-tanks" class="tab-panel">
+  <div class="card" id="card-tanks">
+    <h2>Tankit</h2>
+    <div class="tanks-inner">
+
+      <div class="tank-wrap">
+        <div class="tank-label">Vesi</div>
+        <div class="bar-track">
+          <div class="bar-fill water" id="water-fill" style="height:0%"></div>
+        </div>
+        <div class="bar-value" id="water-val">—</div>
+        <div class="bar-unit">L</div>
+        <div class="bar-secondary" id="water-pct">—%</div>
+      </div>
+
+      <div class="tank-wrap">
+        <div class="tank-label">Polttoaine</div>
+        <div class="bar-track">
+          <div class="bar-fill fuel" id="fuel-fill" style="height:0%"></div>
+        </div>
+        <div class="bar-value" id="fuel-val">—</div>
+        <div class="bar-unit">L</div>
+        <div class="bar-secondary" id="fuel-pct">—%</div>
+      </div>
+
+    </div>
+    <div style="display:flex;gap:12px;margin-top:4px;">
+      <button onclick="tareWater()"
+        style="padding:5px 14px;background:#21262d;border:1px solid var(--border);
+               border-radius:6px;color:var(--muted);font-size:0.7rem;cursor:pointer">
+        Tara vesi (tyhjä tankki)
+      </button>
+      <button onclick="tareFuel()"
+        style="padding:5px 14px;background:#21262d;border:1px solid var(--border);
+               border-radius:6px;color:var(--muted);font-size:0.7rem;cursor:pointer">
+        Tara polttoaine (tyhjä kanisteri)
+      </button>
+    </div>
+  </div>
+</div><!-- #tab-tanks -->
+
+<div id="tab-weather" class="tab-panel">
+
+  <!-- Ilma (AHT20+BMP280) -->
+  <div class="card" id="card-air" style="margin-bottom: 12px;">
+    <h2>Ilma</h2>
+    <div class="weather-rows">
+      <div class="weather-row">
+        <div class="weather-label"><span class="emoji">🌡️</span> Ilmanlämpötila</div>
+        <div class="weather-value"><span id="air-temp">—</span> °C</div>
+      </div>
+      <div class="weather-row">
+        <div class="weather-label"><span class="emoji">💧</span> Kosteus</div>
+        <div class="weather-value"><span id="air-hum">—</span> %</div>
+      </div>
+      <div class="weather-row" style="flex-direction:column; align-items:flex-start; gap:2px;">
+        <div style="display:flex; width:100%; justify-content:space-between; align-items:baseline;">
+          <div class="weather-label"><span class="emoji">📊</span> Ilmanpaine</div>
+          <div class="weather-value"><span id="air-press">—</span> hPa</div>
+        </div>
+        <div class="pressure-trend" id="press-trend" style="align-self:flex-end;">→ Vakaa</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vesi (DS18B20) -->
+  <div class="card" id="card-water-temp">
+    <h2>Vesi</h2>
+    <div style="padding: 8px 0;">
+      <div class="water-temp-big">
+        <span id="water-temp">—</span><span class="water-temp-unit"> °C</span>
+      </div>
+    </div>
+    <div style="font-size:0.75rem; color:var(--muted); letter-spacing:0.04em;">🌊 Järviveden lämpötila</div>
+  </div>
+
+</div><!-- #tab-weather -->
+
+<div id="tab-satama" class="tab-panel">
+
+  <!-- Keulakamera -->
+  <div class="card" id="card-cam" style="margin-bottom: 12px;">
+    <h2>Keulakamera</h2>
+    <div class="cam-frame" id="cam-frame">
+      <div class="cam-offline" id="cam-offline-msg">Kamera — ei yhteyttä</div>
+      <img id="cam-img" style="display:none" alt="Keulakamera">
+    </div>
+  </div>
+
+  <!-- Etäisyysmittari -->
+  <div class="card" id="card-distance">
+    <h2>Etäisyys laituriin</h2>
+    <div class="distance-big" id="distance-val" style="color:var(--green);">
+      <span id="distance-num">—</span><span class="distance-unit"> m</span>
+    </div>
+    <div class="proximity-bar-track">
+      <div class="proximity-bar-fill" id="proximity-fill" style="width:0%; background:var(--green);"></div>
+    </div>
+    <div class="bow-status-row">
+      <span><span class="bow-dot" id="bow-dot"></span> Keulayksikkö</span>
+      <span id="bow-status-text">Offline</span>
+      <span id="bow-rssi"></span>
+    </div>
+  </div>
+
+</div><!-- #tab-satama -->
+
+<script>
+// ─── Draw compass tick ring ────────────────────────────────────────────
+function drawCompassRing() {
+  var ticks = document.getElementById("compass-ticks");
+  while (ticks.firstChild) ticks.removeChild(ticks.firstChild);
+  var cx = 140, cy = 140;
+  var R_OUT = 127;
+
+  for (var deg = 0; deg < 360; deg += 5) {
+    var isMajor = deg % 30 === 0;
+    var isMed   = !isMajor && deg % 10 === 0;
+    var R_IN = isMajor ? 110 : (isMed ? 117 : 121);
+    var rad = (deg - 90) * Math.PI / 180;
+    var x1 = cx + R_IN  * Math.cos(rad);
+    var y1 = cy + R_IN  * Math.sin(rad);
+    var x2 = cx + R_OUT * Math.cos(rad);
+    var y2 = cy + R_OUT * Math.sin(rad);
+    var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", x1.toFixed(2));
+    line.setAttribute("y1", y1.toFixed(2));
+    line.setAttribute("x2", x2.toFixed(2));
+    line.setAttribute("y2", y2.toFixed(2));
+    line.setAttribute("stroke", isMajor ? "#8b949e" : (isMed ? "#4a5568" : "#30363d"));
+    line.setAttribute("stroke-width", isMajor ? "2" : "1");
+    line.setAttribute("stroke-linecap", "round");
+    ticks.appendChild(line);
+  }
+}
+drawCompassRing();
+
+// ─── SVG Battery gauge ─────────────────────────────────────────────────
+function updateBatteryGauge(soc) {
+  var maxW = 254;
+  var fillW = maxW * Math.max(0, Math.min(100, soc != null ? soc : 0)) / 100;
+  var fill = document.getElementById("batt-fill-bar");
+  fill.setAttribute("width", fillW.toFixed(1));
+  var color = soc >= 50 ? "#3fb950" : soc >= 25 ? "#d29922" : "#f85149";
+  fill.setAttribute("fill", color);
+  document.getElementById("batt-pct-text").textContent =
+    soc != null ? soc.toFixed(1) + "%" : "—%";
+}
+
+// ─── Charge state labels ───────────────────────────────────────────────
+var CHARGE_STATES = {
+  0: ["OFF",    "charge-off"],
+  2: ["Vika",   "charge-off"],
+  3: ["Bulk",   "charge-bulk"],
+  4: ["Absorb", "charge-absorb"],
+  5: ["Float",  "charge-float"],
+  7: ["Manual", "charge-off"],
+  245: ["Start", "charge-bulk"],
+  247: ["Eq",    "charge-absorb"],
+  252: ["ESS",   "charge-float"],
+};
+
+// ─── Beaufort scale conversion ─────────────────────────────────────────
+function toBeaufort(mps) {
+  if (mps <  0.3) return { n: 0, label: "B0 — Tyyntä",    color: "#3fb950" };
+  if (mps <  1.6) return { n: 1, label: "B1 — Heikko",    color: "#3fb950" };
+  if (mps <  3.4) return { n: 2, label: "B2 — Heikko",    color: "#3fb950" };
+  if (mps <  5.5) return { n: 3, label: "B3 — Kohtalainen", color: "#3fb950" };
+  if (mps <  8.0) return { n: 4, label: "B4 — Kohtalainen", color: "#3fb950" };
+  if (mps < 10.8) return { n: 5, label: "B5 — Navakka",   color: "#d29922" };
+  if (mps < 13.9) return { n: 6, label: "B6 — Navakka",   color: "#d29922" };
+  if (mps < 17.2) return { n: 7, label: "B7 — Kova",      color: "#d29922" };
+  if (mps < 20.8) return { n: 8, label: "B8 — Kova",      color: "#f85149" };
+  if (mps < 24.5) return { n: 9, label: "B9 — Myrsky",    color: "#f85149" };
+  if (mps < 28.5) return { n:10, label: "B10 — Myrsky",   color: "#f85149" };
+  if (mps < 32.7) return { n:11, label: "B11 — Myrsky",   color: "#f85149" };
+  return              { n:12,    label: "B12 — Hurrikaani", color: "#f85149" };
+}
+
+// ─── Wind direction arrow smooth rotation ─────────────────────────────
+var _currentWindDeg = 0;
+
+function updateWindCompass(speed, dir) {
+  var delta = ((dir - _currentWindDeg) % 360 + 360) % 360;
+  if (delta > 180) delta -= 360;
+  _currentWindDeg = _currentWindDeg + delta;
+
+  // R4: normalize to prevent unbounded growth over long sessions
+  if (Math.abs(_currentWindDeg) > 36000) {
+    _currentWindDeg = _currentWindDeg % 360;
+  }
+
+  var arrowGroup = document.getElementById("wind-arrow-group");
+  arrowGroup.style.transform = "rotate(" + _currentWindDeg + "deg)";
+
+  var speedEl = document.getElementById("wind-speed-text");
+  speedEl.textContent = speed != null ? speed.toFixed(1) : "—";
+
+  var bf = toBeaufort(speed != null ? speed : 0);
+  var bfEl = document.getElementById("wind-beaufort-svg");
+  bfEl.textContent = bf.label;
+  bfEl.setAttribute("fill", bf.color);
+}
+
+// ─── Wind history (10 min rolling, 2s interval → 300 samples) ─────────
+var WIND_HISTORY_MAX = 300;
+var windHistory = [];
+
+function pushWindHistory(speed) {
+  windHistory.push(speed);
+  if (windHistory.length > WIND_HISTORY_MAX) windHistory.shift();
+}
+
+function windMinMax() {
+  if (windHistory.length === 0) return { min: null, max: null };
+  var mn = windHistory[0], mx = windHistory[0];
+  for (var i = 0; i < windHistory.length; i++) {
+    if (windHistory[i] < mn) mn = windHistory[i];
+    if (windHistory[i] > mx) mx = windHistory[i];
+  }
+  return { min: mn, max: mx };
+}
+
+// ─── Pressure trend (3 min window, 2s interval → 90 samples) ──────────
+var PRESS_HISTORY_MAX = 90;
+var pressHistory = [];
+
+function pushPressHistory(hpa) {
+  pressHistory.push(hpa);
+  if (pressHistory.length > PRESS_HISTORY_MAX) pressHistory.shift();
+}
+
+function pressureTrend() {
+  if (pressHistory.length < 10) return { symbol: "→", label: "Vakaa", color: "var(--muted)" };
+  var half = Math.floor(pressHistory.length / 2);
+  var old = pressHistory.slice(0, half);
+  var rec = pressHistory.slice(half);
+  var avgOld = old.reduce(function(a, b) { return a + b; }, 0) / old.length;
+  var avgRec = rec.reduce(function(a, b) { return a + b; }, 0) / rec.length;
+  var delta = avgRec - avgOld;
+  if (delta > 0.3)  return { symbol: "↑", label: "Nouseva", color: "var(--green)" };
+  if (delta < -0.3) return { symbol: "↓", label: "Laskeva", color: "var(--red)" };
+  return               { symbol: "→", label: "Vakaa",   color: "var(--muted)" };
+}
+
+// ─── State ────────────────────────────────────────────────────────────
+var ws;
+var reconnectDelay = 1000;
+var lastMsgTime = 0;
+var staleTimer;
+var _wsReconnecting = false;  // L: prevent onclose+onerror double-fire
+
+// ─── WebSocket connection ──────────────────────────────────────────────
+function connect() {
+  _wsReconnecting = false;
+  var host = location.hostname || "192.168.4.1";
+  ws = new WebSocket("ws://" + host + "/ws");
+
+  ws.onopen = function() {
+    document.getElementById("dot").classList.add("live");
+    document.getElementById("status-text").textContent = "Live";
+    reconnectDelay = 1000;
+  };
+
+  ws.onmessage = function(evt) {
+    lastMsgTime = Date.now();
+    clearTimeout(staleTimer);
+    staleTimer = setTimeout(markStale, 8000);
+    try {
+      update(JSON.parse(evt.data));
+    } catch (e) {
+      console.error("JSON parse error", e);
+    }
+  };
+
+  ws.onclose = ws.onerror = function() {
+    if (_wsReconnecting) return;  // L: prevent double-fire
+    _wsReconnecting = true;
+    document.getElementById("dot").classList.remove("live");
+    document.getElementById("status-text").textContent = "Yhdistetään…";
+    var jitter = Math.random() * 500;
+    setTimeout(connect, reconnectDelay + jitter);
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
+  };
+}
+
+function markStale() {
+  document.getElementById("dot").classList.remove("live");
+  document.getElementById("status-text").textContent = "Vanhentunut";
+}
+
+// ─── Main data update ──────────────────────────────────────────────────
+function update(d) {
+  // Wind
+  var windOk = d.wind && d.wind.valid;
+  document.getElementById("card-wind").classList.toggle("stale", !windOk);
+  if (windOk) {
+    var windSpeed = d.wind.speed != null ? d.wind.speed : 0;
+    updateWindCompass(windSpeed, d.wind.direction != null ? d.wind.direction : 0);
+    pushWindHistory(windSpeed);
+    var mm = windMinMax();
+    document.getElementById("wind-min").textContent =
+      mm.min != null ? mm.min.toFixed(1) : "—";
+    document.getElementById("wind-max").textContent =
+      mm.max != null ? mm.max.toFixed(1) : "—";
+  }
+
+  // GPS time
+  if (d.gps && d.gps.utc_h != null) {
+    _gpsUtc = { h: d.gps.utc_h, m: d.gps.utc_m, s: d.gps.utc_s, receivedAt: Date.now() };
+  }
+
+  // GPS → boat speed in wind card
+  var gpsOk = d.gps && d.gps.valid && d.gps.fix && d.gps.sog_knots != null;
+  document.getElementById("boat-speed-val").textContent = gpsOk
+    ? d.gps.sog_knots.toFixed(1)
+    : "—";
+
+  // Battery
+  var battOk = d.battery && d.battery.valid;
+  document.getElementById("card-battery").classList.toggle("stale", !battOk);
+  if (battOk) {
+    var soc = d.battery.soc != null ? d.battery.soc : 0;
+    updateBatteryGauge(soc);
+
+    var bv = d.battery.voltage;
+    var ba = d.battery.current;
+    document.getElementById("batt-v").textContent =
+      bv != null ? bv.toFixed(1) + " V" : "—";
+    document.getElementById("batt-a").textContent =
+      ba != null ? ba.toFixed(1) + " A" : "—";
+
+    var bw = (bv != null && ba != null) ? bv * ba : null;
+    var bwEl = document.getElementById("batt-w");
+    if (bw != null) {
+      bwEl.textContent = (bw >= 0 ? "+" : "") + bw.toFixed(0) + " W";
+      bwEl.style.color = bw >= 0 ? "var(--green)" : "var(--red)";
+    } else {
+      bwEl.textContent = "—";
+      bwEl.style.color = "";
+    }
+
+    document.getElementById("batt-src").textContent =
+      d.battery.source === "victron" ? "Victron" : "INA219";
+  }
+
+  // Solar (Victron)
+  var solarOk = d.solar && d.solar.valid;
+  var solarStrip = document.getElementById("solar-strip");
+  var energyFlow = document.getElementById("energy-flow");
+  if (solarOk) {
+    solarStrip.style.display = "flex";
+    energyFlow.style.display = "flex";
+
+    var solPower = d.solar.pv_power != null ? d.solar.pv_power : 0;
+    document.getElementById("sol-pv").textContent =
+      d.solar.pv_power != null ? d.solar.pv_power.toFixed(0) : "—";
+    document.getElementById("sol-v").textContent =
+      d.solar.pv_voltage != null ? d.solar.pv_voltage.toFixed(1) : "—";
+    var badge = document.getElementById("charge-badge");
+    var stateInfo = CHARGE_STATES[d.solar.state] || ["—", "charge-off"];
+    badge.textContent = stateInfo[0];
+    badge.className = "charge-badge " + stateInfo[1];
+
+    // Energy flow
+    var battPower = (d.battery && d.battery.valid && d.battery.voltage != null && d.battery.current != null)
+      ? d.battery.voltage * d.battery.current : null;
+    updateFlowDiagram(solPower, battPower);
+  } else {
+    solarStrip.style.display = "none";
+    energyFlow.style.display = "none";
+  }
+
+  // Water
+  var waterOk = d.water && d.water.valid;
+  document.getElementById("card-tanks").classList.toggle("stale", !waterOk && !(d.fuel && d.fuel.valid));
+  if (waterOk) {
+    var waterPct    = d.water.level_pct != null ? d.water.level_pct : 0;
+    var waterLiters = d.water.liters != null ? d.water.liters : 0;
+    document.getElementById("water-fill").style.height = waterPct + "%";
+    document.getElementById("water-val").textContent   = waterLiters.toFixed(1);
+    document.getElementById("water-pct").textContent   = Math.round(waterPct) + "%";
+    setBarColor(document.getElementById("water-fill"), waterPct, "water");
+  }
+
+  // Fuel
+  var fuelOk = d.fuel && d.fuel.valid;
+  if (fuelOk) {
+    var fuelPct    = d.fuel.pct != null ? d.fuel.pct : 0;
+    var fuelLiters = d.fuel.liters != null ? d.fuel.liters : 0;
+    document.getElementById("fuel-fill").style.height = fuelPct + "%";
+    document.getElementById("fuel-val").textContent   = fuelLiters.toFixed(1);
+    document.getElementById("fuel-pct").textContent   = Math.round(fuelPct) + "%";
+    setBarColor(document.getElementById("fuel-fill"), fuelPct, "fuel");
+  }
+
+  // Weather
+  var weatherOk = d.weather && d.weather.valid;
+  document.getElementById("card-air").classList.toggle("stale", !weatherOk);
+  document.getElementById("card-water-temp").classList.toggle("stale", !weatherOk);
+  if (weatherOk) {
+    updateWeather(d.weather);
+  }
+
+  // Uptime in status bar
+  if (d.uptime_s != null) {
+    var h = Math.floor(d.uptime_s / 3600);
+    var m = Math.floor((d.uptime_s % 3600) / 60);
+    document.getElementById("status-text").textContent =
+      "Live · uptime " + h + "h " + m + "m";
+  }
+}
+
+function updateFlowDiagram(solPower, battPower) {
+  document.getElementById("flow-solar-w").textContent =
+    solPower != null ? solPower.toFixed(0) + " W" : "— W";
+
+  var battW = battPower != null ? battPower : 0;
+  var battEl = document.getElementById("flow-batt-w");
+  battEl.textContent = battPower != null
+    ? (battW >= 0 ? "+" : "") + battW.toFixed(0) + " W"
+    : "— W";
+  battEl.style.color = battW >= 0 ? "var(--green)" : "var(--red)";
+
+  var loadW = (solPower != null ? solPower : 0) - battW;
+  document.getElementById("flow-load-w").textContent = loadW.toFixed(0) + " W";
+
+  var arrowSolar = document.getElementById("flow-arrow-solar");
+  var arrowLoad  = document.getElementById("flow-arrow-load");
+
+  arrowSolar.style.animationPlayState = solPower > 0 ? "running" : "paused";
+  arrowSolar.className = "flow-arrow-fill " + (solPower > 0 ? "solar-color" : "charge-off");
+  arrowLoad.style.animationPlayState  = loadW > 0 ? "running" : "paused";
+  arrowLoad.className  = "flow-arrow-fill " + (loadW > 0 ? "load-color" : "charge-off");
+
+  document.getElementById("flow-label-solar").textContent = solPower > 0 ? "→" : "—";
+  document.getElementById("flow-label-load").textContent  = loadW > 0 ? "→" : "—";
+}
+
+function setBarColor(el, pct, type) {
+  if (pct < 25) {
+    el.style.background = "linear-gradient(to top, #5a1010, #f85149)";
+  } else if (pct < 50) {
+    el.style.background = "linear-gradient(to top, #4a3300, #d29922)";
+  } else if (type === "water") {
+    el.style.background = "linear-gradient(to top, #1c5fa5, #58a6ff)";
+  } else {
+    el.style.background = "linear-gradient(to top, #7d4e0f, #db6d28)";
+  }
+}
+
+function updateWeather(w) {
+  if (!w || !w.valid) return;
+  document.getElementById("air-temp").textContent =
+    w.air_temp != null ? w.air_temp.toFixed(1) : "—";
+  document.getElementById("air-hum").textContent =
+    w.humidity != null ? Math.round(w.humidity) : "—";
+  document.getElementById("air-press").textContent =
+    w.pressure != null ? w.pressure.toFixed(1) : "—";
+  document.getElementById("water-temp").textContent =
+    w.water_temp != null ? w.water_temp.toFixed(1) : "—";
+
+  if (w.pressure != null) {
+    pushPressHistory(w.pressure);
+  }
+  var trend = pressureTrend();
+  var trendEl = document.getElementById("press-trend");
+  trendEl.textContent = trend.symbol + " " + trend.label;
+  trendEl.style.color = trend.color;
+}
+
+// ─── Tare scales ───────────────────────────────────────────────────────
+function tareFuel() {
+  if (!confirm("Aseta tyhjä kanisteri vaa'alle ja paina OK.")) return;
+  fetchWithTimeout("/tare", { method: "POST" }, 5000)
+    .then(function(r) { return r.text(); })
+    .then(function(t) { alert("Polttoaine tara tallennettu: " + t); })
+    .catch(function(e) { alert("Virhe: " + e); });
+}
+
+function tareWater() {
+  if (!confirm("Aseta tyhjä vesitankki vaa'alle ja paina OK.")) return;
+  fetchWithTimeout("/tare_water", { method: "POST" }, 5000)
+    .then(function(r) { return r.text(); })
+    .then(function(t) { alert("Vesi tara tallennettu: " + t); })
+    .catch(function(e) { alert("Virhe: " + e); });
+}
+
+// ─── Satama: camera stream + LiDAR distance ──────────────────────────
+var CAM_STREAM_URL   = "http://192.168.4.10:81/stream";
+var CAM_DISTANCE_URL = "http://192.168.4.10/distance";
+var CAM_STATUS_URL   = "http://192.168.4.10/status";
+var CAM_SLEEP_URL    = "http://192.168.4.10/sleep";
+var CAM_WAKE_URL     = "http://192.168.4.10/wake";
+var _distanceTimer   = null;
+var _satamaActive    = false;
+var _satamaAbort     = null;  // H5: AbortController to cancel pending sleep/wake
+
+// M8: AbortSignal.timeout polyfill for Safari <16.4 / older Chrome
+function fetchWithTimeout(url, options, timeoutMs) {
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  options = options || {};
+  // If caller provided a signal (e.g. _satamaAbort), chain abort to our controller
+  if (options.signal) {
+    var outerSignal = options.signal;
+    if (outerSignal.aborted) { clearTimeout(timer); return Promise.reject(new DOMException("Aborted", "AbortError")); }
+    outerSignal.addEventListener("abort", function() { controller.abort(); }, { once: true });
+  }
+  options.signal = controller.signal;
+  try {
+    return fetch(url, options).finally(function() { clearTimeout(timer); });
+  } catch (e) {
+    clearTimeout(timer);
+    return Promise.reject(e);
+  }
+}
+
+function startCamStream() {
+  var img = document.getElementById("cam-img");
+  var msg = document.getElementById("cam-offline-msg");
+  img.style.display = "none";
+  msg.style.display = "block";
+  msg.textContent = "Kamera — käynnistyy…";
+
+  // D1: use _satamaAbort signal so stopSatama() can cancel this wake request
+  var wakeOpts = { method: "POST" };
+  if (_satamaAbort) wakeOpts.signal = _satamaAbort.signal;
+
+  fetchWithTimeout(CAM_WAKE_URL, wakeOpts, 3000)
+    .catch(function() {})  // bow may already be awake, or request cancelled
+    .then(function() {
+      if (!_satamaActive) return;  // tab switched away during wake
+      // set onerror BEFORE setting src to avoid missing early errors
+      img.onerror = function() {
+        img.style.display = "none";
+        msg.style.display = "block";
+        msg.textContent = "Kamera — ei yhteyttä";
+      };
+      setTimeout(function() {
+        if (!_satamaActive) return;
+        img.src = CAM_STREAM_URL;
+        img.style.display = "block";
+        msg.style.display = "none";
+      }, 400);  // camera sensor init after wake response
+    });
+}
+
+function stopCamStream() {
+  var img = document.getElementById("cam-img");
+  img.onerror = null;  // L: prevent error handler firing on intentional stop
+  // M6: data URI reliably closes MJPEG TCP connection (vs empty string)
+  img.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+  img.style.display = "none";
+  document.getElementById("cam-offline-msg").style.display = "block";
+}
+
+// M7: chained polling — next poll starts after previous completes
+function fetchDistance() {
+  return fetchWithTimeout(CAM_DISTANCE_URL, {}, 2000)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.valid) {
+        updateDistance(data.distance_cm / 100.0);
+      }
+      setBowOnline(true);
+    })
+    .catch(function() {
+      setBowOnline(false);
+    });
+}
+
+function updateDistance(m) {
+  var el = document.getElementById("distance-val");
+  var numEl = document.getElementById("distance-num");
+  var fill = document.getElementById("proximity-fill");
+  var maxDist = 8.0;
+  var clamped = Math.max(0, Math.min(maxDist, m));
+  var pct = ((maxDist - clamped) / maxDist) * 100;
+
+  var color;
+  if (m > 2.0) color = "var(--green)";
+  else if (m > 0.5) color = "var(--yellow)";
+  else color = "var(--red)";
+
+  numEl.textContent = m.toFixed(2);  // L5: textContent instead of innerHTML
+  el.style.color = color;
+  fill.style.width = pct + "%";
+  fill.style.background = color;
+}
+
+function setBowOnline(online) {
+  var dot = document.getElementById("bow-dot");
+  var txt = document.getElementById("bow-status-text");
+  dot.classList.toggle("online", online);
+  txt.textContent = online ? "Online" : "Offline";
+}
+
+// M7: chained distance polling — no overlapping requests
+function startDistancePolling() {
+  function poll() {
+    if (!_satamaActive) return;
+    fetchDistance().then(function() {
+      if (_satamaActive) {
+        _distanceTimer = setTimeout(poll, 500);
+      }
+    });
+  }
+  poll();
+}
+
+function startSatama() {
+  // D1: abort any pending sleep, create new controller for this session
+  if (_satamaAbort) _satamaAbort.abort();
+  _satamaAbort = new AbortController();
+  _satamaActive = true;
+  startCamStream();  // uses _satamaAbort.signal for wake request
+  startDistancePolling();
+}
+
+function stopSatama() {
+  // D1: abort any pending wake (startCamStream uses _satamaAbort.signal)
+  if (_satamaAbort) _satamaAbort.abort();
+  _satamaAbort = new AbortController();
+  _satamaActive = false;
+  stopCamStream();
+  if (_distanceTimer) { clearTimeout(_distanceTimer); _distanceTimer = null; }
+  // Tell bow unit to sleep (fire-and-forget — idle timeout is fallback)
+  fetch(CAM_SLEEP_URL, { method: "POST", signal: _satamaAbort.signal })
+    .catch(function() {});
+}
+
+// ─── Tab navigation ────────────────────────────────────────────────────
+document.querySelectorAll(".tab").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    document.querySelectorAll(".tab").forEach(function(t) { t.classList.remove("active"); });
+    document.querySelectorAll(".tab-panel").forEach(function(p) { p.classList.remove("active"); });
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+
+    // Start/stop Satama stream based on active tab
+    if (btn.dataset.tab === "satama") {
+      startSatama();
+    } else if (_satamaActive) {
+      stopSatama();
+    }
+  });
+});
+
+// ─── GPS Time (use GPS UTC when available, fallback to device clock) ────
+var _gpsUtc = null;  // { h, m, s, receivedAt } — last GPS time from ESP32
+
+function updateGpsTime() {
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+
+  // Local time always from device clock
+  var now = new Date();
+  document.getElementById('gps-time-local').textContent =
+    pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+
+  // UTC: prefer GPS time, extrapolate seconds since last update
+  if (_gpsUtc) {
+    var elapsed = Math.floor((Date.now() - _gpsUtc.receivedAt) / 1000);
+    var totalSec = _gpsUtc.h * 3600 + _gpsUtc.m * 60 + _gpsUtc.s + elapsed;
+    totalSec = ((totalSec % 86400) + 86400) % 86400;  // wrap at midnight
+    var gh = Math.floor(totalSec / 3600);
+    var gm = Math.floor((totalSec % 3600) / 60);
+    var gs = totalSec % 60;
+    document.getElementById('gps-time-utc').textContent =
+      'GPS ' + pad(gh) + ':' + pad(gm) + ':' + pad(gs);
+  } else {
+    document.getElementById('gps-time-utc').textContent =
+      'UTC ' + pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds());
+  }
+}
+updateGpsTime();
+setInterval(updateGpsTime, 1000);
+
+// ─── Boot ──────────────────────────────────────────────────────────────
+connect();
+</script>
+</body>
+</html>
