@@ -53,7 +53,7 @@ ESP32-WROOM-32 DevKit V1 — WiFi Access Point + WebSocket-palvelin
 | Rommi | HX711 vaaka (0,7 l pullo) |
 
 ### Keulayksikkö (susieq_bow/)
-ESP32-CAM AI-Thinker — liittyy cockpit-verkkoon (IP: 192.168.4.10)
+ESP32-CAM AI-Thinker — pyörittää omaa itsenäistä WiFi-AP:tä `SusieQ-Bow` (IP: 192.168.5.1). Satamassa puhelin vaihdetaan tähän verkkoon ja avataan http://192.168.5.1 jossa näkyy kameran kuva ja etäisyys laituriin.
 
 | Anturi | Tyyppi |
 |--------|--------|

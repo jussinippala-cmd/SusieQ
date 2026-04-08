@@ -3,7 +3,6 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
-#include <HTTPClient.h>
 #include <ArduinoOTA.h>
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -22,11 +21,6 @@ AsyncWebServer  server(80);
 AsyncWebSocket  ws("/ws");
 
 static unsigned long last_sensor_read = 0;
-
-// ─── Bow health check (runs on separate core to avoid blocking main loop) ──
-static volatile bool bow_online = false;
-static volatile int  bow_rssi   = 0;
-static void check_bow_task(void* param);  // forward declaration
 
 // ─── JSON builder ─────────────────────────────────────────────────────
 static JsonDocument doc;  // pre-allocated to reduce heap fragmentation
@@ -110,12 +104,6 @@ static String build_json() {
     }
     if (weather.ds_valid) {
         doc["weather"]["water_temp"] = round(weather.water_temp * 10) / 10.0;
-    }
-
-    // Bow unit status
-    doc["bow"]["online"] = bow_online;
-    if (bow_online) {
-        doc["bow"]["rssi"] = (int)bow_rssi;
     }
 
     // System uptime (64-bit to avoid 49-day millis() overflow)
@@ -228,31 +216,7 @@ void setup() {
     server.begin();
     Serial.println("[http] server started on port 80");
 
-    // Bow health check on core 0 (main loop runs on core 1)
-    xTaskCreatePinnedToCore(check_bow_task, "bow_chk", 4096, NULL, 1, NULL, 0);
-
     Serial.println("[SusieQ] ready — open http://192.168.4.1 on iPad");
-}
-
-// ─── Bow health check (FreeRTOS task, non-blocking) ──────────────────
-static void check_bow_task(void* param) {
-    for (;;) {
-        HTTPClient http;
-        http.setTimeout(2000);
-        http.begin("http://" BOW_IP "/status");
-        int code = http.GET();
-        if (code == 200) {
-            JsonDocument doc;
-            if (!deserializeJson(doc, http.getString())) {
-                bow_online = true;
-                bow_rssi   = doc["wifi_rssi"] | 0;
-            }
-        } else {
-            bow_online = false;
-        }
-        http.end();
-        vTaskDelay(pdMS_TO_TICKS(BOW_CHECK_INTERVAL_MS));
-    }
 }
 
 // ─── Loop ─────────────────────────────────────────────────────────────

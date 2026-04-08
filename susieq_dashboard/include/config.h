@@ -70,10 +70,6 @@
 #define RUM_BOTTLE_FULL_KG        0.7f     // full 0.7L bottle net weight in kg
 #define RUM_DENSITY               0.94f    // kg/L (approx for rum ~40% ABV)
 
-// ─── Bow unit (ESP32-CAM + TF-Luna) ─────────────────────────────────
-#define BOW_IP                  "192.168.4.10"
-#define BOW_CHECK_INTERVAL_MS   10000    // health check every 10 s
-
 // ─── Victron SmartSolar MPPT BLE ──────────────────────────────────────
 // Find these in VictronConnect: Device → Product Info
 // Leave VICTRON_KEY empty ("") to disable Victron BLE

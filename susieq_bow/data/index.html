@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d1117">
+<title>SusieQ — Keulakamera</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  header .sub {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 8px;
+  }
+  main {
+    padding: 12px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .cam-frame {
+    background: #000;
+    border-radius: 8px;
+    aspect-ratio: 4 / 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .cam-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  .cam-offline {
+    color: var(--muted);
+    font-size: 0.9rem;
+    position: absolute;
+  }
+  .distance-big {
+    font-size: 4rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1;
+    margin: 8px 0 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .distance-big .unit {
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+  .bar-track {
+    height: 12px;
+    background: #21262d;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--green);
+    transition: width 0.3s ease, background 0.3s ease;
+  }
+  .meta {
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  h2 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    letter-spacing: 0.03em;
+  }
+</style>
+</head>
+<body>
+<header>SusieQ<span class="sub">Keulakamera</span></header>
+<main>
+
+  <div class="card">
+    <h2>Kamera</h2>
+    <div class="cam-frame">
+      <div class="cam-offline" id="cam-offline">Yhdistetään…</div>
+      <img id="cam-img" alt="Keulakamera">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Etäisyys laituriin</h2>
+    <div class="distance-big" id="dist-val" style="color:var(--muted);">
+      <span id="dist-num">—</span><span class="unit">m</span>
+    </div>
+    <div class="bar-track">
+      <div class="bar-fill" id="dist-bar"></div>
+    </div>
+    <div class="meta">
+      <span id="dist-strength">Signaali: —</span>
+      <span id="dist-status">Odotetaan…</span>
+    </div>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  var img = document.getElementById("cam-img");
+  var off = document.getElementById("cam-offline");
+
+  function startStream() {
+    img.src = "http://192.168.5.1:81/stream?t=" + Date.now();
+  }
+  img.onload = function () { off.style.display = "none"; };
+  img.onerror = function () {
+    off.style.display = "block";
+    off.textContent = "Kamera — ei yhteyttä";
+    setTimeout(startStream, 2000);
+  };
+  startStream();
+
+  var dNum = document.getElementById("dist-num");
+  var dVal = document.getElementById("dist-val");
+  var dBar = document.getElementById("dist-bar");
+  var dStr = document.getElementById("dist-strength");
+  var dSta = document.getElementById("dist-status");
+  var MAX_M = 8;
+
+  function colorFor(m) {
+    if (m < 1)  return "var(--red)";
+    if (m < 3)  return "var(--yellow)";
+    return "var(--green)";
+  }
+
+  function pollDistance() {
+    fetch("/distance", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j.valid) {
+          var m = j.distance_cm / 100;
+          dNum.textContent = m.toFixed(2);
+          var c = colorFor(m);
+          dVal.style.color = c;
+          dBar.style.background = c;
+          var pct = Math.max(0, Math.min(100, (1 - m / MAX_M) * 100));
+          dBar.style.width = pct + "%";
+          dStr.textContent = "Signaali: " + j.strength;
+          dSta.textContent = "OK";
+        } else {
+          dNum.textContent = "—";
+          dVal.style.color = "var(--muted)";
+          dBar.style.width = "0%";
+          dSta.textContent = "Ei lukemaa";
+        }
+      })
+      .catch(function () {
+        dSta.textContent = "Yhteyskatkos";
+      });
+  }
+  pollDistance();
+  setInterval(pollDistance, 500);
+})();
+</script>
+</body>
+</html>

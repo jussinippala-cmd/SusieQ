@@ -1,13 +1,13 @@
 #pragma once
 
-// ─── WiFi (connect to cockpit AP as STA) ─────────────────────────────
-#define WIFI_SSID        "SusieQ-Data"
-#define WIFI_PASSWORD    "susieq123"
-
-// ─── Static IP for bow unit ──────────────────────────────────────────
-#define BOW_IP           "192.168.4.10"
-#define BOW_GATEWAY      "192.168.4.1"
-#define BOW_SUBNET       "255.255.255.0"
+// ─── WiFi Access Point (bow hosts its own AP) ────────────────────────
+// Phone connects directly to SusieQ-Bow when in harbor to view camera
+// and distance sensor. Different subnet + channel from cockpit AP to
+// avoid collisions.
+#define BOW_AP_SSID      "SusieQ-Bow"
+#define BOW_AP_PASSWORD  "susieq123"   // min 8 chars
+#define BOW_AP_CHANNEL   11            // cockpit uses ch 6 — keep separated
+#define BOW_AP_IP        "192.168.5.1" // different subnet from cockpit (4.x)
 
 // ─── TF-Luna LiDAR (UART) ───────────────────────────────────────────
 // ESP32-CAM: GPIO 14/15 are free when SD card is not used

@@ -1,7 +1,7 @@
 # SusieQ — C&C 28 Sailboat IoT System
 
 ## Project Overview
-Dual-ESP32 IoT system for a 1975 C&C 28 sailboat. Cockpit unit (ESP32-WROOM-32) runs WiFi AP + WebSocket dashboard. Bow unit (ESP32-CAM) provides camera + LiDAR.
+Dual-ESP32 IoT system for a 1975 C&C 28 sailboat. Cockpit unit (ESP32-WROOM-32) runs WiFi AP `SusieQ-Data` + WebSocket dashboard for sensors/navigation. Bow unit (ESP32-CAM) runs its OWN independent WiFi AP `SusieQ-Bow` serving a simple camera + LiDAR distance page — the two units are NOT networked together. In harbor, phone switches to `SusieQ-Bow` to see the bow camera.
 
 ## Directory Structure
 - `susieq_dashboard/` — Cockpit firmware (PlatformIO, ESP32-WROOM-32)
@@ -10,6 +10,7 @@ Dual-ESP32 IoT system for a 1975 C&C 28 sailboat. Cockpit unit (ESP32-WROOM-32) 
   - `data/index.html` — Full dashboard UI (HTML5/CSS/JS, ~2000 lines)
 - `susieq_bow/` — Bow unit firmware (PlatformIO, ESP32-CAM)
   - `src/` — Camera streaming, TF-Luna LiDAR, power management
+  - `data/index.html` — Bow's own phone-facing page (camera + distance)
 - `CC28_tekniset_tiedot.md` — Boat specs (Finnish)
 - `CC28_varustelu.md` — Equipment inventory (Finnish)
 - `CC28_kunnostus_ja_projektit.md` — Restoration projects & priorities (Finnish)
@@ -32,9 +33,9 @@ Dual-ESP32 IoT system for a 1975 C&C 28 sailboat. Cockpit unit (ESP32-WROOM-32) 
 - Sensor data serialized as flat JSON via ArduinoJson
 
 ## WiFi & Network
-- Cockpit AP: SSID `SusieQ-Data`, password `susieq123`, IP `192.168.4.1`
-- Bow unit STA: static IP `192.168.4.10`
-- OTA hostnames: `susieq-cockpit.local`, `susieq-bow.local`
+- Cockpit AP: SSID `SusieQ-Data`, password `susieq123`, IP `192.168.4.1`, channel 6
+- Bow AP: SSID `SusieQ-Bow`, password `susieq123`, IP `192.168.5.1`, channel 11 (independent — not connected to cockpit)
+- OTA: connect laptop to the relevant unit's AP, then `pio run -e ...-ota -t upload`
 
 ## Sensors (Cockpit)
 - Wind: RS485 Modbus ultrasonic anemometer (GPIO 16/17/4)

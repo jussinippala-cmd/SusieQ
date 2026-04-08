@@ -3,6 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
+#include <LittleFS.h>
 #include "esp_camera.h"
 #include "esp_wifi.h"
 #include "../include/config.h"
@@ -261,38 +262,18 @@ static void handle_status(AsyncWebServerRequest* request) {
     request->send(200, "application/json", out);
 }
 
-// ─── WiFi STA connect (blocking, used only in setup) ────────────────
-static void wifi_apply_config() {
-    IPAddress ip, gateway, subnet;
-    ip.fromString(BOW_IP);
-    gateway.fromString(BOW_GATEWAY);
-    subnet.fromString(BOW_SUBNET);
-    WiFi.config(ip, gateway, subnet);
-}
-
-static void connect_wifi_blocking() {
-    WiFi.mode(WIFI_STA);
-    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
-    wifi_apply_config();
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+// ─── WiFi AP (bow hosts its own network) ─────────────────────────────
+static void start_wifi_ap() {
+    WiFi.mode(WIFI_AP);
+    IPAddress ip; ip.fromString(BOW_AP_IP);
+    IPAddress subnet(255, 255, 255, 0);
+    WiFi.softAPConfig(ip, ip, subnet);
+    WiFi.softAP(BOW_AP_SSID, BOW_AP_PASSWORD, BOW_AP_CHANNEL);
     esp_wifi_set_ps(WIFI_PS_NONE);
     esp_wifi_set_max_tx_power(82);  // 20.5 dBm max
-
-    Serial.printf("[wifi] connecting to %s as %s...\n", WIFI_SSID, BOW_IP);
-
-    int retries = 0;
-    while (WiFi.status() != WL_CONNECTED && retries < 40) {
-        delay(500);
-        Serial.print(".");
-        retries++;
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf("\n[wifi] connected! IP: %s  RSSI: %d dBm\n",
-                      WiFi.localIP().toString().c_str(), WiFi.RSSI());
-    } else {
-        Serial.println("\n[wifi] connection failed — will retry in loop");
-    }
+    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
+    Serial.printf("[wifi] AP started: %s  IP: %s  ch: %d\n",
+                  BOW_AP_SSID, WiFi.softAPIP().toString().c_str(), BOW_AP_CHANNEL);
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────
@@ -314,8 +295,15 @@ void setup() {
     pinMode(PWDN_GPIO_NUM, OUTPUT);
     digitalWrite(PWDN_GPIO_NUM, HIGH);  // camera powered down
 
+    // Filesystem (serves /index.html)
+    if (!LittleFS.begin(true)) {
+        Serial.println("[fs] LittleFS mount failed!");
+    } else {
+        Serial.println("[fs] LittleFS mounted");
+    }
+
     lidar_init();
-    connect_wifi_blocking();
+    start_wifi_ap();
     esp_wifi_set_ps(WIFI_PS_MIN_MODEM);  // modem sleep until first request
 
     // F8: CORS via DefaultHeaders — no need for per-handler addHeader
@@ -323,9 +311,16 @@ void setup() {
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
 
+    // Root: serve bow's own dashboard (camera + distance)
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(LittleFS, "/index.html", "text/html");
+    });
+
     server.on("/capture",  HTTP_GET, handle_capture);
     server.on("/distance", HTTP_GET, handle_distance);
     server.on("/status",   HTTP_GET, handle_status);
+
+    server.serveStatic("/", LittleFS, "/");
 
     server.on("/sleep", HTTP_POST, [](AsyncWebServerRequest* req) {
         if (bow_sleep()) {
@@ -371,11 +366,10 @@ void setup() {
     ArduinoOTA.begin();
     Serial.printf("[ota] ready — hostname: %s\n", OTA_HOSTNAME);
 
-    Serial.printf("[SusieQ-Bow] ready — stream: http://%s:81/stream\n", BOW_IP);
+    Serial.printf("[SusieQ-Bow] ready — open http://%s on phone\n", BOW_AP_IP);
 }
 
 // ─── Loop ────────────────────────────────────────────────────────────
-static unsigned long _lastWifiCheck = 0;
 static unsigned long _lastLidarPoll = 0;
 static const unsigned long LIDAR_POLL_MS = 1000 / LIDAR_READ_HZ;  // 250ms at 4Hz
 
@@ -394,15 +388,6 @@ void loop() {
             xSemaphoreGive(_lidarMutex);
             _lastLidarPoll = millis();
         }
-    }
-
-    // F3: non-blocking WiFi reconnect WITH static IP re-application
-    if (WiFi.status() != WL_CONNECTED && (millis() - _lastWifiCheck > 10000)) {
-        _lastWifiCheck = millis();
-        Serial.println("[wifi] disconnected, reconnecting...");
-        WiFi.disconnect();
-        wifi_apply_config();
-        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     }
 
     delay(10);

@@ -460,78 +460,6 @@
     font-weight: 400;
   }
 
-  /* ── Satama: camera + distance ────────────────────────────────────── */
-  .cam-frame {
-    width: 100%;
-    aspect-ratio: 3/2;
-    background: #21262d;
-    border-radius: 8px;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border);
-  }
-
-  .cam-frame img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .cam-offline {
-    color: var(--muted);
-    font-size: 0.8rem;
-    text-align: center;
-  }
-
-  .distance-big {
-    font-size: 4rem;
-    font-weight: 700;
-    line-height: 1;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .distance-unit {
-    font-size: 1.2rem;
-    color: var(--muted);
-    font-weight: 400;
-  }
-
-  .proximity-bar-track {
-    width: 100%;
-    height: 12px;
-    background: #21262d;
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-  }
-
-  .proximity-bar-fill {
-    height: 100%;
-    border-radius: 6px;
-    transition: width 0.4s ease, background 0.4s ease;
-  }
-
-  .bow-status-row {
-    display: flex;
-    gap: 16px;
-    font-size: 0.75rem;
-    color: var(--muted);
-    align-items: center;
-  }
-
-  .bow-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--red);
-    transition: background 0.4s;
-    display: inline-block;
-  }
-  .bow-dot.online { background: var(--green); }
-
   /* ── Stale overlay ────────────────────────────────────────────────── */
   .stale { opacity: 0.35; transition: opacity 0.4s; }
 
@@ -745,7 +673,6 @@
   <button class="tab" data-tab="battery">Akku</button>
   <button class="tab" data-tab="tanks">Tankit</button>
   <button class="tab" data-tab="weather">Sää</button>
-  <button class="tab" data-tab="satama">Satama</button>
 </nav>
 
 <div id="tab-wind" class="tab-panel active">
@@ -988,35 +915,6 @@
 
 </div><!-- #tab-weather -->
 
-<div id="tab-satama" class="tab-panel">
-
-  <!-- Keulakamera -->
-  <div class="card" id="card-cam" style="margin-bottom: 12px;">
-    <h2>Keulakamera</h2>
-    <div class="cam-frame" id="cam-frame">
-      <div class="cam-offline" id="cam-offline-msg">Kamera — ei yhteyttä</div>
-      <img id="cam-img" style="display:none" alt="Keulakamera">
-    </div>
-  </div>
-
-  <!-- Etäisyysmittari -->
-  <div class="card" id="card-distance">
-    <h2>Etäisyys laituriin</h2>
-    <div class="distance-big" id="distance-val" style="color:var(--green);">
-      <span id="distance-num">—</span><span class="distance-unit"> m</span>
-    </div>
-    <div class="proximity-bar-track">
-      <div class="proximity-bar-fill" id="proximity-fill" style="width:0%; background:var(--green);"></div>
-    </div>
-    <div class="bow-status-row">
-      <span><span class="bow-dot" id="bow-dot"></span> Keulayksikkö</span>
-      <span id="bow-status-text">Offline</span>
-      <span id="bow-rssi"></span>
-    </div>
-  </div>
-
-</div><!-- #tab-satama -->
-
 <!-- ═══ Help overlay + slide-over panel ═══ -->
 <div class="help-overlay" id="help-overlay" onclick="toggleHelp()"></div>
 <div class="help-panel" id="help-panel">
@@ -1126,8 +1024,10 @@
           <li><strong>Akku:</strong> Jännite, virta, SOC %, teho (W). Aurinkopaneelin tuotto ja latausvaihe. Energiavirtakaavio.</li>
           <li><strong>Tankit:</strong> Vesitankki (15 L), polttoaine (25 L), rommi (0,7 L). Tara-napit kalibrointiin.</li>
           <li><strong>Sää:</strong> Ilman lämpötila, kosteus, ilmanpaine + trendi (AHT20/BMP280). Järviveden lämpötila (DS18B20).</li>
-          <li><strong>Satama:</strong> Keulakamera (MJPEG-stream), LiDAR-etäisyysmittari (TF-Luna, 8 m).</li>
         </ul>
+
+        <h4>Keulakamera satamassa</h4>
+        <p>Satamaan saavuttaessa keulayksikön kamera ja etäisyysmittari ovat käytössä bow-yksikön omasta WiFi-verkosta. Vaihda puhelin/iPad verkkoon <strong>SusieQ-Bow</strong> (salasana <code>susieq123</code>) ja avaa selaimessa <a href="http://192.168.5.1">http://192.168.5.1</a>. Siellä näet kameran live-kuvan ja etäisyyden laituriin. Palaa tähän dashboardiin vaihtamalla takaisin <strong>SusieQ-Data</strong>-verkkoon.</p>
 
         <h4>Tilailmaisimet</h4>
         <ul>
@@ -1346,7 +1246,7 @@
           <tr><td>Akku ei näy</td><td>Victron BLE: encryption key config.h:ssa, BLE kantama</td></tr>
           <tr><td>Tuulianturi ei vastaa</td><td>Modbus slave ID (1), baud (4800), DE-nasta GPIO 4</td></tr>
           <tr><td>Vaaka lukee väärin</td><td>Kalibrointikerroin, tee tara uudelleen</td></tr>
-          <tr><td>Kamera ei toimi</td><td>Keulayksikön IP 192.168.4.10, virta OK?</td></tr>
+          <tr><td>Kamera ei toimi</td><td>Liity SusieQ-Bow-verkkoon ja avaa http://192.168.5.1</td></tr>
         </table>
       </div>
     </details>
@@ -1943,194 +1843,6 @@ function tareRum() {
     .catch(function(e) { alert("Virhe: " + e); });
 }
 
-// ─── Satama: camera stream + LiDAR distance ──────────────────────────
-var CAM_STREAM_URL   = "http://192.168.4.10:81/stream";
-var CAM_DISTANCE_URL = "http://192.168.4.10/distance";
-var CAM_STATUS_URL   = "http://192.168.4.10/status";
-var CAM_SLEEP_URL    = "http://192.168.4.10/sleep";
-var CAM_WAKE_URL     = "http://192.168.4.10/wake";
-var _distanceTimer       = null;
-var _satamaActive        = false;
-var _satamaAbort         = null;  // H5: AbortController to cancel pending sleep/wake
-var _camWatchdog         = null;
-var _camReconnectAttempts = 0;
-
-// M8: AbortSignal.timeout polyfill for Safari <16.4 / older Chrome
-function fetchWithTimeout(url, options, timeoutMs) {
-  var controller = new AbortController();
-  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
-  options = options || {};
-  // If caller provided a signal (e.g. _satamaAbort), chain abort to our controller
-  if (options.signal) {
-    var outerSignal = options.signal;
-    if (outerSignal.aborted) { clearTimeout(timer); return Promise.reject(new DOMException("Aborted", "AbortError")); }
-    outerSignal.addEventListener("abort", function() { controller.abort(); }, { once: true });
-  }
-  options.signal = controller.signal;
-  try {
-    return fetch(url, options).finally(function() { clearTimeout(timer); });
-  } catch (e) {
-    clearTimeout(timer);
-    return Promise.reject(e);
-  }
-}
-
-function reconnectCamStream() {
-  var img = document.getElementById("cam-img");
-  img.onerror = null;
-  img.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
-  setTimeout(function() {
-    if (!_satamaActive) return;
-    setCamStreamSrc(img);
-  }, 500);
-}
-
-function setCamStreamSrc(img) {
-  var msg = document.getElementById("cam-offline-msg");
-  img.onload = function() {
-    _camReconnectAttempts = 0;
-    img.style.display = "block";
-    msg.style.display = "none";
-  };
-  img.onerror = function() {
-    if (!_satamaActive) return;
-    _camReconnectAttempts++;
-    var delay = Math.min(1000 * Math.pow(1.5, _camReconnectAttempts), 10000);
-    img.style.display = "none";
-    msg.style.display = "block";
-    msg.textContent = "Kamera — yhdistetään…";
-    setTimeout(function() {
-      if (_satamaActive) reconnectCamStream();
-    }, delay);
-  };
-  img.src = CAM_STREAM_URL + "?t=" + Date.now();
-  img.style.display = "block";
-  msg.style.display = "none";
-}
-
-function startCamWatchdog() {
-  clearInterval(_camWatchdog);
-  var streamStarted = Date.now();
-  _camWatchdog = setInterval(function() {
-    if (!_satamaActive) { clearInterval(_camWatchdog); return; }
-    var img = document.getElementById("cam-img");
-    if (img.naturalWidth === 0 && (Date.now() - streamStarted > 8000)) {
-      reconnectCamStream();
-      streamStarted = Date.now();
-    }
-  }, 3000);
-}
-
-function startCamStream() {
-  var img = document.getElementById("cam-img");
-  var msg = document.getElementById("cam-offline-msg");
-  img.style.display = "none";
-  msg.style.display = "block";
-  msg.textContent = "Kamera — käynnistyy…";
-  _camReconnectAttempts = 0;
-
-  // D1: use _satamaAbort signal so stopSatama() can cancel this wake request
-  var wakeOpts = { method: "POST" };
-  if (_satamaAbort) wakeOpts.signal = _satamaAbort.signal;
-
-  fetchWithTimeout(CAM_WAKE_URL, wakeOpts, 3000)
-    .catch(function() {})  // bow may already be awake, or request cancelled
-    .then(function() {
-      if (!_satamaActive) return;  // tab switched away during wake
-      setTimeout(function() {
-        if (!_satamaActive) return;
-        setCamStreamSrc(img);
-        startCamWatchdog();
-      }, 400);  // camera sensor init after wake response
-    });
-}
-
-function stopCamStream() {
-  var img = document.getElementById("cam-img");
-  img.onerror = null;
-  img.onload = null;
-  clearInterval(_camWatchdog);
-  // M6: data URI reliably closes MJPEG TCP connection (vs empty string)
-  img.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
-  img.style.display = "none";
-  document.getElementById("cam-offline-msg").style.display = "block";
-}
-
-// M7: chained polling — next poll starts after previous completes
-function fetchDistance() {
-  return fetchWithTimeout(CAM_DISTANCE_URL, {}, 2000)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.valid) {
-        updateDistance(data.distance_cm / 100.0);
-      }
-      setBowOnline(true);
-    })
-    .catch(function() {
-      setBowOnline(false);
-    });
-}
-
-function updateDistance(m) {
-  var el = document.getElementById("distance-val");
-  var numEl = document.getElementById("distance-num");
-  var fill = document.getElementById("proximity-fill");
-  var maxDist = 8.0;
-  var clamped = Math.max(0, Math.min(maxDist, m));
-  var pct = ((maxDist - clamped) / maxDist) * 100;
-
-  var color;
-  if (m > 2.0) color = "var(--green)";
-  else if (m > 0.5) color = "var(--yellow)";
-  else color = "var(--red)";
-
-  numEl.textContent = m.toFixed(2);  // L5: textContent instead of innerHTML
-  el.style.color = color;
-  fill.style.width = pct + "%";
-  fill.style.background = color;
-}
-
-function setBowOnline(online) {
-  var dot = document.getElementById("bow-dot");
-  var txt = document.getElementById("bow-status-text");
-  dot.classList.toggle("online", online);
-  txt.textContent = online ? "Online" : "Offline";
-}
-
-// M7: chained distance polling — no overlapping requests
-function startDistancePolling() {
-  function poll() {
-    if (!_satamaActive) return;
-    fetchDistance().then(function() {
-      if (_satamaActive) {
-        _distanceTimer = setTimeout(poll, 150);
-      }
-    });
-  }
-  poll();
-}
-
-function startSatama() {
-  // D1: abort any pending sleep, create new controller for this session
-  if (_satamaAbort) _satamaAbort.abort();
-  _satamaAbort = new AbortController();
-  _satamaActive = true;
-  startCamStream();  // uses _satamaAbort.signal for wake request
-  startDistancePolling();
-}
-
-function stopSatama() {
-  // D1: abort any pending wake (startCamStream uses _satamaAbort.signal)
-  if (_satamaAbort) _satamaAbort.abort();
-  _satamaAbort = new AbortController();
-  _satamaActive = false;
-  stopCamStream();
-  if (_distanceTimer) { clearTimeout(_distanceTimer); _distanceTimer = null; }
-  // Tell bow unit to sleep (fire-and-forget — idle timeout is fallback)
-  fetch(CAM_SLEEP_URL, { method: "POST", signal: _satamaAbort.signal })
-    .catch(function() {});
-}
-
 // ─── Tab navigation ────────────────────────────────────────────────────
 document.querySelectorAll(".tab").forEach(function(btn) {
   btn.addEventListener("click", function() {
@@ -2138,13 +1850,6 @@ document.querySelectorAll(".tab").forEach(function(btn) {
     document.querySelectorAll(".tab-panel").forEach(function(p) { p.classList.remove("active"); });
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-
-    // Start/stop Satama stream based on active tab
-    if (btn.dataset.tab === "satama") {
-      startSatama();
-    } else if (_satamaActive) {
-      stopSatama();
-    }
   });
 });
 
