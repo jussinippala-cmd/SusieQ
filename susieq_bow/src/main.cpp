@@ -35,7 +35,8 @@ AsyncWebServer server(80);
 static unsigned long _bootTime              = 0;
 volatile PowerState _powerState             = POWER_AWAKE;
 volatile unsigned long _lastActivity        = 0;
-SemaphoreHandle_t _camMutex                 = NULL;  // protects camera + lidar hw
+SemaphoreHandle_t _camMutex                 = NULL;  // protects camera hw
+static SemaphoreHandle_t _lidarMutex        = NULL;  // protects lidar UART reads
 static volatile bool _cameraOk              = false; // R4: track camera init status
 
 // ─── Camera init ──────────────────────────────────────────────────────
@@ -83,6 +84,11 @@ static bool init_camera() {
         _cameraOk = false;
         return false;
     }
+    sensor_t* s = esp_camera_sensor_get();
+    if (s != NULL) {
+        s->set_raw_gma(s, 1);
+    }
+
     Serial.println("[cam] camera initialized");
     _cameraOk = true;
     return true;
@@ -165,7 +171,9 @@ bool bow_wake() {
     vTaskDelay(pdMS_TO_TICKS(10));
 
     if (!init_camera()) {
-        Serial.println("[power] WARNING: camera reinit failed after wake");
+        Serial.println("[power] WARNING: camera reinit failed — staying in sleep");
+        xSemaphoreGive(_camMutex);
+        return false;
     }
 
     lidar_flush();  // discard stale UART data
@@ -218,19 +226,12 @@ static void handle_distance(AsyncWebServerRequest* request) {
         return;
     }
 
-    // Bounded timeout — don't stall async web server task
-    if (!xSemaphoreTake(_camMutex, pdMS_TO_TICKS(500))) {
-        request->send(503, "application/json", "{\"valid\":false}");
-        return;
-    }
-    // R4: re-check state after acquiring mutex (TOCTOU protection)
-    if (_powerState != POWER_AWAKE) {
-        xSemaphoreGive(_camMutex);
+    if (!xSemaphoreTake(_lidarMutex, pdMS_TO_TICKS(200))) {
         request->send(503, "application/json", "{\"valid\":false}");
         return;
     }
     LidarData ld = lidar_read();
-    xSemaphoreGive(_camMutex);
+    xSemaphoreGive(_lidarMutex);
 
     JsonDocument doc;
     doc["valid"] = ld.valid;
@@ -271,8 +272,11 @@ static void wifi_apply_config() {
 
 static void connect_wifi_blocking() {
     WiFi.mode(WIFI_STA);
+    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
     wifi_apply_config();
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    esp_wifi_set_ps(WIFI_PS_NONE);
+    esp_wifi_set_max_tx_power(82);  // 20.5 dBm max
 
     Serial.printf("[wifi] connecting to %s as %s...\n", WIFI_SSID, BOW_IP);
 
@@ -299,13 +303,20 @@ void setup() {
     Serial.println("\n[SusieQ-Bow] starting up...");
 
     _camMutex = xSemaphoreCreateMutex();
-
-    if (!init_camera()) {
-        Serial.println("[bow] FATAL: camera init failed");
+    _lidarMutex = xSemaphoreCreateMutex();
+    if (!_camMutex || !_lidarMutex) {
+        Serial.println("[bow] FATAL: mutex creation failed — halting");
+        while (true) { delay(1000); }
     }
+
+    // Boot in sleep state — wake on first request to save power
+    _powerState = POWER_SLEEPING;
+    pinMode(PWDN_GPIO_NUM, OUTPUT);
+    digitalWrite(PWDN_GPIO_NUM, HIGH);  // camera powered down
 
     lidar_init();
     connect_wifi_blocking();
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);  // modem sleep until first request
 
     // F8: CORS via DefaultHeaders — no need for per-handler addHeader
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
@@ -366,7 +377,7 @@ void setup() {
 // ─── Loop ────────────────────────────────────────────────────────────
 static unsigned long _lastWifiCheck = 0;
 static unsigned long _lastLidarPoll = 0;
-static const unsigned long LIDAR_POLL_MS = 1000 / LIDAR_READ_HZ;  // 50ms at 20Hz
+static const unsigned long LIDAR_POLL_MS = 1000 / LIDAR_READ_HZ;  // 250ms at 4Hz
 
 void loop() {
     ArduinoOTA.handle();
@@ -376,12 +387,11 @@ void loop() {
         bow_sleep();
     }
 
-    // R3: rate-limit lidar polling to match sensor output rate (20Hz)
-    // Reduces unnecessary mutex contention with stream handler
+    // Rate-limit lidar polling (4Hz) — uses own mutex, no camera contention
     if (_powerState == POWER_AWAKE && (millis() - _lastLidarPoll >= LIDAR_POLL_MS)) {
-        if (xSemaphoreTake(_camMutex, pdMS_TO_TICKS(50))) {
+        if (xSemaphoreTake(_lidarMutex, pdMS_TO_TICKS(50))) {
             lidar_read();
-            xSemaphoreGive(_camMutex);
+            xSemaphoreGive(_lidarMutex);
             _lastLidarPoll = millis();
         }
     }

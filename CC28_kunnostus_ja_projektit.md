@@ -155,7 +155,7 @@ Veneessä on ollut hankintahetkellä seuraavat purjeet — nämä ovat lähtöti
 
 ---
 
-## Talvitytys Suomessa
+## Talvisäilytys Suomessa
 
 | Kuukausi | Toimenpiteet |
 |---|---|

@@ -32,12 +32,19 @@ void tanks_init() {
 }
 
 // Call with empty tank resting on scale; saves tare to flash
+// Debounced: ignores calls within 10 s of last tare to protect NVS flash
+static unsigned long last_tare_ms = 0;
 void water_tare() {
+    if (millis() - last_tare_ms < 10000) {
+        Serial.println("[water] tare debounced — wait 10s");
+        return;
+    }
     water_scale.tare();
     tare_offset = water_scale.get_offset();
     prefs.begin("water", false);
     prefs.putFloat("tare", tare_offset);
     prefs.end();
+    last_tare_ms = millis();
     Serial.println("[water] tare saved");
 }
 

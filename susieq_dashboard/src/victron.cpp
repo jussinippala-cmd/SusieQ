@@ -19,9 +19,30 @@
 //   0x0E = Battery current (mA, signed)
 //   0x15 = Panel voltage (mV)
 
-// VICTRON_ENABLED is set automatically based on VICTRON_KEY in config.h
+// ─── 12V lead-acid/AGM voltage → SOC lookup table (21 points, 5% steps) ──
+static const float soc_v_table[21] = {
+    11.51f, 11.66f, 11.81f, 11.96f, 12.00f,  //  0– 20 %
+    12.06f, 12.12f, 12.20f, 12.32f, 12.42f,  // 25– 45 %
+    12.50f, 12.60f, 12.70f, 12.79f, 12.88f,  // 50– 70 %
+    12.98f, 13.05f, 13.11f, 13.20f, 13.30f,  // 75– 95 %
+    13.40f                                     // 100 %
+};
+
+float battery_voltage_to_soc(float v) {
+    if (v <= soc_v_table[0])  return 0.0f;
+    if (v >= soc_v_table[20]) return 100.0f;
+    for (int i = 0; i < 20; i++) {
+        if (v >= soc_v_table[i] && v < soc_v_table[i + 1]) {
+            float frac = (v - soc_v_table[i]) / (soc_v_table[i + 1] - soc_v_table[i]);
+            return (i + frac) * 5.0f;
+        }
+    }
+    return 0.0f;
+}
+
+// VICTRON_ENABLED is set in config.h (default 1)
 #ifndef VICTRON_ENABLED
-  #define VICTRON_ENABLED 0
+  #define VICTRON_ENABLED 1
 #endif
 
 #if VICTRON_ENABLED
@@ -33,6 +54,7 @@
 #define STALE_TIMEOUT_MS         30000    // data older than 30 s = stale
 
 static VictronData latest;
+static portMUX_TYPE victron_mux = portMUX_INITIALIZER_UNLOCKED;
 static String target_name = VICTRON_NAME;
 
 // ── AES-128-CCM decrypt helper ──────────────────────────────────────────
@@ -40,6 +62,9 @@ static bool decrypt_payload(const uint8_t* key_hex_str,
                              const uint8_t* nonce, size_t nonce_len,
                              const uint8_t* cipher, size_t cipher_len,
                              uint8_t* plain) {
+    // Validate key length before accessing bytes
+    if (strlen((const char*)key_hex_str) < 32) return false;
+
     // Convert 32-char hex key string to 16-byte binary
     uint8_t key[16];
     for (int i = 0; i < 16; i++) {
@@ -114,14 +139,20 @@ class VictronAdvCB : public NimBLEAdvertisedDeviceCallbacks {
                 case 0x15: latest.pv_voltage      = val / 1000.0f; break;
             }
         }
+        portENTER_CRITICAL(&victron_mux);
         latest.valid       = true;
         latest.last_seen_ms = millis();
+        portEXIT_CRITICAL(&victron_mux);
     }
 };
 
 static VictronAdvCB advCB;
 
 void victron_init() {
+    if (strlen(VICTRON_KEY) < 32) {
+        Serial.println("[victron] WARNING: VICTRON_KEY not set or too short — BLE scan disabled");
+        return;
+    }
     NimBLEDevice::init("");
     NimBLEScan* scan = NimBLEDevice::getScan();
     scan->setAdvertisedDeviceCallbacks(&advCB, true);
@@ -133,11 +164,18 @@ void victron_init() {
 }
 
 VictronData victron_get() {
+    portENTER_CRITICAL(&victron_mux);
+    VictronData copy = latest;
+    portEXIT_CRITICAL(&victron_mux);
+
     // Mark stale if we haven't seen an advert recently
-    if (latest.valid && (millis() - latest.last_seen_ms > STALE_TIMEOUT_MS)) {
+    if (copy.valid && (millis() - copy.last_seen_ms > STALE_TIMEOUT_MS)) {
+        copy.valid = false;
+        portENTER_CRITICAL(&victron_mux);
         latest.valid = false;
+        portEXIT_CRITICAL(&victron_mux);
     }
-    return latest;
+    return copy;
 }
 
 #else  // VICTRON_KEY not set — stub implementation

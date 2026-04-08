@@ -236,6 +236,7 @@
 
   .bar-fill.water { background: linear-gradient(to top, #1c5fa5, #58a6ff); }
   .bar-fill.fuel  { background: linear-gradient(to top, #7d4e0f, #db6d28); }
+  .bar-fill.rum   { background: linear-gradient(to top, #5a1a00, #d4a017); }
 
   .bar-value {
     font-size: 1.5rem;
@@ -462,7 +463,7 @@
   /* ── Satama: camera + distance ────────────────────────────────────── */
   .cam-frame {
     width: 100%;
-    aspect-ratio: 4/3;
+    aspect-ratio: 3/2;
     background: #21262d;
     border-radius: 8px;
     overflow: hidden;
@@ -533,15 +534,204 @@
 
   /* ── Stale overlay ────────────────────────────────────────────────── */
   .stale { opacity: 0.35; transition: opacity 0.4s; }
+
+  /* ── Help panel (slide-over) ────────────────────────────────────── */
+  .help-overlay {
+    position: fixed; inset: 0; z-index: 900;
+    background: rgba(0,0,0,0.5);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .help-overlay.open { opacity: 1; pointer-events: auto; }
+
+  .help-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 901;
+    width: min(420px, 88vw);
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+  }
+  .help-panel.open { transform: translateX(0); }
+
+  .help-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 4px 10px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg); z-index: 1;
+  }
+  .help-header h2 { font-size: 1.1rem; font-weight: 700; }
+  .help-close {
+    background: none; border: none; color: var(--muted); font-size: 1.5rem;
+    cursor: pointer; padding: 4px 8px; line-height: 1;
+  }
+
+  .help-body { padding: 12px 4px 40px; }
+  .help-body h3 {
+    font-size: 0.95rem; color: var(--blue); margin: 18px 0 6px;
+    padding-bottom: 4px; border-bottom: 1px solid var(--border);
+  }
+  .help-body h3:first-child { margin-top: 4px; }
+  .help-body h4 { font-size: 0.88rem; margin: 12px 0 4px; color: var(--text); }
+  .help-body p { font-size: 0.85rem; margin: 4px 0; color: var(--text); line-height: 1.5; }
+  .help-body ul, .help-body ol { font-size: 0.85rem; padding-left: 20px; margin: 4px 0 10px; }
+  .help-body li { margin-bottom: 3px; line-height: 1.5; }
+  .help-body table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 0.8rem; }
+  .help-body th, .help-body td { text-align: left; padding: 6px 8px; border: 1px solid var(--border); }
+  .help-body th { background: rgba(88,166,255,0.08); color: var(--blue); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+  .help-body code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 0.82em; }
+  .help-warn {
+    background: rgba(248,81,73,0.08); border-left: 3px solid var(--red);
+    padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 8px 0; font-size: 0.83rem;
+  }
+  .help-info {
+    background: rgba(88,166,255,0.08); border-left: 3px solid var(--blue);
+    padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 8px 0; font-size: 0.83rem;
+  }
+  .help-tip {
+    background: rgba(63,185,80,0.08); border-left: 3px solid var(--green);
+    padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 8px 0; font-size: 0.83rem;
+  }
+  .help-section {
+    border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px;
+  }
+  .help-section > summary {
+    font-size: 0.9rem; font-weight: 600; padding: 10px 14px; cursor: pointer;
+    list-style: none; display: flex; align-items: center; gap: 8px;
+    background: var(--card); border-radius: 8px;
+  }
+  .help-section[open] > summary { border-radius: 8px 8px 0 0; border-bottom: 1px solid var(--border); }
+  .help-section > summary::-webkit-details-marker { display: none; }
+  .help-section > summary::before { content: "\25B6"; font-size: 0.6em; color: var(--muted); transition: transform 0.2s; }
+  .help-section[open] > summary::before { transform: rotate(90deg); }
+  .help-section-body { padding: 12px 14px; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>⛵ SusieQ</h1>
-  <div id="status">
-    <div id="dot"></div>
-    <span id="status-text">Yhdistetään…</span>
+  <h1><svg viewBox="0 0 180 85" width="52" height="24" style="vertical-align:middle;margin-right:4px">
+    <defs>
+      <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur"/>
+        <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+      </filter>
+      <filter id="neon" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="glow1"/>
+        <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="glow2"/>
+        <feMerge><feMergeNode in="glow1"/><feMergeNode in="glow2"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <radialGradient id="eyeGlow" cx="50%" cy="50%" r="70%">
+        <stop offset="0%" stop-color="#ff2222" stop-opacity="1"/>
+        <stop offset="40%" stop-color="#ff4444" stop-opacity="0.8"/>
+        <stop offset="100%" stop-color="#f85149" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="bodyFill" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#4a5568"/>
+        <stop offset="50%" stop-color="#3a4250"/>
+        <stop offset="100%" stop-color="#2d3748"/>
+      </linearGradient>
+    </defs>
+
+    <g filter="url(#glow)">
+      <!-- Main body -->
+      <path d="M65,42 C70,36 78,30 85,28 L90,27 C96,28 102,32 108,38
+               C112,42 116,46 118,48 C114,50 108,52 104,50
+               C100,48 96,46 92,44 C88,42 82,42 78,44
+               C74,46 70,46 65,42 Z"
+            fill="url(#bodyFill)" stroke="#9eafca" stroke-width="1.6" stroke-linejoin="round"/>
+
+      <!-- Left wing -->
+      <path d="M76,36 C70,30 58,20 46,14 C38,10 28,8 16,8
+               C10,8 6,10 8,12
+               C14,16 22,20 32,24 C42,28 54,34 64,40
+               L76,36 Z"
+            fill="url(#bodyFill)" stroke="#9eafca" stroke-width="1.6" stroke-linejoin="round"/>
+
+      <!-- Right wing -->
+      <path d="M100,32 C108,24 120,16 134,12 C144,9 154,8 164,9
+               C168,10 170,12 168,14
+               C162,18 152,22 142,26 C130,32 118,38 110,42
+               L100,32 Z"
+            fill="url(#bodyFill)" stroke="#9eafca" stroke-width="1.6" stroke-linejoin="round"/>
+
+      <!-- Head detail -->
+      <path d="M65,42 C62,40 58,38 55,38 C52,38 50,40 48,42
+               C46,44 44,46 42,48 L44,47 C46,45 50,42 54,40
+               C58,38 62,40 65,42 Z"
+            fill="url(#bodyFill)" stroke="#9eafca" stroke-width="1.4" stroke-linejoin="round"/>
+
+      <!-- Beak -->
+      <path d="M48,41 C45,43 42,46 41,48
+               C40,50 40,50 41,48 C42,45 44,42 46,40
+               C47,39 48,40 48,41 Z"
+            fill="#4a5568" stroke="#9eafca" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M48,41 C45,44 42,47 41,48" fill="none" stroke="#6b7a8d" stroke-width="0.7" opacity="0.6"/>
+
+      <!-- Tail feathers -->
+      <path d="M118,48 C122,52 128,58 134,64 C136,66 138,68 140,70
+               C138,70 134,68 130,64 C126,60 122,56 118,52 Z"
+            fill="url(#bodyFill)" stroke="#9eafca" stroke-width="1.4"/>
+      <path d="M116,50 C120,54 124,60 128,66 C130,68 132,72 134,74
+               C132,74 128,70 124,66 C120,60 116,54 114,50 Z"
+            fill="url(#bodyFill)" stroke="#9eafca" stroke-width="1.4"/>
+      <path d="M114,50 C116,54 118,60 120,66 C122,70 124,74 126,76
+               C124,76 120,72 118,66 C114,60 112,54 112,50 Z"
+            fill="url(#bodyFill)" stroke="#9eafca" stroke-width="1.4"/>
+
+      <!-- Left wing feather grooves -->
+      <line x1="24" y1="11" x2="34" y2="18" stroke="#1a2030" stroke-width="1.2"/>
+      <line x1="22" y1="14" x2="32" y2="21" stroke="#1a2030" stroke-width="1.2"/>
+      <line x1="20" y1="17" x2="30" y2="24" stroke="#1a2030" stroke-width="1.2"/>
+      <line x1="18" y1="20" x2="28" y2="27" stroke="#1a2030" stroke-width="1.2"/>
+      <line x1="25" y1="11" x2="35" y2="18" stroke="#5a6577" stroke-width="0.5" opacity="0.4"/>
+      <line x1="23" y1="14" x2="33" y2="21" stroke="#5a6577" stroke-width="0.5" opacity="0.4"/>
+      <line x1="21" y1="17" x2="31" y2="24" stroke="#5a6577" stroke-width="0.5" opacity="0.4"/>
+      <line x1="19" y1="20" x2="29" y2="27" stroke="#5a6577" stroke-width="0.5" opacity="0.4"/>
+
+      <!-- Right wing feather grooves -->
+      <line x1="156" y1="12" x2="144" y2="20" stroke="#1a2030" stroke-width="1.2"/>
+      <line x1="158" y1="15" x2="146" y2="22" stroke="#1a2030" stroke-width="1.2"/>
+      <line x1="158" y1="18" x2="146" y2="25" stroke="#1a2030" stroke-width="1.2"/>
+      <line x1="158" y1="21" x2="146" y2="28" stroke="#1a2030" stroke-width="1.2"/>
+      <line x1="155" y1="12" x2="143" y2="20" stroke="#5a6577" stroke-width="0.5" opacity="0.4"/>
+      <line x1="157" y1="15" x2="145" y2="22" stroke="#5a6577" stroke-width="0.5" opacity="0.4"/>
+      <line x1="157" y1="18" x2="145" y2="25" stroke="#5a6577" stroke-width="0.5" opacity="0.4"/>
+      <line x1="157" y1="21" x2="145" y2="28" stroke="#5a6577" stroke-width="0.5" opacity="0.4"/>
+
+      <!-- Tail feather separations -->
+      <line x1="125" y1="58" x2="131" y2="66" stroke="#1a2030" stroke-width="1.0"/>
+      <line x1="121" y1="58" x2="125" y2="66" stroke="#1a2030" stroke-width="1.0"/>
+      <line x1="117" y1="56" x2="119" y2="64" stroke="#1a2030" stroke-width="1.0"/>
+
+      <!-- Wing interior detail lines -->
+      <path d="M70,34 C64,28 54,22 44,18" fill="none" stroke="#5a6577" stroke-width="0.8" opacity="0.5"/>
+      <path d="M74,36 C68,32 60,26 50,22" fill="none" stroke="#5a6577" stroke-width="0.8" opacity="0.5"/>
+      <path d="M104,32 C112,26 124,20 136,16" fill="none" stroke="#5a6577" stroke-width="0.8" opacity="0.5"/>
+      <path d="M108,36 C114,32 126,26 138,22" fill="none" stroke="#5a6577" stroke-width="0.8" opacity="0.5"/>
+
+      <!-- Chest/belly curve detail -->
+      <path d="M78,44 C82,46 88,48 94,46" fill="none" stroke="#5a6577" stroke-width="0.7" opacity="0.4"/>
+      <path d="M80,42 C84,44 90,46 96,44" fill="none" stroke="#5a6577" stroke-width="0.7" opacity="0.4"/>
+    </g>
+
+    <!-- Red glowing eye -->
+    <circle cx="62" cy="40" r="8" fill="url(#eyeGlow)" filter="url(#neon)"/>
+    <circle cx="62" cy="40" r="3.5" fill="#ff1111" opacity="0.95"/>
+    <circle cx="61" cy="39" r="1.2" fill="#ffffff" opacity="0.6"/>
+  </svg> SusieQ</h1>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button id="help-btn" onclick="toggleHelp()" title="Käyttöopas"
+      style="background:none;border:1px solid var(--border);color:var(--muted);
+             width:28px;height:28px;border-radius:50%;font-size:0.85rem;
+             font-weight:700;cursor:pointer;display:flex;align-items:center;
+             justify-content:center;font-family:inherit;flex-shrink:0;">?</button>
+    <div id="status">
+      <div id="dot"></div>
+      <span id="status-text">Yhdistetään…</span>
+    </div>
   </div>
 </header>
 
@@ -608,6 +798,13 @@
               font-size="11" font-weight="600" fill="#3fb950"
               font-family="-apple-system, BlinkMacSystemFont, sans-serif">—</text>
 
+        <!-- Beaufort help button -->
+        <g id="bf-help-btn" onclick="toggleBfModal()" style="cursor:pointer">
+          <circle cx="196" cy="208" r="7" fill="#21262d" stroke="#30363d" stroke-width="1.2"/>
+          <text x="196" y="212" text-anchor="middle" font-size="9" font-weight="700"
+                fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, sans-serif">?</text>
+        </g>
+
         <!-- Center pivot dot -->
         <circle cx="140" cy="140" r="3" fill="#30363d"/>
 
@@ -659,14 +856,10 @@
         <span>Teho</span>
         <span id="batt-w">—</span>
       </div>
-      <div class="stat">
-        <span>Lähde</span>
-        <span id="batt-src">—</span>
-      </div>
     </div>
     <div id="solar-strip" style="display:none">
-      <span>Aurinko<strong id="sol-pv">—</strong> W</span>
-      <span>PV<strong id="sol-v">—</strong> V</span>
+      <span>Aurinko <strong id="sol-pv">—</strong> W</span>
+      <span>PV <strong id="sol-v">—</strong> V</span>
       <span id="charge-badge" class="charge-badge charge-off">—</span>
     </div>
     <!-- Energy flow diagram -->
@@ -727,8 +920,18 @@
         <div class="bar-secondary" id="fuel-pct">—%</div>
       </div>
 
+      <div class="tank-wrap">
+        <div class="tank-label">Rommi</div>
+        <div class="bar-track">
+          <div class="bar-fill rum" id="rum-fill" style="height:0%"></div>
+        </div>
+        <div class="bar-value" id="rum-val">—</div>
+        <div class="bar-unit">L</div>
+        <div class="bar-secondary" id="rum-pct">—%</div>
+      </div>
+
     </div>
-    <div style="display:flex;gap:12px;margin-top:4px;">
+    <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;">
       <button onclick="tareWater()"
         style="padding:5px 14px;background:#21262d;border:1px solid var(--border);
                border-radius:6px;color:var(--muted);font-size:0.7rem;cursor:pointer">
@@ -738,6 +941,11 @@
         style="padding:5px 14px;background:#21262d;border:1px solid var(--border);
                border-radius:6px;color:var(--muted);font-size:0.7rem;cursor:pointer">
         Tara polttoaine (tyhjä kanisteri)
+      </button>
+      <button onclick="tareRum()"
+        style="padding:5px 14px;background:#21262d;border:1px solid var(--border);
+               border-radius:6px;color:var(--muted);font-size:0.7rem;cursor:pointer">
+        Tara rommi (tyhjä pullo)
       </button>
     </div>
   </div>
@@ -809,6 +1017,505 @@
 
 </div><!-- #tab-satama -->
 
+<!-- ═══ Help overlay + slide-over panel ═══ -->
+<div class="help-overlay" id="help-overlay" onclick="toggleHelp()"></div>
+<div class="help-panel" id="help-panel">
+  <div class="help-header">
+    <h2>Käyttöopas</h2>
+    <button class="help-close" onclick="toggleHelp()">&times;</button>
+  </div>
+  <div class="help-body">
+
+    <details class="help-section">
+      <summary>Veneen tiedot</summary>
+      <div class="help-section-body">
+        <table>
+          <tr><th>Tieto</th><th>Arvo</th></tr>
+          <tr><td>Nimi</td><td><strong>SusieQ</strong></td></tr>
+          <tr><td>Malli</td><td>C&C 28 (1975)</td></tr>
+          <tr><td>Rekisterinumero</td><td>L-7695</td></tr>
+          <tr><td>LOA</td><td>8,53 m</td></tr>
+          <tr><td>Leveys</td><td>2,90 m</td></tr>
+          <tr><td>Syväys</td><td>1,37–1,52 m</td></tr>
+          <tr><td>Siirtymä</td><td>~2 722–2 948 kg</td></tr>
+          <tr><td>Makuupaikat</td><td>4</td></tr>
+          <tr><td>Kotisatama</td><td>Romsin satama</td></tr>
+          <tr><td>Veneseura</td><td>Vene-71</td></tr>
+          <tr><td>Omistajat</td><td>Jussi, Miikka I., Miikka V.</td></tr>
+        </table>
+        <p>Bermuda-slooppi, alumiinimasto (keel-stepped), tillinohjaus. Lasikuiturunko, balsa-sandwich-kansi.</p>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Moottori — Suzuki 9,9 hv</summary>
+      <div class="help-section-body">
+        <h4>Käynnistys</h4>
+        <ol>
+          <li>Laske moottori veteen (tilt-lukitus)</li>
+          <li>Avaa polttoaineen sulkuventtiili</li>
+          <li>Vaihde vapaalle (N)</li>
+          <li>Vedä rikastin (choke) kylmänä</li>
+          <li>Käynnistä — tarkista jäähdytysveden ulostulo</li>
+          <li>Palauta rikastin lämmettyä</li>
+        </ol>
+        <h4>Sammutus</h4>
+        <ol>
+          <li>Vaihde vapaalle, joutokäynti 1–2 min</li>
+          <li>Sammuta virta-avain / hätäkytkin</li>
+          <li>Sulje polttoaineen sulkuventtiili</li>
+          <li>Nosta moottori yläasentoon</li>
+        </ol>
+        <div class="help-warn"><strong>Varoitus:</strong> Älä vaihda vaihdetta täysillä kierroksilla.</div>
+        <h4>Polttoaine</h4>
+        <p>Kanisteri 25 L. Tiheys 0,74 kg/L. Dashboardin Tankit-välilehti näyttää jäljellä olevan määrän.</p>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Purjeet</summary>
+      <div class="help-section-body">
+        <h4>Pääpurje (North Sails)</h4>
+        <p>Nosta falilla tuuleen päin. Reivaus: löysää fallia, kiristä reivausliina, kiristä falli.</p>
+        <h4>Rullaetupurje (Furlex)</h4>
+        <p>Avaus: löysää rullausliina, vedä skuuttia. Reivaus: vedä rullausliinasta. Tarkista ettei rullausliina ole sotkeutunut.</p>
+        <h4>Spinnakkeri</h4>
+        <p>Kevyen tuulen myötätuulipurje. Vaatii spinnakeripuomin. Kaksi henkilöä suositeltava.</p>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Sähköjärjestelmä</summary>
+      <div class="help-section-body">
+        <h4>Akku</h4>
+        <p>100 Ah lyijyakku, 12 V. Seuranta Victron SmartSolar MPPT 75/15:n kautta Bluetoothilla.</p>
+        <table>
+          <tr><th>Jännite</th><th>SOC</th><th>Tila</th></tr>
+          <tr><td>≥ 12,7 V</td><td>100 %</td><td style="color:var(--green)">Täysi</td></tr>
+          <tr><td>12,4 V</td><td>~75 %</td><td style="color:var(--green)">Hyvä</td></tr>
+          <tr><td>12,2 V</td><td>~50 %</td><td style="color:var(--yellow)">OK</td></tr>
+          <tr><td>12,0 V</td><td>~25 %</td><td style="color:var(--orange)">Matala</td></tr>
+          <tr><td>≤ 11,8 V</td><td>&lt; 20 %</td><td style="color:var(--red)">Kriittinen</td></tr>
+        </table>
+        <div class="help-warn"><strong>Lyijyakku:</strong> Älä päästä varausta alle 50 % — lyhentää käyttöikää.</div>
+        <h4>Aurinkopaneeli</h4>
+        <p>150 W puolijoustava paneeli → Victron MPPT 75/15. Latausvaiheet: Bulk → Absorb → Float. Seuraa Akku-välilehdeltä.</p>
+        <h4>VictronConnect</h4>
+        <p>Lataa App Storesta. Yhdistä Bluetoothilla säätimeen tarkempiin asetuksiin.</p>
+        <h4>COLIGHT-kytkintaulu</h4>
+        <p>12/8 Gang Switch Panel. Ohjaus fyysisesti tai älypuhelinsovelluksella (Bluetooth).</p>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Dashboard — SusieQ-Data</summary>
+      <div class="help-section-body">
+        <h4>Yhdistäminen</h4>
+        <table>
+          <tr><th>Tieto</th><th>Arvo</th></tr>
+          <tr><td>WiFi</td><td><code>SusieQ-Data</code></td></tr>
+          <tr><td>Salasana</td><td><code>susieq123</code></td></tr>
+          <tr><td>Osoite</td><td><code>http://192.168.4.1</code></td></tr>
+          <tr><td>Päivitysväli</td><td>2 s (WebSocket)</td></tr>
+        </table>
+        <div class="help-tip"><strong>iPad-vinkki:</strong> Safari → Jaa → Lisää kotivalikkoon → avautuu koko näytön sovelluksena.</div>
+
+        <h4>Välilehdet</h4>
+        <ul>
+          <li><strong>Tuuli:</strong> Tuulennopeus (m/s), suunta (kompassi), Beaufort-asteikko, GPS-nopeus (solmut). 10 min min/max-historia.</li>
+          <li><strong>Akku:</strong> Jännite, virta, SOC %, teho (W). Aurinkopaneelin tuotto ja latausvaihe. Energiavirtakaavio.</li>
+          <li><strong>Tankit:</strong> Vesitankki (15 L), polttoaine (25 L), rommi (0,7 L). Tara-napit kalibrointiin.</li>
+          <li><strong>Sää:</strong> Ilman lämpötila, kosteus, ilmanpaine + trendi (AHT20/BMP280). Järviveden lämpötila (DS18B20).</li>
+          <li><strong>Satama:</strong> Keulakamera (MJPEG-stream), LiDAR-etäisyysmittari (TF-Luna, 8 m).</li>
+        </ul>
+
+        <h4>Tilailmaisimet</h4>
+        <ul>
+          <li style="color:var(--green)">Vihreä pallero = yhteys toimii (Live)</li>
+          <li style="color:var(--red)">Punainen pallero = yhteys katkennut</li>
+          <li>Himmeä kortti = anturidata vanhentunut</li>
+        </ul>
+
+        <h4>Taraus (kalibrointi)</h4>
+        <p>Tankit-välilehdellä: aseta <strong>tyhjä</strong> säiliö vaa'alle ja paina Tara-nappia. Tara tallennetaan flash-muistiin (säilyy virrankatkojen yli).</p>
+
+        <h4>JSON API</h4>
+        <p><code>GET http://192.168.4.1/data</code> — kaikki sensoridatan JSON-muodossa.</p>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Navigointi</summary>
+      <div class="help-section-body">
+        <h4>VHF-radio — tärkeimmät kanavat</h4>
+        <table>
+          <tr><th>Kanava</th><th>Käyttö</th></tr>
+          <tr><td><strong>16</strong></td><td>Hätäkutsu (MAYDAY) — aina päällä</td></tr>
+          <tr><td>9</td><td>Kutsukanava</td></tr>
+          <tr><td>13</td><td>Satamaliikenne</td></tr>
+          <tr><td>72</td><td>Venetoveneyhteydet</td></tr>
+        </table>
+        <div class="help-warn">
+          <strong>MAYDAY (kanava 16):</strong><br>
+          "MAYDAY MAYDAY MAYDAY, tämä on SusieQ, SusieQ, SusieQ.<br>
+          Sijaintimme on [koordinaatit].<br>
+          Hätämme on [kuvaus].<br>
+          Meitä on [lkm] henkilöä. Over."
+        </div>
+        <details class="help-section" style="margin-top:12px;border-color:var(--border);">
+          <summary style="background:rgba(88,166,255,0.06);">⚙️ Raymarine ST1000+ — täydet käyttöohjeet</summary>
+          <div class="help-section-body">
+
+            <h4>Painikkeet</h4>
+            <table>
+              <tr><th>Painike</th><th>Toiminto</th></tr>
+              <tr><td><strong>AUTO</strong></td><td>Kytke autopilotti — lukitsee nykyisen kurssin</td></tr>
+              <tr><td><strong>STANDBY</strong></td><td>Kytke pois — palaa manuaaliohjaukseen</td></tr>
+              <tr><td><strong>−1 / +1</strong></td><td>Muuta kurssia 1° paapuuriin / styyrpuuriin</td></tr>
+              <tr><td><strong>−10 / +10</strong></td><td>Muuta kurssia 10° paapuuriin / styyrpuuriin</td></tr>
+            </table>
+
+            <h4>Käyttöönotto</h4>
+            <ol>
+              <li>Kiinnitä työnvarsi tilliin</li>
+              <li>Aja halutulle kurssille käsin</li>
+              <li>Paina <strong>AUTO</strong> — näyttöön ilmestyy <code>A</code> ja lukittu kurssi</li>
+              <li>Tarkista, että ohjaus toimii (vene pysyy kurssilla)</li>
+            </ol>
+
+            <h4>Sammutus ja manuaaliohjaus</h4>
+            <ol>
+              <li>Paina <strong>STANDBY</strong> — näyttö näyttää vilkkuvaa <code>C</code> ja veneen kurssin</li>
+              <li>Irrota työnvarsi tillistä</li>
+            </ol>
+
+            <h4>Edellinen kurssi</h4>
+            <p>Pidä <strong>AUTO</strong> painettuna 1 sekunnin ajan → edellinen kurssi vilkkuu 10 s. Paina <strong>AUTO</strong> uudelleen hyväksyäksesi.</p>
+
+            <h4>Dodge — este-väistö</h4>
+            <p>Autopilotti päällä, kohtaat esteen:</p>
+            <ol>
+              <li>Paina esim. <strong>−10</strong> kolmesti → 30° väistö paapuuriin</li>
+              <li>Odota kunnes este on sivuutettu</li>
+              <li>Paina <strong>+10</strong> kolmesti palauttaaksesi alkuperäisen kurssin <em>tai</em> paina <strong>AUTO</strong></li>
+            </ol>
+            <div class="help-tip">Suuret kurssimuutokset on turvallisempaa tehdä manuaalisesti ennen AUTO-painallusta.</div>
+
+            <h4>WindTrim — tuulikulman lukitus</h4>
+            <ol>
+              <li>Paina <strong>STANDBY</strong> + <strong>AUTO</strong> samanaikaisesti</li>
+              <li>Pilotti lukitsee nykyisen näennäisen tuulikulman (piippaa 30 s välein)</li>
+              <li>Poistuminen: paina <strong>STANDBY</strong> (→ manuaali) tai <strong>AUTO</strong> (→ kurssilukitus)</li>
+            </ol>
+            <p style="font-size:0.82rem;color:var(--muted);">WindTrim sopii vakaaseen tuuleen. Tuulen kääntymishälytyksessä tarkista kurssi ja hyväksy painamalla STANDBY + AUTO.</p>
+
+            <h4>AutoTack — automaattinen halssaus</h4>
+            <table>
+              <tr><th>Painikkeet</th><th>Toiminto</th></tr>
+              <tr><td><strong>−1 + −10</strong> yhtä aikaa</td><td>Halssaa 100° paapuuriin</td></tr>
+              <tr><td><strong>+1 + +10</strong> yhtä aikaa</td><td>Halssaa 100° styyrpuuriin</td></tr>
+            </table>
+            <p style="font-size:0.82rem;color:var(--muted);">Toimii Auto-, Track- ja WindTrim-tiloissa.</p>
+
+            <h4>Kalibrointi (deviaatiokorjaus)</h4>
+            <ol>
+              <li>Aja venettä hitaissa ympyröissä, nopeus alle 2 solmua</li>
+              <li>Pilotti mittaa magneettisen deviaation automaattisesti</li>
+              <li>Suuntakorjaus: paina <strong>−1</strong> / <strong>+1</strong> kunnes näyttö vastaa veneen kompassia</li>
+            </ol>
+
+            <h4>Tekniset tiedot</h4>
+            <table>
+              <tr><th>Ominaisuus</th><th>Arvo</th></tr>
+              <tr><td>Virransyöttö</td><td>10–15 V DC</td></tr>
+              <tr><td>Virrankulutus (standby)</td><td>40 mA</td></tr>
+              <tr><td>Virrankulutus (ohjaus)</td><td>0,5–1,5 A</td></tr>
+              <tr><td>Maks. veneen paino</td><td>3 000 kg</td></tr>
+              <tr><td>Työntyövoima</td><td>57 kg</td></tr>
+              <tr><td>Ohjausnopeus (lock to lock)</td><td>8 s</td></tr>
+            </table>
+
+            <h4>Virhekoodit</h4>
+            <table>
+              <tr><th>Koodi</th><th>Syy</th><th>Toimenpide</th></tr>
+              <tr><td><strong>1000</strong></td><td>Ei liikettä painikkeista</td><td>Tarkista virransyöttö ja navat (+ / −)</td></tr>
+              <tr><td><strong>2000</strong></td><td>Liian pieni ampeeri</td><td>Tarkista 12V syöttö ja johdot</td></tr>
+              <tr><td>Kurssivirhe</td><td>Kompassi ei täsmää</td><td>Tee deviaatiokorjaus ja suuntasäätö</td></tr>
+            </table>
+
+            <div class="help-warn"><strong>Rajoitukset:</strong> Ei korvaa vahtia — älä jätä ohjaamoa valvomatta. Ei käytettävissä kovassa merenkäynnissä (ylittää momenttirajan). Suuret kurssimuutokset tee aina manuaalisesti.</div>
+
+          </div>
+        </details>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Keittiö ja sisätilat</summary>
+      <div class="help-section-body">
+        <h4>Spriikeitin (2 polttimoa)</h4>
+        <ol>
+          <li>Avaa luukku (tuuletus)</li>
+          <li>Kaada spriitä altaaseen, sytytä tulitikulla</li>
+          <li>Avaa venttiili kun poltin lämpenee → sininen liekki</li>
+          <li>Sammutus: sulje venttiili</li>
+        </ol>
+        <div class="help-warn"><strong>Varoitus:</strong> Sprii palaa lähes näkymättömällä liekillä. Älä koskaan lisää polttonestettä kuumaan keittimeen.</div>
+        <h4>Vesipumppu</h4>
+        <p>12V kalvopumppu, maks. 3,5 l/min. Pumppaa järvivettä tankista tiskialtaaseen. Järvivesi ei ole juomakelpoista.</p>
+        <h4>Porta Potti</h4>
+        <p>Tyhjennä aina sataman septitankkiin — ei koskaan veteen. Talvisäilytys: huuhtele propyleeniglykolilla.</p>
+        <h4>Viskikaappi</h4>
+        <p>Aktuaattorilla aukeava. 12V, hetkellinen virta ~2 A.</p>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Turvallisuus</summary>
+      <div class="help-section-body">
+        <table>
+          <tr><th>Varuste</th><th>Määrä</th></tr>
+          <tr><td>Pelastusliivit</td><td>5 kpl</td></tr>
+          <tr><td>Pelastusrengas (hevosenkenkä)</td><td>1 kpl + merkkivalo</td></tr>
+          <tr><td>Jauhesammutin</td><td>1 kpl</td></tr>
+          <tr><td>Lepuuttajat</td><td>6 kpl</td></tr>
+          <tr><td>Ankkuri (Bruce 7,5 kg)</td><td>1 kpl + 2 liinat</td></tr>
+          <tr><td>Peräportaat</td><td>1 kpl</td></tr>
+        </table>
+        <div class="help-warn">
+          <strong>MOB — Mies yli laidan:</strong>
+          <ol>
+            <li>Huuda "MIES YLI LAIDAN!" — osoita kädellä</li>
+            <li>Heitä pelastusrengas</li>
+            <li>Merkitse paikka (GPS)</li>
+            <li>Käynnistä moottori, laske purjeet</li>
+            <li>Palaa uhrin luokse (Williamson-käännös)</li>
+            <li>Lähesty tuulen puolelta, nosta peräportaista</li>
+          </ol>
+        </div>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Tarkistuslistat</summary>
+      <div class="help-section-body">
+        <h4>Lähtötarkistus</h4>
+        <ul>
+          <li>Sääennuste tarkistettu</li>
+          <li>Akun SOC riittävä (Akku-välilehti)</li>
+          <li>Polttoaine ja vesi OK (Tankit-välilehti)</li>
+          <li>Pelastusliivit, sammutin paikallaan</li>
+          <li>VHF-radio toimii</li>
+          <li>Navigointivalot OK</li>
+          <li>Moottori tarkistettu</li>
+          <li>Purjeet valmiina</li>
+          <li>Pilssi kuiva, luukut kiinni</li>
+        </ul>
+        <h4>Veneen sulkeminen</h4>
+        <ul>
+          <li>Purjeet laskettu, puomipeite päälle</li>
+          <li>Moottori nostettu ja sammutettu</li>
+          <li>Polttoaineen sulkuventtiili kiinni</li>
+          <li>Sähkölaitteet sammutettu</li>
+          <li>Luukut suljettu ja lukittu</li>
+          <li>Köydet ja lepuuttajat paikoillaan</li>
+          <li>Pilssi tarkistettu</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Hätänumerot</summary>
+      <div class="help-section-body">
+        <table>
+          <tr><th>Palvelu</th><th>Numero</th></tr>
+          <tr><td>Yleinen hätänumero</td><td><strong>112</strong></td></tr>
+          <tr><td>Meripelastus (MRCC Turku)</td><td>02 1001</td></tr>
+          <tr><td>VHF hätäkanava</td><td><strong>Kanava 16</strong></td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Vianetsintä</summary>
+      <div class="help-section-body">
+        <table>
+          <tr><th>Ongelma</th><th>Tarkista</th></tr>
+          <tr><td>WiFi ei näy</td><td>ESP32 saa virtaa? 12V → 5V muunnin OK?</td></tr>
+          <tr><td>Dashboard ei avaudu</td><td><code>pio run -t uploadfs</code> suoritettu?</td></tr>
+          <tr><td>Akku ei näy</td><td>Victron BLE: encryption key config.h:ssa, BLE kantama</td></tr>
+          <tr><td>Tuulianturi ei vastaa</td><td>Modbus slave ID (1), baud (4800), DE-nasta GPIO 4</td></tr>
+          <tr><td>Vaaka lukee väärin</td><td>Kalibrointikerroin, tee tara uudelleen</td></tr>
+          <tr><td>Kamera ei toimi</td><td>Keulayksikön IP 192.168.4.10, virta OK?</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Vene-71 — Tukikohdat</summary>
+      <div class="help-section-body">
+        <h4>Taulasalo</h4>
+        <table>
+          <tr><th>Tieto</th><th>Arvo</th></tr>
+          <tr><td>Koordinaatit</td><td>61°39,1'N 23°45,1'E</td></tr>
+          <tr><td>Paikka</td><td>Taulasalon saari</td></tr>
+          <tr><td>Vesistö</td><td>Koljonselkä, Näsijärvi</td></tr>
+          <tr><td>Paikkakunta</td><td>Tampere</td></tr>
+        </table>
+        <h4>Karhusaari</h4>
+        <table>
+          <tr><th>Tieto</th><th>Arvo</th></tr>
+          <tr><td>Koordinaatit</td><td>61°8,9'N 23°57,3'E</td></tr>
+          <tr><td>Paikka</td><td>Karhusaari / Hanhikarit</td></tr>
+          <tr><td>Vesistö</td><td>Joutsenselkä, Tarjannevesi, Näsijärvi</td></tr>
+          <tr><td>Paikkakunta</td><td>Virrat</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details class="help-section">
+      <summary>Vene-71 — Veneluettelo</summary>
+      <div class="help-section-body">
+        <p style="color:var(--muted);margin-bottom:8px;">Päivitetty 17.1.2025 · P = purjevene, M = moottorivene</p>
+        <div style="overflow-x:auto;">
+        <table style="font-size:0.8rem;">
+          <tr><th>Nimi</th><th>Rek.nro</th><th>T</th><th>m</th><th>Omistaja</th><th>Kunta</th><th>Puhelin</th></tr>
+          <tr><td>Aida</td><td>X15101</td><td>P</td><td>10</td><td>Mika Tynkkynen</td><td>Tampere</td><td>050 598 9201</td></tr>
+          <tr><td>Anniara</td><td>P25055</td><td>P</td><td>9.6</td><td>Pirkka Schellhammer</td><td>Tampere</td><td>0408064104</td></tr>
+          <tr><td>Aqua Maria</td><td>A51504</td><td>M</td><td></td><td></td><td></td><td></td></tr>
+          <tr><td>Aquilar</td><td>A51258</td><td>P</td><td>7</td><td>John Coogan</td><td>Tampere</td><td>040 849 6555</td></tr>
+          <tr><td>Avance 245</td><td>A53554</td><td>P</td><td>7.45</td><td>Riku Ilvesmäki</td><td>Tampere</td><td>040 500 1047</td></tr>
+          <tr><td>BelindaV</td><td>R51203</td><td>M</td><td>7.5</td><td>Reima Saarinen</td><td>Tampere</td><td>0400 732 932</td></tr>
+          <tr><td>Beltico</td><td></td><td>P</td><td>8.4</td><td>Mika Kulmala</td><td>Ylöjärvi</td><td>040 741 3314</td></tr>
+          <tr><td>Bettina</td><td>T12420</td><td>M</td><td>14.8</td><td>Jukka Piippo</td><td>Tampere</td><td>0400 588 515</td></tr>
+          <tr><td>Buenaventura</td><td>O13116</td><td>P</td><td>9.2</td><td>Janne Ekman</td><td>Tampere</td><td>044 594 4316</td></tr>
+          <tr><td>Buster RS</td><td>H8522</td><td>M</td><td>4.5</td><td>Teemu Mäntykorpi</td><td>Tampere</td><td>0400 651 733</td></tr>
+          <tr><td>Calimera</td><td>U9853</td><td>M</td><td>9</td><td>Jorma Moisio</td><td>Tampere</td><td>050 530 3093</td></tr>
+          <tr><td>Camalo</td><td>H71328</td><td>P</td><td>7.85</td><td>Timo Hassinen</td><td>Tampere</td><td>040 356 6995</td></tr>
+          <tr><td>Candal</td><td>U39865</td><td>M</td><td>8.2</td><td>Ilkka Säteri</td><td>Tampere</td><td>044 973 4246</td></tr>
+          <tr><td>Carola</td><td>V19559</td><td>M</td><td>9.5</td><td>Marko Hakola</td><td>Kangasala</td><td>044 542 1421</td></tr>
+          <tr><td>Catti</td><td></td><td>P</td><td>5</td><td>Pauli Tossavainen</td><td>Valkeakoski</td><td>0400 790 290</td></tr>
+          <tr><td>Clara</td><td>A13581</td><td>M</td><td>8.3</td><td>Päivi Keränen</td><td>Tampere</td><td>050 365 6652</td></tr>
+          <tr><td>Cri-Cri</td><td>M12673</td><td>M</td><td>11</td><td>Samu Majander</td><td>Tampere</td><td>0414336613</td></tr>
+          <tr><td>Dawn-2-Dusk</td><td>T40325</td><td>M</td><td>10.8</td><td>Tommi Keränen</td><td>Tampere</td><td>0400409897</td></tr>
+          <tr><td>DiipaDaapa</td><td>U54077</td><td>P</td><td>8.05</td><td>Olli Leppänen</td><td>Tampere</td><td>0407552218</td></tr>
+          <tr><td>Dirlanda</td><td></td><td>P</td><td>5.2</td><td></td><td></td><td></td></tr>
+          <tr><td>Elise</td><td>L6630</td><td>P</td><td>9.42</td><td>Pekka Rissanen</td><td>Pirkkala</td><td>050 572 0747</td></tr>
+          <tr><td>Ellida</td><td>T29914</td><td>M</td><td>8.7</td><td>Hannu Nieminen</td><td>Pirkkala</td><td>040 556 6490</td></tr>
+          <tr><td>Elsa</td><td>L8198</td><td>P</td><td>7.7</td><td>Atte Joutsen</td><td>Tampere</td><td>050 327 0314</td></tr>
+          <tr><td>Esteri</td><td></td><td>P</td><td>8</td><td>Luca Vapaavuori</td><td></td><td>0451306380</td></tr>
+          <tr><td>Falco</td><td>T53689</td><td>M</td><td>7.65</td><td>Miisa Nieminen</td><td>Vesilahti</td><td>050 314 3584</td></tr>
+          <tr><td>Felicia</td><td>S18994</td><td>P</td><td>9.1</td><td>Kaius Kaartinen</td><td>Tampere</td><td>0504090707</td></tr>
+          <tr><td>Forza 2</td><td>X11024</td><td>M</td><td>12</td><td>Mari Mäkinen</td><td>Tampere</td><td>040 732 6616</td></tr>
+          <tr><td>Fredrika</td><td>H73568</td><td>M</td><td>8.94</td><td>Mika Kymäläinen</td><td>Tampere</td><td>050 535 8997</td></tr>
+          <tr><td>Frida</td><td>V23829</td><td>P</td><td>8.2</td><td>Jussi Järvinen</td><td>Tampere</td><td>044 541 0047</td></tr>
+          <tr><td>Havilo</td><td>R50435</td><td>P</td><td>8</td><td>Kalle Lento</td><td>Tampere</td><td>0400 697 044</td></tr>
+          <tr><td>Helmiina</td><td>A55878</td><td>M</td><td>11</td><td>Asko Ellman</td><td>Tampere</td><td>040 757 4247</td></tr>
+          <tr><td>Hiisi</td><td>H13799</td><td>M</td><td>10</td><td>Heikki Karjunen</td><td>Tampere</td><td>0443339987</td></tr>
+          <tr><td>Hildegard</td><td></td><td>P</td><td>5.5</td><td>Timotej Kovacic</td><td>Kangasala</td><td>+358404811032</td></tr>
+          <tr><td>Hilla</td><td>T25150</td><td>M</td><td>9.05</td><td>Kari Maunu Juhani Soukka</td><td>Tampere</td><td>050 561 1032</td></tr>
+          <tr><td>Huihai 2</td><td>L11421</td><td>P</td><td>7</td><td>Matti Uusitalo</td><td>Tampere</td><td>0403581137</td></tr>
+          <tr><td>Ii-sakki</td><td>H70864</td><td>M</td><td></td><td>Iiro Hirvensalo</td><td>Järvenpää</td><td>040 751 1057</td></tr>
+          <tr><td>Jokke</td><td></td><td>P</td><td>5.27</td><td>Esa Sirkkunen</td><td>Tampere</td><td>040 768 0323</td></tr>
+          <tr><td>Josepha</td><td>A57768</td><td>M</td><td>10.5</td><td>Timo Salminen</td><td>Kangasala</td><td>050 313 7400</td></tr>
+          <tr><td>Kaisla 550</td><td></td><td>M</td><td>5.5</td><td>Tuomas Rinne</td><td>Tampere</td><td>040 706 4448</td></tr>
+          <tr><td>La Bianca</td><td></td><td>P</td><td>7</td><td>Elmeri Lumme</td><td>Tampere</td><td>0400158829</td></tr>
+          <tr><td>La Onda</td><td>S18053</td><td>P</td><td>6.6</td><td>Sampo Heino-Hytönen</td><td>Kangasala</td><td>0451331643</td></tr>
+          <tr><td>Leiko</td><td>R16105</td><td>M</td><td>5</td><td>Jarmo Marttinen</td><td>Tampere</td><td>044 239 6490</td></tr>
+          <tr><td>LeiLei</td><td></td><td>P</td><td></td><td>Marko Leino</td><td>Tampere</td><td>040 588 2820</td></tr>
+          <tr><td>Lilli</td><td>T50446</td><td>P</td><td>7.8</td><td>Jukka-Pekka Tanner</td><td>Lempäälä</td><td>0400 956 552</td></tr>
+          <tr><td>Lorna</td><td>X12193</td><td>M</td><td>10</td><td>Jukka-Pekka Tanner</td><td>Lempäälä</td><td>0400 956 552</td></tr>
+          <tr><td>Maininki/Joseline</td><td>H79868</td><td>P</td><td></td><td>Tenho Pimiä</td><td>Siuro</td><td>041 440 6476</td></tr>
+          <tr><td>Mamma Mia!</td><td>X5976</td><td>M</td><td>12</td><td>Jukka Pynnönen</td><td>Pirkkala</td><td>040 767 1949</td></tr>
+          <tr><td>Mantsi</td><td>X10278</td><td>M</td><td>10.4</td><td>Jori Mantsinen</td><td>Tampere</td><td>0405456973</td></tr>
+          <tr><td>Marika</td><td>R52386</td><td>M</td><td>9.56</td><td>Heli Syrjälä</td><td>Tampere</td><td>0505613224</td></tr>
+          <tr><td>Marylin</td><td>T51059</td><td>P</td><td>8.3</td><td>Gabor Szanti</td><td>Pirkkala</td><td>044 416 6543</td></tr>
+          <tr><td>Neitsyt Maria</td><td>T53327</td><td>M</td><td>7.2</td><td>Sirpa Lemmetti</td><td>Tampere</td><td>040 717 6462</td></tr>
+          <tr><td>Nimue</td><td>X15275</td><td>P</td><td>8.8</td><td>Jani Airaksinen</td><td>Kangasala</td><td>040 843 7702</td></tr>
+          <tr><td>Nina</td><td>H71062</td><td>P</td><td>8.1</td><td>Veli Kaipainen</td><td>Tampere</td><td>040 557 4476</td></tr>
+          <tr><td>Oasis</td><td>U27593</td><td>M</td><td>9.85</td><td>Matti Ajo</td><td>Tampere</td><td>050 540 3422</td></tr>
+          <tr><td>Olviina</td><td>L8201</td><td>M</td><td>8.65</td><td>Olli Laurila</td><td>Tampere</td><td>0400 735 371</td></tr>
+          <tr><td>Palmeri</td><td>V21125</td><td>M</td><td>11.5</td><td>Rami Ahmavuo</td><td>Pirkkala</td><td>045 132 1612</td></tr>
+          <tr><td>Papu</td><td>S17702</td><td>P</td><td>5.7</td><td>Teemu Matilainen</td><td>Tampere</td><td>040 779 2040</td></tr>
+          <tr><td>Pii</td><td></td><td>P</td><td>8.3</td><td>Ari Myrskyranta</td><td>Lempäälä</td><td>040 839 3866</td></tr>
+          <tr><td>Piko</td><td>L9056</td><td>P</td><td>6.6</td><td>Ari Selander</td><td>Tampere</td><td>050 550 1388</td></tr>
+          <tr><td>Prima Donna</td><td>L9851</td><td>P</td><td>9.2</td><td>Ismo Nieminen</td><td>Tampere</td><td>040 140 1048</td></tr>
+          <tr><td>Prunella M</td><td>R53107</td><td>P</td><td>8.95</td><td>Jukka Rautiainen</td><td>Ylinen</td><td>040 716 8808</td></tr>
+          <tr><td>Pulu</td><td>A51946</td><td>P</td><td>6.06</td><td>Juha Anttila</td><td>Tampere</td><td>050 406 2981</td></tr>
+          <tr><td>RAN</td><td></td><td>M</td><td>7</td><td>Juha Järvinen</td><td>Pirkkala</td><td>050 569 7747</td></tr>
+          <tr><td>Reija</td><td>H14585</td><td>M</td><td>10.3</td><td>Aarto Lundberg</td><td>Tampere</td><td>0503591835</td></tr>
+          <tr><td>Resande Man 3</td><td>T55622</td><td>P</td><td>7.7</td><td>Aleksi Astor</td><td>Nokia</td><td>0504066077</td></tr>
+          <tr><td>S/Y ChaoX</td><td>X19636</td><td>P</td><td>7.96</td><td>Jarmo Estama</td><td>Tampere</td><td>045 261 5972</td></tr>
+          <tr><td>Samppa</td><td>H3098</td><td>M</td><td>12</td><td>Jyrki Vilppo</td><td>Nokia</td><td>0400 868562</td></tr>
+          <tr><td>Sandels III</td><td>T51843</td><td>P</td><td>8.22</td><td>Joni Virtanen</td><td>Tampere</td><td>0400 524 040</td></tr>
+          <tr><td>Shamima</td><td>L101365</td><td>P</td><td>8.2</td><td>Atte Skogster</td><td>Tampere</td><td>041 740 4857</td></tr>
+          <tr><td>Silver</td><td>P93459</td><td>M</td><td>4.95</td><td>Vesa Heiskanen</td><td>Tampere</td><td>050 407 4966</td></tr>
+          <tr><td>Sindbad</td><td>T51051</td><td>M</td><td>10.55</td><td>Olli Hakala</td><td>Yläjärvi</td><td>050 302 0431</td></tr>
+          <tr><td>Sofia</td><td>A50967</td><td>P</td><td>6.6</td><td>Jussi Salonen</td><td>Tampere</td><td>0405183772</td></tr>
+          <tr><td><strong>Susie Q</strong></td><td>X15207</td><td>P</td><td>8.5</td><td>Miikka Irri</td><td>Kangasala</td><td>040 821 6090</td></tr>
+          <tr><td>Svala</td><td></td><td>M</td><td>9</td><td>Arto Rautajoki</td><td>Tampere</td><td>+358445252200</td></tr>
+          <tr><td>Thalessa</td><td>T55546</td><td>P</td><td>8.56</td><td>Tatu Strengell</td><td>Tampere</td><td>0400567922</td></tr>
+          <tr><td>Tiko-Tiko</td><td>T54913</td><td>P</td><td>9</td><td>Tapani Niininen</td><td>Tampere</td><td>040 572 2700</td></tr>
+          <tr><td>Tuulikki</td><td>T55345</td><td>P</td><td>8</td><td>Timo Raiski</td><td>Ylöjärvi</td><td>0500 724 754</td></tr>
+          <tr><td>Tuulikki</td><td>U57847</td><td>M</td><td>6.8</td><td>Markku Karila</td><td>Tampere</td><td>0400925223</td></tr>
+          <tr><td>Typy</td><td>U51323</td><td>P</td><td>8.22</td><td>Kari Taskinen</td><td>Tampere</td><td>0442485911</td></tr>
+          <tr><td>Vanamo</td><td>P21146</td><td>M</td><td>5.3</td><td>Tommi Mantila</td><td>Ylöjärvi</td><td>0406551146</td></tr>
+          <tr><td>Viktoria</td><td>P59814</td><td>M</td><td>8.5</td><td>Raimo Hakala</td><td>Tampere</td><td>0400 771 996</td></tr>
+          <tr><td>Villiina</td><td>T24147</td><td>M</td><td>8.7</td><td>Jussi Kantolahti</td><td>Tampere</td><td>045 678 9611</td></tr>
+          <tr><td>—</td><td>T25555</td><td>P</td><td>7.8</td><td>Antti Tarhio</td><td>Ylöjärvi</td><td>0400 633 070</td></tr>
+          <tr><td>—</td><td>P46928</td><td>M</td><td>5.8</td><td>Ossi Hakala</td><td>Tampere</td><td>0400 541 272</td></tr>
+          <tr><td>—</td><td>R56592</td><td>M</td><td>6.7</td><td>Lauri Berlin</td><td>Tampere</td><td>041 540 5552</td></tr>
+          <tr><td>—</td><td>P87223</td><td>M</td><td>11.98</td><td>Julius Haarla</td><td>Tampere</td><td>040 779 2910</td></tr>
+          <tr><td>—</td><td>P90764</td><td>M</td><td>4.8</td><td>Jouko Polvinen</td><td>Jyväskylä</td><td>0408387988</td></tr>
+          <tr><td>—</td><td>A53687</td><td>M</td><td>5.62</td><td>Seppo Luosa</td><td>Tampere</td><td>040 730 7808</td></tr>
+          <tr><td>—</td><td>T26638</td><td>M</td><td></td><td>Harri Paltila</td><td>Tampere</td><td>0405232623</td></tr>
+          <tr><td>—</td><td></td><td>P</td><td>4</td><td>Mart Kroon</td><td>Kangasala</td><td>0445752819</td></tr>
+          <tr><td>—</td><td></td><td>M</td><td>4.85</td><td>Mika Lehtinen</td><td>Tampere</td><td>040 551 6882</td></tr>
+        </table>
+        </div>
+      </div>
+    </details>
+
+  </div>
+</div>
+
+<!-- ═══ Beaufort modal ═══ -->
+<div id="bf-overlay" onclick="toggleBfModal()"
+  style="display:none;position:fixed;inset:0;z-index:950;background:rgba(0,0,0,0.55);"></div>
+<div id="bf-modal"
+  style="display:none;position:fixed;z-index:951;top:50%;left:50%;
+         transform:translate(-50%,-50%);width:min(340px,90vw);max-height:80vh;
+         overflow-y:auto;background:#161b22;border:1px solid #30363d;
+         border-radius:12px;padding:16px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;
+       margin-bottom:10px;border-bottom:1px solid #30363d;padding-bottom:8px;">
+    <span style="font-weight:700;font-size:0.95rem;">Beaufort-asteikko</span>
+    <button onclick="toggleBfModal()"
+      style="background:none;border:none;color:#8b949e;font-size:1.3rem;
+             cursor:pointer;padding:0 4px;line-height:1;">&times;</button>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+    <tr>
+      <th style="padding:5px 8px;border:1px solid #30363d;background:rgba(88,166,255,0.08);color:#58a6ff;text-align:center;">B</th>
+      <th style="padding:5px 8px;border:1px solid #30363d;background:rgba(88,166,255,0.08);color:#58a6ff;text-align:center;">m/s</th>
+      <th style="padding:5px 8px;border:1px solid #30363d;background:rgba(88,166,255,0.08);color:#58a6ff;text-align:left;">Kuvaus</th>
+    </tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">0</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">&lt; 0,3</td><td style="padding:4px 8px;border:1px solid #30363d;color:#3fb950;">Tyyntä</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">1</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">0,3–1,5</td><td style="padding:4px 8px;border:1px solid #30363d;color:#3fb950;">Heikko</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">2</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">1,6–3,3</td><td style="padding:4px 8px;border:1px solid #30363d;color:#3fb950;">Heikko</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">3</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">3,4–5,4</td><td style="padding:4px 8px;border:1px solid #30363d;color:#3fb950;">Kohtalainen</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">4</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">5,5–7,9</td><td style="padding:4px 8px;border:1px solid #30363d;color:#3fb950;">Kohtalainen</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">5</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">8,0–10,7</td><td style="padding:4px 8px;border:1px solid #30363d;color:#d29922;">Navakka</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">6</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">10,8–13,8</td><td style="padding:4px 8px;border:1px solid #30363d;color:#d29922;">Navakka</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">7</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">13,9–17,1</td><td style="padding:4px 8px;border:1px solid #30363d;color:#d29922;">Kova</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">8</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">17,2–20,7</td><td style="padding:4px 8px;border:1px solid #30363d;color:#f85149;">Kova tuuli</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">9</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">20,8–24,4</td><td style="padding:4px 8px;border:1px solid #30363d;color:#f85149;">Myrsky</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">10</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">24,5–28,4</td><td style="padding:4px 8px;border:1px solid #30363d;color:#f85149;">Kova myrsky</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">11</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">28,5–32,6</td><td style="padding:4px 8px;border:1px solid #30363d;color:#f85149;">Rajumyrsky</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">12</td><td style="padding:4px 8px;border:1px solid #30363d;text-align:center;">≥ 32,7</td><td style="padding:4px 8px;border:1px solid #30363d;color:#f85149;">Hurrikaani</td></tr>
+  </table>
+</div>
+
 <script>
 // ─── Draw compass tick ring ────────────────────────────────────────────
 function drawCompassRing() {
@@ -838,6 +1545,24 @@ function drawCompassRing() {
   }
 }
 drawCompassRing();
+
+// ─── Help panel toggle ────────────────────────────────────────────────
+function toggleBfModal() {
+  var overlay = document.getElementById("bf-overlay");
+  var modal   = document.getElementById("bf-modal");
+  var open = overlay.style.display === "block";
+  overlay.style.display = open ? "none" : "block";
+  modal.style.display   = open ? "none" : "block";
+}
+
+function toggleHelp() {
+  var panel = document.getElementById("help-panel");
+  var overlay = document.getElementById("help-overlay");
+  var isOpen = panel.classList.contains("open");
+  panel.classList.toggle("open", !isOpen);
+  overlay.classList.toggle("open", !isOpen);
+  if (!isOpen) panel.scrollTop = 0;
+}
 
 // ─── SVG Battery gauge ─────────────────────────────────────────────────
 function updateBatteryGauge(soc) {
@@ -957,8 +1682,17 @@ var _wsReconnecting = false;  // L: prevent onclose+onerror double-fire
 // ─── WebSocket connection ──────────────────────────────────────────────
 function connect() {
   _wsReconnecting = false;
-  var host = location.hostname || "192.168.4.1";
-  ws = new WebSocket("ws://" + host + "/ws");
+  try {
+    var host = location.hostname || "192.168.4.1";
+    ws = new WebSocket("ws://" + host + "/ws");
+  } catch (e) {
+    console.error("WebSocket connect error", e);
+    _wsReconnecting = true;
+    var jitter = Math.random() * 500;
+    setTimeout(connect, reconnectDelay + jitter);
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
+    return;
+  }
 
   ws.onopen = function() {
     document.getElementById("dot").classList.add("live");
@@ -1044,8 +1778,6 @@ function update(d) {
       bwEl.style.color = "";
     }
 
-    document.getElementById("batt-src").textContent =
-      d.battery.source === "victron" ? "Victron" : "INA219";
   }
 
   // Solar (Victron)
@@ -1077,7 +1809,9 @@ function update(d) {
 
   // Water
   var waterOk = d.water && d.water.valid;
-  document.getElementById("card-tanks").classList.toggle("stale", !waterOk && !(d.fuel && d.fuel.valid));
+  var fuelOk  = d.fuel && d.fuel.valid;
+  var rumOk   = d.rum && d.rum.valid;
+  document.getElementById("card-tanks").classList.toggle("stale", !waterOk && !fuelOk && !rumOk);
   if (waterOk) {
     var waterPct    = d.water.level_pct != null ? d.water.level_pct : 0;
     var waterLiters = d.water.liters != null ? d.water.liters : 0;
@@ -1088,7 +1822,6 @@ function update(d) {
   }
 
   // Fuel
-  var fuelOk = d.fuel && d.fuel.valid;
   if (fuelOk) {
     var fuelPct    = d.fuel.pct != null ? d.fuel.pct : 0;
     var fuelLiters = d.fuel.liters != null ? d.fuel.liters : 0;
@@ -1096,6 +1829,16 @@ function update(d) {
     document.getElementById("fuel-val").textContent   = fuelLiters.toFixed(1);
     document.getElementById("fuel-pct").textContent   = Math.round(fuelPct) + "%";
     setBarColor(document.getElementById("fuel-fill"), fuelPct, "fuel");
+  }
+
+  // Rum
+  if (rumOk) {
+    var rumPct    = d.rum.pct != null ? d.rum.pct : 0;
+    var rumLiters = d.rum.liters != null ? d.rum.liters : 0;
+    document.getElementById("rum-fill").style.height = rumPct + "%";
+    document.getElementById("rum-val").textContent   = rumLiters.toFixed(1);
+    document.getElementById("rum-pct").textContent   = Math.round(rumPct) + "%";
+    setBarColor(document.getElementById("rum-fill"), rumPct, "rum");
   }
 
   // Weather
@@ -1133,7 +1876,7 @@ function updateFlowDiagram(solPower, battPower) {
   var arrowLoad  = document.getElementById("flow-arrow-load");
 
   arrowSolar.style.animationPlayState = solPower > 0 ? "running" : "paused";
-  arrowSolar.className = "flow-arrow-fill " + (solPower > 0 ? "solar-color" : "charge-off");
+  arrowSolar.className = "flow-arrow-fill" + (solPower > 0 ? " solar-color" : "");
   arrowLoad.style.animationPlayState  = loadW > 0 ? "running" : "paused";
   arrowLoad.className  = "flow-arrow-fill " + (loadW > 0 ? "load-color" : "charge-off");
 
@@ -1148,6 +1891,8 @@ function setBarColor(el, pct, type) {
     el.style.background = "linear-gradient(to top, #4a3300, #d29922)";
   } else if (type === "water") {
     el.style.background = "linear-gradient(to top, #1c5fa5, #58a6ff)";
+  } else if (type === "rum") {
+    el.style.background = "linear-gradient(to top, #5a1a00, #d4a017)";
   } else {
     el.style.background = "linear-gradient(to top, #7d4e0f, #db6d28)";
   }
@@ -1190,15 +1935,25 @@ function tareWater() {
     .catch(function(e) { alert("Virhe: " + e); });
 }
 
+function tareRum() {
+  if (!confirm("Aseta tyhjä rommipullo vaa'alle ja paina OK.")) return;
+  fetchWithTimeout("/tare_rum", { method: "POST" }, 5000)
+    .then(function(r) { return r.text(); })
+    .then(function(t) { alert("Rommi tara tallennettu: " + t); })
+    .catch(function(e) { alert("Virhe: " + e); });
+}
+
 // ─── Satama: camera stream + LiDAR distance ──────────────────────────
 var CAM_STREAM_URL   = "http://192.168.4.10:81/stream";
 var CAM_DISTANCE_URL = "http://192.168.4.10/distance";
 var CAM_STATUS_URL   = "http://192.168.4.10/status";
 var CAM_SLEEP_URL    = "http://192.168.4.10/sleep";
 var CAM_WAKE_URL     = "http://192.168.4.10/wake";
-var _distanceTimer   = null;
-var _satamaActive    = false;
-var _satamaAbort     = null;  // H5: AbortController to cancel pending sleep/wake
+var _distanceTimer       = null;
+var _satamaActive        = false;
+var _satamaAbort         = null;  // H5: AbortController to cancel pending sleep/wake
+var _camWatchdog         = null;
+var _camReconnectAttempts = 0;
 
 // M8: AbortSignal.timeout polyfill for Safari <16.4 / older Chrome
 function fetchWithTimeout(url, options, timeoutMs) {
@@ -1220,12 +1975,59 @@ function fetchWithTimeout(url, options, timeoutMs) {
   }
 }
 
+function reconnectCamStream() {
+  var img = document.getElementById("cam-img");
+  img.onerror = null;
+  img.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+  setTimeout(function() {
+    if (!_satamaActive) return;
+    setCamStreamSrc(img);
+  }, 500);
+}
+
+function setCamStreamSrc(img) {
+  var msg = document.getElementById("cam-offline-msg");
+  img.onload = function() {
+    _camReconnectAttempts = 0;
+    img.style.display = "block";
+    msg.style.display = "none";
+  };
+  img.onerror = function() {
+    if (!_satamaActive) return;
+    _camReconnectAttempts++;
+    var delay = Math.min(1000 * Math.pow(1.5, _camReconnectAttempts), 10000);
+    img.style.display = "none";
+    msg.style.display = "block";
+    msg.textContent = "Kamera — yhdistetään…";
+    setTimeout(function() {
+      if (_satamaActive) reconnectCamStream();
+    }, delay);
+  };
+  img.src = CAM_STREAM_URL + "?t=" + Date.now();
+  img.style.display = "block";
+  msg.style.display = "none";
+}
+
+function startCamWatchdog() {
+  clearInterval(_camWatchdog);
+  var streamStarted = Date.now();
+  _camWatchdog = setInterval(function() {
+    if (!_satamaActive) { clearInterval(_camWatchdog); return; }
+    var img = document.getElementById("cam-img");
+    if (img.naturalWidth === 0 && (Date.now() - streamStarted > 8000)) {
+      reconnectCamStream();
+      streamStarted = Date.now();
+    }
+  }, 3000);
+}
+
 function startCamStream() {
   var img = document.getElementById("cam-img");
   var msg = document.getElementById("cam-offline-msg");
   img.style.display = "none";
   msg.style.display = "block";
   msg.textContent = "Kamera — käynnistyy…";
+  _camReconnectAttempts = 0;
 
   // D1: use _satamaAbort signal so stopSatama() can cancel this wake request
   var wakeOpts = { method: "POST" };
@@ -1235,24 +2037,19 @@ function startCamStream() {
     .catch(function() {})  // bow may already be awake, or request cancelled
     .then(function() {
       if (!_satamaActive) return;  // tab switched away during wake
-      // set onerror BEFORE setting src to avoid missing early errors
-      img.onerror = function() {
-        img.style.display = "none";
-        msg.style.display = "block";
-        msg.textContent = "Kamera — ei yhteyttä";
-      };
       setTimeout(function() {
         if (!_satamaActive) return;
-        img.src = CAM_STREAM_URL;
-        img.style.display = "block";
-        msg.style.display = "none";
+        setCamStreamSrc(img);
+        startCamWatchdog();
       }, 400);  // camera sensor init after wake response
     });
 }
 
 function stopCamStream() {
   var img = document.getElementById("cam-img");
-  img.onerror = null;  // L: prevent error handler firing on intentional stop
+  img.onerror = null;
+  img.onload = null;
+  clearInterval(_camWatchdog);
   // M6: data URI reliably closes MJPEG TCP connection (vs empty string)
   img.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
   img.style.display = "none";
@@ -1306,7 +2103,7 @@ function startDistancePolling() {
     if (!_satamaActive) return;
     fetchDistance().then(function() {
       if (_satamaActive) {
-        _distanceTimer = setTimeout(poll, 500);
+        _distanceTimer = setTimeout(poll, 150);
       }
     });
   }

@@ -6,7 +6,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// ─── AHT20 + BMP280 (I2C, shared bus with INA219 on GPIO 21/22) ────────
+// ─── AHT20 + BMP280 (I2C, GPIO 21/22) ──────────────────────────────────
 // AHT20 default I2C address: 0x38 (fixed)
 // BMP280 default I2C address: 0x76 (SDO low); 0x77 if SDO pulled high
 
@@ -25,7 +25,7 @@ static DallasTemperature ds18b20(&oneWire);
 static bool ds_ok = false;
 
 void weather_init() {
-    // Wire already started by battery_init() — do not call Wire.begin() again
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);  // I2C bus for AHT20 + BMP280
 
     // AHT20
     if (aht.begin()) {
@@ -81,6 +81,7 @@ WeatherData weather_read() {
                 }
             } else {
                 aht_err_count = 0;  // reset on good reading
+                d.aht_valid = true;
                 d.valid = true;
             }
         }
@@ -91,6 +92,7 @@ WeatherData weather_read() {
         float pres = bmp.readPressure() / 100.0f; // Pa → hPa
         if (pres > 800.0f && pres < 1200.0f) {
             d.pressure = pres;
+            d.bmp_valid = true;
             d.valid = true;
         }
     }
@@ -103,6 +105,7 @@ WeatherData weather_read() {
         if (wt != DEVICE_DISCONNECTED_C && wt != 85.0f
                 && wt > -10.0f && wt < 40.0f) {
             d.water_temp = wt;
+            d.ds_valid = true;
             d.valid = true;
         }
     }

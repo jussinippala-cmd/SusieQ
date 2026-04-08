@@ -44,7 +44,7 @@
 
 ### Ohjauspaneeli
 - **Malli:** COLIGHT 12/8 Gang Switch Panel
-- **Ohjaus:** App Control (älypuhelinsovellus)
+- **Ohjaus:** Bluetooth-sovellus (älypuhelin)
 - **Kytkimet:** 12 kytkinpaikkaa
 
 ### Akkujen seurantalaite

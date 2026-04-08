@@ -10,10 +10,8 @@
 // Net weight / fuel_density = litres remaining.
 //
 // Calibration: after wiring, run fuel_tare() once with EMPTY canister,
-// then weigh a known-weight object and adjust CALIBRATION_FACTOR until
+// then weigh a known-weight object and adjust FUEL_CALIBRATION_FACTOR until
 // the reading matches.  Typical factor: ~400–450 for most HX711 modules.
-
-#define CALIBRATION_FACTOR  420.0f    // adjust until scale reads correct kg
 
 static HX711 scale;
 static Preferences prefs;
@@ -21,7 +19,7 @@ static float tare_offset = 0.0f;
 
 void fuel_init() {
     scale.begin(HX711_DOUT_PIN, HX711_SCK_PIN);
-    scale.set_scale(CALIBRATION_FACTOR);
+    scale.set_scale(FUEL_CALIBRATION_FACTOR);
 
     prefs.begin("fuel", true);   // read-only
     tare_offset = prefs.getFloat("tare", 0.0f);
@@ -35,12 +33,19 @@ void fuel_init() {
 }
 
 // Call with empty canister resting on scale; saves tare to flash
+// Debounced: ignores calls within 10 s of last tare to protect NVS flash
+static unsigned long last_tare_ms = 0;
 void fuel_tare() {
+    if (millis() - last_tare_ms < 10000) {
+        Serial.println("[fuel] tare debounced — wait 10s");
+        return;
+    }
     scale.tare();
     tare_offset = scale.get_offset();
     prefs.begin("fuel", false);
     prefs.putFloat("tare", tare_offset);
     prefs.end();
+    last_tare_ms = millis();
     Serial.println("[fuel] tare saved");
 }
 

@@ -14,7 +14,8 @@
 #define LIDAR_RX_PIN     14    // ESP32 RX ← TF-Luna TX
 #define LIDAR_TX_PIN     15    // ESP32 TX → TF-Luna RX
 #define LIDAR_BAUD       115200
-#define LIDAR_READ_HZ    20    // TF-Luna default output rate
+#define LIDAR_READ_HZ    20    // 20Hz — matches TF-Luna native output rate
+#define LIDAR_OFFSET_CM  0     // mounting offset from bow tip (cm) — adjust after installation
 
 // ─── OTA (Over The Air) firmware update ──────────────────────────────
 #define OTA_HOSTNAME   "susieq-bow"
@@ -23,8 +24,8 @@
 // ─── Camera ─────────────────────────────────────────────────────────
 // OV2640 on ESP32-CAM AI-Thinker board — pin mapping is handled
 // by esp_camera with CAMERA_MODEL_AI_THINKER defines.
-#define CAM_FRAMESIZE    FRAMESIZE_VGA    // 640x480
-#define CAM_QUALITY      12               // JPEG quality 0-63 (lower = better)
+#define CAM_FRAMESIZE    FRAMESIZE_QVGA   // 320x240 — optimized for WiFi AP relay
+#define CAM_QUALITY      25               // JPEG quality 0-63 (lower = better, ~4-6KB/frame at QVGA)
 
 // ─── Power management ────────────────────────────────────────────────
 // Auto-sleep after this many ms without any /stream or /distance request.

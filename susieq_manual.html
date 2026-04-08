@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SusieQ — Käyttöopas</title>
+<style>
+  :root {
+    --bg:      #0d1117;
+    --card:    #161b22;
+    --border:  #30363d;
+    --text:    #e6edf3;
+    --muted:   #8b949e;
+    --green:   #3fb950;
+    --yellow:  #d29922;
+    --red:     #f85149;
+    --blue:    #58a6ff;
+    --orange:  #db6d28;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+
+  /* ── Sticky header ─────────────────────────────────── */
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .site-header h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .site-header .subtitle {
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 400;
+  }
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .header-actions button {
+    background: var(--border);
+    color: var(--text);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .header-actions button:active { opacity: 0.7; }
+
+  /* ── Main content ──────────────────────────────────── */
+  .content {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+  }
+
+  /* ── Table of contents ─────────────────────────────── */
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+  }
+  .toc h2 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+    color: var(--blue);
+  }
+  .toc ol {
+    padding-left: 20px;
+  }
+  .toc li {
+    margin-bottom: 4px;
+  }
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .toc a:hover { color: var(--blue); }
+
+  /* ── Chapters ──────────────────────────────────────── */
+  .chapter {
+    margin-bottom: 24px;
+  }
+  .chapter > summary {
+    font-size: 1.2rem;
+    font-weight: 700;
+    padding: 14px 18px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .chapter > summary::-webkit-details-marker { display: none; }
+  .chapter > summary::before {
+    content: "\25B6";
+    font-size: 0.7em;
+    color: var(--muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .chapter[open] > summary::before {
+    transform: rotate(90deg);
+  }
+  .chapter[open] > summary {
+    border-radius: 10px 10px 0 0;
+    border-bottom-color: transparent;
+  }
+  .chapter-body {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    padding: 18px 20px 24px;
+  }
+
+  /* ── Sub-sections ──────────────────────────────────── */
+  h3 {
+    font-size: 1.05rem;
+    color: var(--blue);
+    margin: 22px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3:first-child { margin-top: 0; }
+  h4 {
+    font-size: 0.95rem;
+    color: var(--text);
+    margin: 14px 0 6px;
+  }
+  p { margin: 6px 0; }
+
+  /* ── Tables ────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 0.9rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+  }
+  th {
+    background: rgba(88, 166, 255, 0.08);
+    color: var(--blue);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  /* ── Lists ─────────────────────────────────────────── */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin-bottom: 3px; }
+
+  /* ── Warning / info boxes ──────────────────────────── */
+  .warn {
+    background: rgba(248, 81, 73, 0.08);
+    border-left: 3px solid var(--red);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    margin: 10px 0;
+    font-size: 0.9rem;
+  }
+  .info {
+    background: rgba(88, 166, 255, 0.08);
+    border-left: 3px solid var(--blue);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    margin: 10px 0;
+    font-size: 0.9rem;
+  }
+  .tip {
+    background: rgba(63, 185, 80, 0.08);
+    border-left: 3px solid var(--green);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    margin: 10px 0;
+    font-size: 0.9rem;
+  }
+
+  /* ── Code / mono ───────────────────────────────────── */
+  code {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.88em;
+  }
+
+  /* ── Checklists ────────────────────────────────────── */
+  .checklist {
+    list-style: none;
+    padding-left: 0;
+    margin: 10px 0 16px;
+  }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+  }
+  .checklist li:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .checklist input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    accent-color: var(--green);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .checklist-reset {
+    background: var(--border);
+    color: var(--muted);
+    border: none;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  /* ── Separator ─────────────────────────────────────── */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 18px 0;
+  }
+
+  /* ── Footer ────────────────────────────────────────── */
+  .footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    padding: 20px;
+    border-top: 1px solid var(--border);
+    margin-top: 30px;
+  }
+
+  /* ── Responsive ────────────────────────────────────── */
+  @media (max-width: 500px) {
+    .site-header h1 { font-size: 1rem; }
+    .chapter > summary { font-size: 1.05rem; padding: 12px 14px; }
+    .chapter-body { padding: 14px 14px 18px; }
+    table { font-size: 0.82rem; }
+    th, td { padding: 6px 8px; }
+  }
+
+  /* ── Print ─────────────────────────────────────────── */
+  @media print {
+    :root {
+      --bg: #fff;
+      --card: #fff;
+      --border: #ccc;
+      --text: #111;
+      --muted: #666;
+      --blue: #0066cc;
+    }
+    body {
+      font-size: 11pt;
+      padding: 0;
+      color: #111;
+      background: #fff;
+    }
+    .site-header { position: static; background: #fff; border-bottom: 2px solid #111; }
+    .header-actions { display: none; }
+    .chapter { break-inside: avoid; }
+    .chapter > summary::before { content: ""; }
+    .chapter[open] > summary, .chapter > summary {
+      background: #fff;
+      border: none;
+      border-bottom: 1px solid #ccc;
+    }
+    .chapter-body { border: none; }
+    .toc { break-after: page; }
+    .checklist-reset { display: none; }
+    a { color: #111; text-decoration: none; }
+    .warn { border-left-color: #c00; }
+    .info { border-left-color: #06c; }
+    .tip { border-left-color: #090; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     HEADER
+     ═══════════════════════════════════════════════════════════════════════ -->
+<header class="site-header">
+  <div>
+    <h1>SusieQ — Käyttöopas</h1>
+    <div class="subtitle">C&C 28 (1975) &middot; L-7695 &middot; Romsin satama</div>
+  </div>
+  <div class="header-actions">
+    <button onclick="toggleAll()">Avaa/sulje kaikki</button>
+    <button onclick="window.print()">Tulosta</button>
+  </div>
+</header>
+
+<div class="content">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SISÄLLYSLUETTELO
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="toc">
+  <h2>Sisällysluettelo</h2>
+  <ol>
+    <li><a href="#ch1">Veneen tiedot</a></li>
+    <li><a href="#ch2">Ohjaamo ja kansi</a></li>
+    <li><a href="#ch3">Purjeet ja takilointi</a></li>
+    <li><a href="#ch4">Moottori — Suzuki Sail 9,9 hv</a></li>
+    <li><a href="#ch5">Sähköjärjestelmä</a></li>
+    <li><a href="#ch6">Navigointi</a></li>
+    <li><a href="#ch7">IoT Dashboard — SusieQ-Data</a></li>
+    <li><a href="#ch8">Keittiö ja sisätilat</a></li>
+    <li><a href="#ch9">Turvallisuus</a></li>
+    <li><a href="#ch10">Tarkistuslistat</a></li>
+    <li><a href="#ch11">Kausihuolto ja talvisäilytys</a></li>
+    <li><a href="#ch12">Yhteystiedot ja viitteet</a></li>
+    <li><a href="#ch13">Vene-71</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     1. VENEEN TIEDOT
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch1" open>
+  <summary>1. Veneen tiedot</summary>
+  <div class="chapter-body">
+
+    <h3>1.1 Yleiset tiedot</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Nimi</td><td><strong>SusieQ</strong></td></tr>
+      <tr><td>Malli</td><td>C&C 28</td></tr>
+      <tr><td>Vuosimalli</td><td>1975</td></tr>
+      <tr><td>Rekisterinumero</td><td>L-7695</td></tr>
+      <tr><td>Kotisatama</td><td>Romsin satama</td></tr>
+      <tr><td>Veneseura</td><td>Vene-71</td></tr>
+      <tr><td>Valmistusmaa</td><td>Ruotsi (Göteborg)</td></tr>
+      <tr><td>Suunnittelija</td><td>George Cuthbertson & George Cassian</td></tr>
+      <tr><td>Omistajat</td><td>Jussi Nippala, Miikka Irri, Miikka Vasaramäki</td></tr>
+    </table>
+
+    <h3>1.2 Tekniset mitat</h3>
+    <table>
+      <tr><th>Ominaisuus</th><th>Arvo</th></tr>
+      <tr><td>LOA (kokonaispituus)</td><td>28 ft / 8,53 m</td></tr>
+      <tr><td>LWL (vesiviivapituus)</td><td>~22,5–23 ft / 6,86–7,01 m</td></tr>
+      <tr><td>Leveys (beam)</td><td>~9 ft 6 in / 2,90 m</td></tr>
+      <tr><td>Syväys (draft)</td><td>4 ft 6 in – 5 ft / 1,37–1,52 m</td></tr>
+      <tr><td>Siirtymä (displacement)</td><td>~2 722–2 948 kg</td></tr>
+      <tr><td>Kiili (ballast)</td><td>~1 134–1 270 kg</td></tr>
+      <tr><td>Purjepinta-ala</td><td>~35–39 m²</td></tr>
+      <tr><td>Makuupaikat</td><td>4</td></tr>
+      <tr><td>PHRF</td><td>~180–210 s/nm</td></tr>
+    </table>
+
+    <h3>1.3 Runkorakenne</h3>
+    <ul>
+      <li><strong>Materiaali:</strong> Lasikuitu (käsin laminoitu polyesterihartsi)</li>
+      <li><strong>Kansi:</strong> Balsa-sandwich (lasikuitu / balsa / lasikuitu)</li>
+      <li><strong>Kiili:</strong> Valurautainen ulkoinen kiili, pultein kiinnitetty</li>
+      <li><strong>Takila:</strong> Bermuda-slooppi, yksimastoinen</li>
+      <li><strong>Masto:</strong> Puristettu alumiini, anodisoitu — keel-stepped (kiilan kohdalta tuettu)</li>
+      <li><strong>Ohjaus:</strong> Tilli (tiller steering)</li>
+    </ul>
+
+    <div class="warn">
+      <strong>Ikään liittyvät huomiot:</strong> Balsa-sandwich-kansi on altis kosteudelle iän myötä. Kannen joustaminen kävellessä ("spongy deck") on merkki delaminoitumisesta. Ketjulevyt (chainplates) ja kiilaruuvit on tarkistettava säännöllisesti.
+    </div>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     2. OHJAAMO JA KANSI
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch2">
+  <summary>2. Ohjaamo ja kansi</summary>
+  <div class="chapter-body">
+
+    <h3>2.1 Ohjaamo</h3>
+    <ul>
+      <li>Pitkä, itsetyhjentyvä ohjaamo</li>
+      <li>Tillinohjaus (tiller) — suora, herkkä ohjausvaste</li>
+      <li>Matalaprofiilinen pääkajuutta</li>
+      <li>Suuret kansovalot kajuuttaan</li>
+    </ul>
+
+    <h3>2.2 Vinsit ja klampit</h3>
+    <ul>
+      <li>2–4 kpl vinssejä (Barient tai Barlow)</li>
+      <li>Skuuttivinssit molemmin puolin ohjaamoa</li>
+    </ul>
+
+    <h3>2.3 Kaiteet ja turvavarusteet</h3>
+    <ul>
+      <li>Ruostumattoman teräksen putkikaiteet (lifelines)</li>
+      <li>Kiinteät peräportaat (uimaan meno / veneeseen nousu)</li>
+    </ul>
+
+    <h3>2.4 Ankkurointi</h3>
+    <table>
+      <tr><th>Varuste</th><th>Tiedot</th></tr>
+      <tr><td>Ankkuri</td><td>Bruce-tyyppinen, 7,5 kg</td></tr>
+      <tr><td>Ankkuriliinat</td><td>2 kpl (1 keulassa, 1 perässä)</td></tr>
+    </table>
+
+    <h4>Ankkuroinnin vaiheet</h4>
+    <ol>
+      <li>Valitse suojainen paikka, tarkista syvyys</li>
+      <li>Laske ankkuri hitaasti keulasta tuulta tai virtaa vasten</li>
+      <li>Varmista ketjun/liina-pituus: syvyys &times; 5–7 (scope)</li>
+      <li>Peruuta moottorilla ja varmista, että ankkuri pitää</li>
+      <li>Yöllä: kiinnitä ankkurivalo</li>
+    </ol>
+
+    <h3>2.5 Lepuuttajat</h3>
+    <p>6 kpl lepuuttajia. Kiinnitä laiturissa molemmin puolin, sijoita rungon leveimmän kohdan korkeudelle.</p>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     3. PURJEET JA TAKILOINTI
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch3">
+  <summary>3. Purjeet ja takilointi</summary>
+  <div class="chapter-body">
+
+    <h3>3.1 Pääpurje (North Sails)</h3>
+    <p>Pinta-ala ~15–17 m². Nostaminen mastoon puomin uraa pitkin.</p>
+    <h4>Nosto</h4>
+    <ol>
+      <li>Vapauta pääpurjeen kiinnitysliina (mainsheet)</li>
+      <li>Varmista, että puomivang on löysä</li>
+      <li>Nosta purje falilla vinssillä — pidä vene tuuleen päin</li>
+      <li>Kiristä halyard ja klampaa</li>
+    </ol>
+    <h4>Reivaus (tuulen kasvaessa)</h4>
+    <ol>
+      <li>Löysää fallia</li>
+      <li>Kiristä reivausliina (cunningham / reef point)</li>
+      <li>Kiristä falli takaisin ja lukitse</li>
+    </ol>
+    <h4>Laskeminen</h4>
+    <ol>
+      <li>Käännä tuuleen päin</li>
+      <li>Löysää falli hallitusti</li>
+      <li>Kokoile purje puomille ja kiinnitä purjenyöreillä</li>
+    </ol>
+
+    <h3>3.2 Rullaetupurje (Furlex)</h3>
+    <p>Furlex-rullausjärjestelmä: purje kelataan rumpuun staagin ympärille.</p>
+    <h4>Avaaminen</h4>
+    <ol>
+      <li>Löysää rullausliina</li>
+      <li>Vedä skuuttiköydestä — purje avautuu</li>
+      <li>Kiristä skuutti sopivaan kulmaan</li>
+    </ol>
+    <h4>Rullaaminen / osareivaus</h4>
+    <ol>
+      <li>Löysää skuuttia</li>
+      <li>Vedä rullausliinasta — purje kelautuu stagiin</li>
+      <li>Osareivaus: rullaa vain osa purjeesta sisään</li>
+    </ol>
+    <div class="tip">
+      <strong>Vinkki:</strong> Furlex-järjestelmän liukuva toiminta vaatii, että rullausliinan kiepit eivät ole sotkeutuneet. Tarkista ennen jokaista käyttöä.
+    </div>
+
+    <h3>3.3 Spinnakkeri</h3>
+    <p>Kevyen tuulen myötätuulipurje. Vaatii spinnakeripuomin.</p>
+    <ol>
+      <li>Kiinnitä spinnakeripuomi</li>
+      <li>Nosta purje hallitusti — kaksi henkilöä suositeltava</li>
+      <li>Säädä skuutti ja killi (guy) halutulle kurssille</li>
+      <li>Jiippi (gybe): siirrä puomi toiselle puolelle hallitusti</li>
+      <li>Laskeminen: pidä kiinni helmasta, löysää falli, kokoile kajuutan luukulle</li>
+    </ol>
+
+    <h3>3.4 Puomipeite</h3>
+    <p>Sininen purjekangaspeite. Aseta aina purjeiden laskun jälkeen UV-suojaksi.</p>
+
+    <h3>3.5 Seisova takilointi</h3>
+    <ul>
+      <li><strong>Laidekangit:</strong> 2 paria (ala + ylä), 1&times;19 teräsvaijeri</li>
+      <li><strong>Etulangat:</strong> Staagi + backstay</li>
+    </ul>
+    <div class="warn">
+      <strong>Varoitus:</strong> Alkuperäinen 50-vuotias teräsvaijeri on vaihdettava. Terminaalipäät ovat erityisen alttiita piilokorroosiolla. Tarkista vanttiruuvit ja terminaalit säännöllisesti. Dyneema on moderni vaihtoehto (kevyt, ei korroosiota).
+    </div>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     4. MOOTTORI
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch4">
+  <summary>4. Moottori — Suzuki Sail 9,9 hv</summary>
+  <div class="chapter-body">
+
+    <h3>4.1 Yleistiedot</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Malli</td><td>Suzuki Sail 9,9 hv</td></tr>
+      <tr><td>Tyyppi</td><td>Ulkoperämoottori</td></tr>
+      <tr><td>Teho</td><td>9,9 hv</td></tr>
+      <tr><td>Polttoaine</td><td>Bensiini (tarkista 2T/4T sekoitus)</td></tr>
+      <tr><td>Polttoainetankki</td><td>Kanisteri, 25 L</td></tr>
+    </table>
+
+    <div class="info">
+      <strong>Huom:</strong> Veneessä ei ole kiinteää sisämoottoria. Alkuperäinen Universal Atomic 4 on poistettu.
+    </div>
+
+    <h3>4.2 Käynnistäminen</h3>
+    <ol>
+      <li>Laske moottori alas veteen (tilt-lukitus)</li>
+      <li>Avaa polttoaineen sulkuventtiili</li>
+      <li>Aseta vaihde vapaalle (N)</li>
+      <li>Vedä rikastin (choke) kylmänä käynnistettäessä</li>
+      <li>Käynnistä: sähkökäynnistys tai vetokäynnistys</li>
+      <li>Palauta rikastin moottorin lämmettyä</li>
+      <li>Tarkista jäähdytysveden ulostulo (vesisuihku peräpeilin alla)</li>
+    </ol>
+
+    <h3>4.3 Sammuttaminen</h3>
+    <ol>
+      <li>Aseta vaihde vapaalle</li>
+      <li>Anna moottorin käydä joutokäynnillä 1–2 minuuttia</li>
+      <li>Paina hätäsammutuskytkin tai käännä virta-avain OFF-asentoon</li>
+      <li>Sulje polttoaineen sulkuventtiili</li>
+      <li>Nosta moottori yläasentoon (tilt) jos ei ajeta</li>
+    </ol>
+
+    <h3>4.4 Vaihteet ja kaasu</h3>
+    <ul>
+      <li><strong>F (Forward):</strong> Eteen — vaihda vain joutokäynnillä</li>
+      <li><strong>N (Neutral):</strong> Vapaa</li>
+      <li><strong>R (Reverse):</strong> Peruutus — vaihda vain joutokäynnillä</li>
+    </ul>
+    <div class="warn">
+      <strong>Varoitus:</strong> Älä koskaan vaihda vaihdetta täysillä kierroksilla — vaihteiston vaurioitumisriski.
+    </div>
+
+    <h3>4.5 Kausihuolto</h3>
+    <table>
+      <tr><th>#</th><th>Toimenpide</th><th>Väli</th></tr>
+      <tr><td>1</td><td>Anodi — tarkastus ja vaihto</td><td>Vuosittain</td></tr>
+      <tr><td>2</td><td>Vesipumpun siipiratas — tarkastus</td><td>Joka kausi</td></tr>
+      <tr><td>3</td><td>Vaihdeöljy — vaihto</td><td>Huolto-ohjeen mukaan</td></tr>
+      <tr><td>4</td><td>Sytytystulpat — tarkastus/vaihto</td><td>Vuosittain</td></tr>
+      <tr><td>5</td><td>Polttoaineletkut ja suodatin</td><td>Tarkastus joka kausi</td></tr>
+    </table>
+
+    <h3>4.6 Talvisäilytys</h3>
+    <ul>
+      <li>Irrota moottori peräpeilistä</li>
+      <li>Säilytä sisätiloissa tai lämpimässä</li>
+      <li>Huuhtele makea vesi jäähdytysjärjestelmän läpi</li>
+      <li>Tyhjennä polttoaine tai lisää stabilointiainetta</li>
+    </ul>
+
+    <h3>4.7 Vianetsintä</h3>
+    <table>
+      <tr><th>Ongelma</th><th>Tarkista</th></tr>
+      <tr><td>Ei käynnisty</td><td>Polttoaine, sytytystulppa, rikastin, hätäsammutuskytkin</td></tr>
+      <tr><td>Moottori yskii</td><td>Polttoainesuodatin, ilma polttoainelinjassa, vanha bensiini</td></tr>
+      <tr><td>Ylikuumenee</td><td>Vesipumpun siipiratas, tukokset jäähdytysvesiaukossa</td></tr>
+      <tr><td>Voimansiirto-ongelma</td><td>Vaihdeöljyn taso, vaijeri</td></tr>
+    </table>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     5. SÄHKÖJÄRJESTELMÄ
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch5">
+  <summary>5. Sähköjärjestelmä</summary>
+  <div class="chapter-body">
+
+    <h3>5.1 Järjestelmän yleiskuva</h3>
+    <pre style="color:var(--muted);font-size:0.85rem;overflow-x:auto;padding:12px;background:rgba(0,0,0,0.3);border-radius:6px;">
+[Aurinkopaneeli 150W]
+        |
+[Victron SmartSolar MPPT 75/15]
+        |
+    [Akku 100 Ah]
+        |
+[COLIGHT 12/8 Gang Switch Panel]
+        |
+   +--------+--------+--------+--------+
+   |        |        |        |        |
+[Pumppu] [Valot] [Viskikaappi] [USB] [IoT]</pre>
+
+    <h3>5.2 Akku</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Tyyppi</td><td>Lyijyakku</td></tr>
+      <tr><td>Kapasiteetti</td><td>100 Ah</td></tr>
+      <tr><td>Jännite</td><td>12 V</td></tr>
+    </table>
+    <h4>Varaustasot</h4>
+    <table>
+      <tr><th>Jännite</th><th>Varaustaso (SOC)</th><th>Tila</th></tr>
+      <tr><td>&ge; 12,7 V</td><td>100 %</td><td style="color:var(--green)">Täysi</td></tr>
+      <tr><td>12,4 V</td><td>~75 %</td><td style="color:var(--green)">Hyvä</td></tr>
+      <tr><td>12,2 V</td><td>~50 %</td><td style="color:var(--yellow)">OK</td></tr>
+      <tr><td>12,0 V</td><td>~25 %</td><td style="color:var(--orange)">Matala</td></tr>
+      <tr><td>&le; 11,8 V</td><td>&lt; 20 %</td><td style="color:var(--red)">Kriittinen — lataa!</td></tr>
+    </table>
+    <div class="warn">
+      <strong>Lyijyakku:</strong> Älä päästä varausta alle 50 % — lyhentää käyttöikää merkittävästi. Talvella: AGM kestää pakkasta, LiFePO4 säilytettävä yli +5°C.
+    </div>
+
+    <h3>5.3 Aurinkopaneeli ja lataussäädin</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Paneeli</td><td>PET puolijoustava, 150 W (nimellisteho 50 W)</td></tr>
+      <tr><td>Koko</td><td>630 &times; 540 mm</td></tr>
+      <tr><td>Lataussäädin</td><td>Victron SmartSolar MPPT 75/15</td></tr>
+      <tr><td>Maks. latausvirta</td><td>15 A</td></tr>
+      <tr><td>Yhteys</td><td>Bluetooth (VictronConnect-sovellus)</td></tr>
+    </table>
+    <h4>VictronConnect-sovellus</h4>
+    <ol>
+      <li>Lataa VictronConnect App Storesta</li>
+      <li>Yhdistä Bluetoothilla säätimeen</li>
+      <li>Näet: PV-teho, akun jännite, latausvirta, latausvaihe</li>
+    </ol>
+    <div class="info">
+      <strong>BLE-salausavain:</strong> IoT-dashboardin Victron-yhteys vaatii 32-merkkisen hex-avaimen. Löytyy VictronConnectista: Laite &rarr; Product Info &rarr; Encryption key.
+    </div>
+
+    <h3>5.4 COLIGHT-kytkintaulu</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Malli</td><td>COLIGHT 12/8 Gang Switch Panel</td></tr>
+      <tr><td>Kytkimet</td><td>12 kytkinpaikkaa</td></tr>
+      <tr><td>Ohjaus</td><td>Fyysinen + Älypuhelinsovellus (Bluetooth)</td></tr>
+    </table>
+    <div class="info">
+      <strong>TODO:</strong> Kytkintaulun kytkentäkartta (mihin kytkimeen mikäkin laite) on dokumentoitava.
+    </div>
+
+    <h3>5.5 USB-lataus</h3>
+    <ul>
+      <li>USB-A + USB-C</li>
+      <li>Tulojännite: 12–24 V</li>
+      <li>Lähtö: 5 V / 3,1 A yhteensä</li>
+    </ul>
+
+    <h3>5.6 Sähkönkulutuksen hallinta</h3>
+    <p>100 Ah akulla (~50 Ah käytettävissä lyijyakulle) on tärkeää tuntea kulutus:</p>
+    <table>
+      <tr><th>Laite</th><th>Kulutus (arvio)</th></tr>
+      <tr><td>IoT-järjestelmä (ESP32 + anturit)</td><td>~0,5 A</td></tr>
+      <tr><td>Navigointivalot</td><td>~1–2 A</td></tr>
+      <tr><td>Vesipumppu</td><td>~2 A (käytössä)</td></tr>
+      <tr><td>VHF-radio (vastaanotto)</td><td>~0,3 A</td></tr>
+      <tr><td>VHF-radio (lähetys)</td><td>~5 A</td></tr>
+      <tr><td>USB-lataus</td><td>~0,5–1 A</td></tr>
+      <tr><td>Viskikaappi (aktuaattori)</td><td>~2 A (hetkellinen)</td></tr>
+    </table>
+    <div class="tip">
+      <strong>Vinkki:</strong> Aurinkopaneeli tuottaa parhaimmillaan ~2–3 A. Pidä tarpeeton kulutus sammutettuna yön yli.
+    </div>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     6. NAVIGOINTI
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch6">
+  <summary>6. Navigointi</summary>
+  <div class="chapter-body">
+
+    <h3>6.1 Kompassi</h3>
+    <p>Kiinteä kompassi ohjaamossa. Huomioi magneettinen deviaatio ja varianssi alueesi mukaan.</p>
+
+    <h3>6.2 VHF-radio</h3>
+    <h4>Tärkeimmät kanavat</h4>
+    <table>
+      <tr><th>Kanava</th><th>Käyttö</th></tr>
+      <tr><td><strong>16</strong></td><td>Hätäkutsu (MAYDAY, PAN PAN, SECURITÉ) — aina päällä</td></tr>
+      <tr><td>9</td><td>Kutsukanava (vaihtoehtokutsu)</td></tr>
+      <tr><td>13</td><td>Satamaliikenne</td></tr>
+      <tr><td>72</td><td>Venetoveneyhteydet</td></tr>
+    </table>
+    <div class="warn">
+      <strong>MAYDAY-hätäkutsu (kanava 16):</strong><br>
+      "MAYDAY MAYDAY MAYDAY, tämä on [veneen nimi], [veneen nimi], [veneen nimi].<br>
+      Sijaintimme on [koordinaatit/paikka].<br>
+      Hätämme on [kuvaus].<br>
+      Meitä on [henkilöiden lukumäärä] henkilöä.<br>
+      Over."
+    </div>
+    <div class="info">
+      Tarkempi VHF-kanavataulukko ja radioliikenneopas löytyvät kansiossa <code>guides/</code>.
+    </div>
+
+    <h3>6.3 Raymarine ST1000+ autopilotti</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Malli</td><td>Raymarine ST1000+</td></tr>
+      <tr><td>Tyyppi</td><td>Pinnapilotta (tiller pilot)</td></tr>
+      <tr><td>Kiinnitys</td><td>Tillin ja kiinnikkeen väliin</td></tr>
+    </table>
+    <h4>Käyttö</h4>
+    <ol>
+      <li>Kiinnitä pilotti tilliin</li>
+      <li>Ohjaa halutulle kurssille</li>
+      <li>Paina AUTO — autopilotti lukitsee kurssin</li>
+      <li>Kurssimuutos: +1° / -1° tai +10° / -10° painikkeilla</li>
+      <li>STANDBY palauttaa manuaaliohjauksen</li>
+    </ol>
+    <div class="warn">
+      <strong>Rajoitukset:</strong> Pinnapilotta ei korvaa vahtia. Älä jätä ohjaamoa ilman valvontaa. Ei käytettävissä kovassa merenkäynnissä (ylittää momenttirajan).
+    </div>
+
+    <h3>6.4 Muut instrumentit</h3>
+    <ul>
+      <li>Kallistusmittari</li>
+      <li>Kiikarit</li>
+      <li>Etsintävalo</li>
+      <li>Autoradio (viihde)</li>
+    </ul>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     7. IoT DASHBOARD
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch7">
+  <summary>7. IoT Dashboard — SusieQ-Data</summary>
+  <div class="chapter-body">
+
+    <h3>7.1 Yhdistäminen</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>WiFi-verkko</td><td><code>SusieQ-Data</code></td></tr>
+      <tr><td>Salasana</td><td><code>susieq123</code></td></tr>
+      <tr><td>Dashboard-osoite</td><td><code>http://192.168.4.1</code></td></tr>
+      <tr><td>Päivitysväli</td><td>2 sekuntia (WebSocket)</td></tr>
+    </table>
+    <h4>Lisää iPadin kotinäytölle</h4>
+    <ol>
+      <li>Avaa Safari &rarr; <code>http://192.168.4.1</code></li>
+      <li>Paina Jaa-painiketta (neliö + nuoli ylös)</li>
+      <li>Valitse "Lisää kotivalikkoon"</li>
+      <li>Dashboard avautuu koko näytön sovelluksena</li>
+    </ol>
+
+    <h3>7.2 Dashboard-näkymä</h3>
+    <p>Dashboard näyttää reaaliaikaisesti kaikki veneen sensorit korttinäkymässä. Yhteyden tila näkyy oikean yläkulman pallerossa:</p>
+    <ul>
+      <li style="color:var(--green)">Vihreä = yhteys toimii</li>
+      <li style="color:var(--red)">Punainen = yhteys katkennut</li>
+    </ul>
+
+    <h3>7.3 Tuulimittari</h3>
+    <table>
+      <tr><th>Tieto</th><th>Lähde</th></tr>
+      <tr><td>Tuulennopeus (m/s)</td><td>Ultraäänianemometri (RS485 Modbus)</td></tr>
+      <tr><td>Tuulensuunta (0–360°)</td><td>Ultraäänianemometri</td></tr>
+    </table>
+    <p>Modbus slave ID: 1, baudinopeus: 4800</p>
+
+    <h3>7.4 Akkumonitori</h3>
+    <table>
+      <tr><th>Mittaus</th><th>Lähde</th></tr>
+      <tr><td>Jännite (V)</td><td>Victron SmartSolar (BLE)</td></tr>
+      <tr><td>Virta (A)</td><td>Victron SmartSolar (BLE) — negatiivinen = purkaus</td></tr>
+      <tr><td>Varaustaso (SOC %)</td><td>Laskettu jännitteestä</td></tr>
+    </table>
+    <p>Akkudata tulee Victron SmartSolar MPPT 75/15:lta Bluetooth Low Energy -yhteydellä.</p>
+
+    <h3>7.5 Aurinkopaneeli (Victron BLE)</h3>
+    <p>Jos Victron BLE on käytössä (<code>VICTRON_ENABLED = 1</code>), dashboard näyttää:</p>
+    <ul>
+      <li>PV-teho (W)</li>
+      <li>PV-jännite (V)</li>
+      <li>Latausvaihe (Off, Bulk, Absorption, Float, Equalization)</li>
+    </ul>
+    <div class="info">
+      <strong>Salausavain:</strong> Victron BLE vaatii 32-merkkisen hex-avaimen. Syötä tiedostoon <code>config.h</code> kohtaan <code>VICTRON_KEY</code>.
+    </div>
+
+    <h3>7.6 Vesitankki</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Mittaus</td><td>HX711 painoanturi (load cell)</td></tr>
+      <tr><td>Tankin kapasiteetti</td><td>15 L</td></tr>
+      <tr><td>Näyttö</td><td>Litrat + prosentti</td></tr>
+    </table>
+
+    <h3>7.7 Polttoainetankki</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Mittaus</td><td>HX711 painoanturi</td></tr>
+      <tr><td>Kanisterin koko</td><td>25 L</td></tr>
+      <tr><td>Polttoaineen tiheys</td><td>0,74 kg/L (bensiini)</td></tr>
+      <tr><td>Näyttö</td><td>Litrat + prosentti</td></tr>
+    </table>
+
+    <h3>7.8 Rommipullo</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Mittaus</td><td>HX711 painoanturi</td></tr>
+      <tr><td>Pullokoko</td><td>0,7 L</td></tr>
+      <tr><td>Näyttö</td><td>Litrat + prosentti</td></tr>
+    </table>
+
+    <h3>7.9 GPS</h3>
+    <table>
+      <tr><th>Mittaus</th><th>Lähde</th></tr>
+      <tr><td>Sijainti (lat/lon)</td><td>GY-NEO6MV2 (UART, 9600 baud)</td></tr>
+      <tr><td>Nopeus (SOG, solmut)</td><td>GPS NMEA</td></tr>
+      <tr><td>Kurssi (COG, asteet)</td><td>GPS NMEA</td></tr>
+      <tr><td>UTC-aika</td><td>GPS</td></tr>
+    </table>
+
+    <h3>7.10 Sääasema</h3>
+    <table>
+      <tr><th>Mittaus</th><th>Anturi</th></tr>
+      <tr><td>Ilman lämpötila</td><td>AHT20 + BMP280 (I2C)</td></tr>
+      <tr><td>Ilmankosteus</td><td>AHT20</td></tr>
+      <tr><td>Ilmanpaine</td><td>BMP280</td></tr>
+      <tr><td>Veden lämpötila</td><td>DS18B20 (1-Wire)</td></tr>
+    </table>
+
+    <h3>7.11 Keulayksikkö (Bow Unit)</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Alusta</td><td>ESP32-CAM (AI-Thinker)</td></tr>
+      <tr><td>Kamera</td><td>OV2640</td></tr>
+      <tr><td>LIDAR</td><td>TF-Luna (8 m kantama)</td></tr>
+      <tr><td>IP-osoite</td><td>192.168.4.10</td></tr>
+      <tr><td>Health check</td><td>10 sekunnin välein</td></tr>
+    </table>
+    <p>Keulayksikön tila näkyy dashboardissa: Online/Offline + signaalinvoimakkuus (RSSI).</p>
+
+    <h3>7.12 Taraus ja kalibrointi</h3>
+    <h4>Polttoainevaaka</h4>
+    <ol>
+      <li>Aseta <strong>tyhjä</strong> kanisteri vaa'alle</li>
+      <li>Avaa <code>http://192.168.4.1</code></li>
+      <li>Paina "Tara (tyhjä kanisteri)" -nappia</li>
+      <li>Tara tallennetaan ESP32:n flash-muistiin (säilyy virrankatkojen yli)</li>
+    </ol>
+    <h4>Vesitankki</h4>
+    <p>Taraus: <code>GET http://192.168.4.1/tare_water</code></p>
+    <h4>Rommipullo</h4>
+    <p>Taraus: <code>GET http://192.168.4.1/tare_rum</code></p>
+    <div class="info">
+      <strong>Kalibrointikerroin:</strong> Jos vaa'an lukema on väärä, säädä <code>CALIBRATION_FACTOR</code> tiedostossa <code>config.h</code>. Aloita arvosta 420.0 ja säädä tunnetulla painolla.
+    </div>
+
+    <h3>7.13 JSON API</h3>
+    <p>Dashboard-datan voi hakea ohjelmallisesti:</p>
+    <p><code>GET http://192.168.4.1/data</code></p>
+    <p>Vastaus sisältää kaikkien sensorien lukemat JSON-muodossa (tuuli, akku, aurinko, vesi, polttoaine, GPS, sää).</p>
+
+    <h3>7.14 Vianetsintä</h3>
+    <table>
+      <tr><th>Ongelma</th><th>Tarkista</th></tr>
+      <tr><td>Tuulianturi ei vastaa</td><td>Modbus slave ID (1), baudinopeus (4800), DE-nasta GPIO 4</td></tr>
+      <tr><td>INA219 ei löydy</td><td>I2C-osoite 0x40, SDA/SCL-kytkentä (GPIO 21/22)</td></tr>
+      <tr><td>Victron ei päivity</td><td>Encryption key config.h:ssa, BLE kantama</td></tr>
+      <tr><td>Vaaka lukee väärin</td><td>Kalibrointikerroin, tee tara uudelleen</td></tr>
+      <tr><td>Dashboard ei avaudu</td><td><code>pio run -t uploadfs</code> suoritettu? LittleFS partition oikein?</td></tr>
+      <tr><td>WiFi ei näy</td><td>ESP32 saa virtaa? 12V &rarr; 5V muunnin OK?</td></tr>
+    </table>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     8. KEITTIÖ JA SISÄTILAT
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch8">
+  <summary>8. Keittiö ja sisätilat</summary>
+  <div class="chapter-body">
+
+    <h3>8.1 Kajuuttajärjestely</h3>
+    <table>
+      <tr><th>Alue</th><th>Kuvaus</th></tr>
+      <tr><td>Keulakajuutta (V-hytti)</td><td>V-muotoiset makuupaikat (yhdistettävissä kaksoisvuoteeksi), säilytystilat</td></tr>
+      <tr><td>Salonki</td><td>Kiinteät penkkilevyt 2+2, taitettava pöytä</td></tr>
+      <tr><td>Navigointipöytä</td><td>Erillinen, oikealla puolella</td></tr>
+      <tr><td>Keittiö (galley)</td><td>L-muotoinen, keitin, tiskiallas</td></tr>
+      <tr><td>WC (head)</td><td>Porta Potti, käsiallas</td></tr>
+    </table>
+
+    <h3>8.2 Spriikeitin</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Polttimot</td><td>2 kpl</td></tr>
+      <tr><td>Polttoaine</td><td>Denaturoitu alkoholi (sprii)</td></tr>
+    </table>
+    <h4>Käyttö</h4>
+    <ol>
+      <li>Varmista tuuletus — avaa luukku tai hatch</li>
+      <li>Kaada polttonestealtaaseen pieni määrä spriitä</li>
+      <li>Sytytä altaan sprii tulitikulla — esilämmitys</li>
+      <li>Kun poltin lämpenee, avaa venttiili — sprii kaasuttuu ja palaa sinisellä liekillä</li>
+      <li>Sammutus: sulje venttiili, anna jäähtyä</li>
+    </ol>
+    <div class="warn">
+      <strong>Turvallisuus:</strong> Sprii palaa lähes näkymättömällä liekillä kirkkaassa valossa. Älä koskaan lisää polttonestettä kuumaan keittimeen. Pidä sammutin käden ulottuvilla.
+    </div>
+
+    <h3>8.3 Vesijärjestelmä</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Pumppu</td><td>Kalvopumppu (12V DC)</td></tr>
+      <tr><td>Virta</td><td>Maks. 2 A</td></tr>
+      <tr><td>Virtaus</td><td>Maks. 3,5 l/min</td></tr>
+      <tr><td>Vesi</td><td>Järvivesi (tankkisäiliöstä hanan kautta tiskialtaaseen)</td></tr>
+    </table>
+    <div class="info">
+      Järvivesi ei ole juomakelpoista. Juomavesi on tuotava erillisesti.
+    </div>
+
+    <h3>8.4 Astiastot</h3>
+    <p>Muovinen astiasto 4 henkilölle: lautaset, leipälautaset, kulhot, mukit, kirkaat mukit. Aterimet (musta ruostumaton teräs): haarukka, veitsi, lusikka, teelusikka &times; 4.</p>
+
+    <h3>8.5 Viskikaappi</h3>
+    <p>Aktuaattorilla (lineaarimoottori) automaattisesti aukeava kaappi. Toimii 12V sähköjärjestelmästä. Hetkellinen virrankulutus ~2 A.</p>
+
+    <h3>8.6 Porta Potti</h3>
+    <h4>Käyttö</h4>
+    <ol>
+      <li>Avaa kansi</li>
+      <li>Pumpaa huuhteluvettä luistinventtiilin kautta</li>
+      <li>Käytön jälkeen: sulje luistinventtiili</li>
+    </ol>
+    <h4>Tyhjennys</h4>
+    <ol>
+      <li>Irrota säiliö kantokahvasta</li>
+      <li>Tyhjennä septitankkiin satamassa — <strong>ei koskaan veteen</strong></li>
+      <li>Huuhtele ja lisää kemikaali</li>
+    </ol>
+    <h4>Talvisäilytys</h4>
+    <p>Huuhtele propyleeniglykolilla (ei myrkyllinen). Jätä venttiili auki.</p>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     9. TURVALLISUUS
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch9">
+  <summary>9. Turvallisuus</summary>
+  <div class="chapter-body">
+
+    <h3>9.1 Turvallisuusvarusteet</h3>
+    <table>
+      <tr><th>Varuste</th><th>Määrä</th><th>Sijainti</th></tr>
+      <tr><td>Pelastusliivit</td><td>5 kpl</td><td>Ohjaamoluukku / kajuutan kaappi</td></tr>
+      <tr><td>Pelastusrengas (hevosenkenkä)</td><td>1 kpl</td><td>Peräkaide</td></tr>
+      <tr><td>Pelastusrenkaan merkkivalo</td><td>1 kpl</td><td>Pelastusrenkaan yhteydessä</td></tr>
+      <tr><td>Jauhesammutin</td><td>1 kpl</td><td>Kajuutan sisäänkäynti</td></tr>
+      <tr><td>Lepuuttajat</td><td>6 kpl</td><td>Ohjaamon lokerot</td></tr>
+      <tr><td>Peräportaat</td><td>1 kpl</td><td>Peräpeili</td></tr>
+    </table>
+
+    <h3>9.2 Paloturvallisuus</h3>
+    <ul>
+      <li>Sammuttimen sijainti on tunnettava — varmista ennen lähtöä</li>
+      <li>Spriikeitin: näkymätön liekki, pidä sammutin lähellä keittäessä</li>
+      <li>Sähköjärjestelmä: kaikki piirit on suojattava sulakkeilla</li>
+      <li>Polttoainehöyryt: tuuleta moottoritila ennen käynnistystä</li>
+    </ul>
+
+    <h3>9.3 Pelastusliivien käyttö</h3>
+    <ul>
+      <li>Puettava aina ennen lähtöä kovassa tuulessa tai huonossa näkyvyydessä</li>
+      <li>Lapset ja uimataidottomat: aina pelastusliivi</li>
+      <li>Yöpurjehdus: pelastusliivi + valjaat + jackline</li>
+    </ul>
+
+    <h3>9.4 MOB — Mies yli laidan</h3>
+    <div class="warn">
+      <strong>Välittömät toimenpiteet:</strong>
+      <ol>
+        <li><strong>Huuda</strong> "MIES YLI LAIDAN!" — osoita kädellä jatkuvasti</li>
+        <li><strong>Heitä</strong> pelastusrengas</li>
+        <li><strong>Merkitse</strong> paikka (GPS MOB-nappi jos käytettävissä)</li>
+        <li><strong>Käynnistä moottori</strong>, laske purjeet tarvittaessa</li>
+        <li><strong>Palaa takaisin</strong> uhrin luokse (Williamson-käännös)</li>
+        <li><strong>Lähesty tuulen puolelta</strong>, nosta peräportaiden / pelastusrenkaan avulla</li>
+        <li>Hätäilmoitus VHF kanavalla 16 tarvittaessa</li>
+      </ol>
+    </div>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     10. TARKISTUSLISTAT
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch10">
+  <summary>10. Tarkistuslistat</summary>
+  <div class="chapter-body">
+
+    <h3>10.1 Lähtötarkistus</h3>
+    <ul class="checklist" data-list="departure">
+      <li><input type="checkbox"><span>Sääennuste tarkistettu</span></li>
+      <li><input type="checkbox"><span>Akun varaustaso riittävä (dashboard tai mittari)</span></li>
+      <li><input type="checkbox"><span>Polttoaineen taso riittävä (dashboard)</span></li>
+      <li><input type="checkbox"><span>Vesitankki täytetty</span></li>
+      <li><input type="checkbox"><span>Pelastusliivit riittävä määrä</span></li>
+      <li><input type="checkbox"><span>Sammutin paikallaan ja tarkastettu</span></li>
+      <li><input type="checkbox"><span>VHF-radio toimii — testikutsu</span></li>
+      <li><input type="checkbox"><span>Navigointivalot toimivat</span></li>
+      <li><input type="checkbox"><span>Moottori tarkistettu (öljy, polttoaine, jäähdytysvesi)</span></li>
+      <li><input type="checkbox"><span>Purjeet valmiina</span></li>
+      <li><input type="checkbox"><span>Ankkuri valmis käyttöön</span></li>
+      <li><input type="checkbox"><span>Pilssi kuiva</span></li>
+      <li><input type="checkbox"><span>Luukut ja venttiilit suljettu</span></li>
+      <li><input type="checkbox"><span>Köydet ja lepuuttajat valmiina</span></li>
+      <li><input type="checkbox"><span>Reittipurjehdussuunnitelma laadittu</span></li>
+    </ul>
+    <button class="checklist-reset" onclick="resetChecklist('departure')">Tyhjennä lista</button>
+
+    <h3>10.2 Ankkurointitarkistus</h3>
+    <ul class="checklist" data-list="anchor">
+      <li><input type="checkbox"><span>Syvyys tarkistettu</span></li>
+      <li><input type="checkbox"><span>Pohjan laatu arvioitu (hiekka/muta/kallio)</span></li>
+      <li><input type="checkbox"><span>Ankkuri laskettu hallitusti</span></li>
+      <li><input type="checkbox"><span>Scope riittävä (syvyys &times; 5–7)</span></li>
+      <li><input type="checkbox"><span>Ankkuri testattu peruuttamalla moottorilla</span></li>
+      <li><input type="checkbox"><span>Ankkurivalo asennettu (yö / huono näkyvyys)</span></li>
+      <li><input type="checkbox"><span>Raivaustila tarkistettu (tuulen kääntyminen)</span></li>
+    </ul>
+    <button class="checklist-reset" onclick="resetChecklist('anchor')">Tyhjennä lista</button>
+
+    <h3>10.3 Satamaan tulo</h3>
+    <ul class="checklist" data-list="harbor">
+      <li><input type="checkbox"><span>Purjeet laskettu / rullattu</span></li>
+      <li><input type="checkbox"><span>Moottori käynnissä</span></li>
+      <li><input type="checkbox"><span>Lepuuttajat asetettu molemmin puolin</span></li>
+      <li><input type="checkbox"><span>Köydet valmiina keulassa ja perässä</span></li>
+      <li><input type="checkbox"><span>Miehistö ohjeistettu (kuka tekee mitäkin)</span></li>
+      <li><input type="checkbox"><span>Tuulen suunta huomioitu (tuuli painaa laituriin vai pois?)</span></li>
+    </ul>
+    <button class="checklist-reset" onclick="resetChecklist('harbor')">Tyhjennä lista</button>
+
+    <h3>10.4 Kovan tuulen toimenpiteet</h3>
+    <ul class="checklist" data-list="heavyweather">
+      <li><input type="checkbox"><span>Sääennuste tarkistettu uudelleen</span></li>
+      <li><input type="checkbox"><span>Purjeet reivattava tai vaihdettava pienempään</span></li>
+      <li><input type="checkbox"><span>Pelastusliivit ja valjaat kaikille</span></li>
+      <li><input type="checkbox"><span>Luukut ja venttiilit suljettu tiukasti</span></li>
+      <li><input type="checkbox"><span>Irralliset tavarat kiinnitetty</span></li>
+      <li><input type="checkbox"><span>Moottori käyttövalmis (vara)</span></li>
+      <li><input type="checkbox"><span>VHF päällä kanavalla 16</span></li>
+    </ul>
+    <button class="checklist-reset" onclick="resetChecklist('heavyweather')">Tyhjennä lista</button>
+
+    <h3>10.5 Veneen sulkeminen</h3>
+    <ul class="checklist" data-list="closeup">
+      <li><input type="checkbox"><span>Purjeet laskettu ja peitetty (puomipeite)</span></li>
+      <li><input type="checkbox"><span>Moottori nostettu ja sammutettu</span></li>
+      <li><input type="checkbox"><span>Polttoaineen sulkuventtiili kiinni</span></li>
+      <li><input type="checkbox"><span>Sähkölaitteet sammutettu</span></li>
+      <li><input type="checkbox"><span>Vesipumppu pois päältä</span></li>
+      <li><input type="checkbox"><span>Luukut suljettu ja lukittu</span></li>
+      <li><input type="checkbox"><span>Köydet kiinnitetty ja tarkistettu</span></li>
+      <li><input type="checkbox"><span>Lepuuttajat paikoillaan</span></li>
+      <li><input type="checkbox"><span>Pilssi tarkistettu</span></li>
+      <li><input type="checkbox"><span>Ankkurivalo pois (jos laiturissa)</span></li>
+    </ul>
+    <button class="checklist-reset" onclick="resetChecklist('closeup')">Tyhjennä lista</button>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     11. KAUSIHUOLTO JA TALVITYTYS
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch11">
+  <summary>11. Kausihuolto ja talvisäilytys</summary>
+  <div class="chapter-body">
+
+    <h3>11.1 Vuosikello</h3>
+    <table>
+      <tr><th>Kuukausi</th><th>Toimenpiteet</th></tr>
+      <tr><td>Syyskuu</td><td>Purjeiden laskeminen ja pesu, takiloinnin tarkastus</td></tr>
+      <tr><td>Lokakuu</td><td>Nosto maalle, pohjamaali, pilssin tyhjennys</td></tr>
+      <tr><td>Lokakuu</td><td>Moottorin talvisäilytys, vesijärjestelmien tyhjennys</td></tr>
+      <tr><td>Marraskuu</td><td>Peite pystyyn, kuivaaja sisälle, akut lataukseen</td></tr>
+      <tr><td>Tammi–Maaliskuu</td><td>Huoltotyöt, kunnostus, varaosien hankinta</td></tr>
+      <tr><td>Huhtikuu</td><td>Tarkastus, vesillelasku-valmistelu</td></tr>
+      <tr><td>Toukokuu</td><td>Vesillelasku, takiloinnin pystytys</td></tr>
+    </table>
+
+    <h3>11.2 Talvisäilytys — kriittiset toimenpiteet</h3>
+    <table>
+      <tr><th>Kohde</th><th>Toimenpide</th></tr>
+      <tr><td>Moottori</td><td>Irrota peräpeilistä, säilytä sisätiloissa/lämpimässä</td></tr>
+      <tr><td>Porta Potti</td><td>Huuhtele propyleeniglykolilla (ei myrkyllinen)</td></tr>
+      <tr><td>Sisätilat</td><td>Sähköinen kuivaaja talveksi — ehdottoman suositeltava</td></tr>
+      <tr><td>Akku (AGM)</td><td>Kestää pakkasta, irrota ja lataa täyteen</td></tr>
+      <tr><td>Akku (LiFePO4)</td><td>Säilytettävä yli +5°C — vie sisälle</td></tr>
+      <tr><td>Vesijärjestelmä</td><td>Tyhjennä kokonaan, puhalla linjat tyhjiksi</td></tr>
+      <tr><td>Purjeet</td><td>Pese, kuivaa, varastoi kuivaan ja pimeään</td></tr>
+    </table>
+
+    <h3>11.3 Keväthuolto (vesillelaskuvalmistelu)</h3>
+    <ol>
+      <li>Tarkista pohjamaali — hio ja maalaa tarvittaessa</li>
+      <li>Tarkista kölivasteet ja anturit</li>
+      <li>Asenna moottori takaisin</li>
+      <li>Tarkista seisova ja juokseva takilointi</li>
+      <li>Asenna purjeet ja testaa Furlex</li>
+      <li>Kytke sähköjärjestelmä — testaa kaikki piirit</li>
+      <li>Täytä vesitankki</li>
+      <li>Suorita lähtötarkistus (kohta 10.1)</li>
+    </ol>
+
+    <h3>11.4 Rakenteelliset tarkistukset (vuosittain)</h3>
+    <table>
+      <tr><th>Kohde</th><th>Mitä tarkistetaan</th><th>Varoitusmerkit</th></tr>
+      <tr><td>Ketjulevyt (chainplates)</td><td>Pistesyöpyminen, ruoste, tiiviste</td><td>Ruostejälki kannella</td></tr>
+      <tr><td>Kiilaruuvit (keel bolts)</td><td>Korroosio, tiukkuus</td><td>Vuoto pilssissä kiilan kohdalla</td></tr>
+      <tr><td>Kansi (balsa-sandwich)</td><td>Delaminoituminen</td><td>Kansi joustaa kävellessä ("spongy")</td></tr>
+      <tr><td>Osmoottiset rakkulat</td><td>Vesilinjan alapuolella</td><td>Kopautettaessa ontto ääni</td></tr>
+    </table>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     12. YHTEYSTIEDOT JA VIITTEET
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch12">
+  <summary>12. Yhteystiedot ja viitteet</summary>
+  <div class="chapter-body">
+
+    <h3>12.1 Omistajat</h3>
+    <table>
+      <tr><th>Nimi</th><th>Puhelin</th></tr>
+      <tr><td>Jussi Nippala</td><td><em>(lisää numero)</em></td></tr>
+      <tr><td>Miikka Irri</td><td><em>(lisää numero)</em></td></tr>
+      <tr><td>Miikka Vasaramäki</td><td><em>(lisää numero)</em></td></tr>
+    </table>
+
+    <h3>12.2 Satama ja seura</h3>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Kotisatama</td><td>Romsin satama</td></tr>
+      <tr><td>Veneseura</td><td>Vene-71</td></tr>
+    </table>
+
+    <h3>12.3 Hätänumerot</h3>
+    <table>
+      <tr><th>Palvelu</th><th>Numero / kanava</th></tr>
+      <tr><td>Yleinen hätänumero</td><td><strong>112</strong></td></tr>
+      <tr><td>Meripelastus (MRCC Turku)</td><td>02 1001</td></tr>
+      <tr><td>VHF hätäkanava</td><td><strong>Kanava 16</strong></td></tr>
+    </table>
+
+    <h3>12.4 Hyödylliset sovellukset</h3>
+    <ul>
+      <li><strong>VictronConnect</strong> — aurinkopaneelin ja lataussäätimen seuranta</li>
+      <li><strong>Navionics</strong> — merikartat, reittisuunnittelu</li>
+      <li><strong>Windy</strong> — sääennusteet, tuulitiedot</li>
+      <li><strong>112 Suomi</strong> — hätäilmoitussovellus (automaattinen paikannus)</li>
+    </ul>
+
+    <h3>12.5 Projektin dokumentit</h3>
+    <table>
+      <tr><th>Tiedosto</th><th>Sisältö</th></tr>
+      <tr><td>CC28_tekniset_tiedot.md</td><td>Mitat, runko, takila, historia</td></tr>
+      <tr><td>CC28_varustelu.md</td><td>Laitteet ja varusteet</td></tr>
+      <tr><td>CC28_kunnostus_ja_projektit.md</td><td>Projektit, huolto, kustannukset</td></tr>
+      <tr><td>wiring_diagram.html</td><td>Sähköjärjestelmän kytkentäkaavio</td></tr>
+      <tr><td>susieq_dashboard/README.md</td><td>IoT-dashboardin ohje</td></tr>
+      <tr><td>guides/</td><td>VHF-kanavataulukko, radioliikenneopas (PDF)</td></tr>
+    </table>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     13. VENE-71
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch13">
+  <summary>13. Vene-71</summary>
+  <div class="chapter-body">
+
+    <h3>13.1 Tukikohdat</h3>
+
+    <h4>Taulasalo</h4>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Koordinaatit</td><td>61°39,1'N 23°45,1'E</td></tr>
+      <tr><td>Paikka</td><td>Taulasalon saari</td></tr>
+      <tr><td>Vesistö</td><td>Koljonselkä, Näsijärvi</td></tr>
+      <tr><td>Paikkakunta</td><td>Tampere</td></tr>
+    </table>
+
+    <h4>Karhusaari</h4>
+    <table>
+      <tr><th>Tieto</th><th>Arvo</th></tr>
+      <tr><td>Koordinaatit</td><td>61°8,9'N 23°57,3'E</td></tr>
+      <tr><td>Paikka</td><td>Karhusaari / Hanhikarit</td></tr>
+      <tr><td>Vesistö</td><td>Joutsenselkä, Tarjannevesi, Näsijärvi</td></tr>
+      <tr><td>Paikkakunta</td><td>Virrat</td></tr>
+    </table>
+
+    <h3>13.2 Veneluettelo</h3>
+    <p style="color:var(--muted);margin-bottom:8px;">Päivitetty 17.1.2025 · P = purjevene, M = moottorivene</p>
+    <div style="overflow-x:auto;">
+    <table>
+      <tr><th>Nimi</th><th>Rek.nro</th><th>Tyyppi</th><th>Pituus</th><th>Omistaja</th><th>Paikkakunta</th><th>Puhelin</th></tr>
+          <tr><td>Aida</td><td>X15101</td><td>P</td><td>10</td><td>Mika Tynkkynen</td><td>Tampere</td><td>050 598 9201</td></tr>
+          <tr><td>Anniara</td><td>P25055</td><td>P</td><td>9.6</td><td>Pirkka Schellhammer</td><td>Tampere</td><td>0408064104</td></tr>
+          <tr><td>Aqua Maria</td><td>A51504</td><td>M</td><td></td><td></td><td></td><td></td></tr>
+          <tr><td>Aquilar</td><td>A51258</td><td>P</td><td>7</td><td>John Coogan</td><td>Tampere</td><td>040 849 6555</td></tr>
+          <tr><td>Avance 245</td><td>A53554</td><td>P</td><td>7.45</td><td>Riku Ilvesmäki</td><td>Tampere</td><td>040 500 1047</td></tr>
+          <tr><td>BelindaV</td><td>R51203</td><td>M</td><td>7.5</td><td>Reima Saarinen</td><td>Tampere</td><td>0400 732 932</td></tr>
+          <tr><td>Beltico</td><td></td><td>P</td><td>8.4</td><td>Mika Kulmala</td><td>Ylöjärvi</td><td>040 741 3314</td></tr>
+          <tr><td>Bettina</td><td>T12420</td><td>M</td><td>14.8</td><td>Jukka Piippo</td><td>Tampere</td><td>0400 588 515</td></tr>
+          <tr><td>Buenaventura</td><td>O13116</td><td>P</td><td>9.2</td><td>Janne Ekman</td><td>Tampere</td><td>044 594 4316</td></tr>
+          <tr><td>Buster RS</td><td>H8522</td><td>M</td><td>4.5</td><td>Teemu Mäntykorpi</td><td>Tampere</td><td>0400 651 733</td></tr>
+          <tr><td>Calimera</td><td>U9853</td><td>M</td><td>9</td><td>Jorma Moisio</td><td>Tampere</td><td>050 530 3093</td></tr>
+          <tr><td>Camalo</td><td>H71328</td><td>P</td><td>7.85</td><td>Timo Hassinen</td><td>Tampere</td><td>040 356 6995</td></tr>
+          <tr><td>Candal</td><td>U39865</td><td>M</td><td>8.2</td><td>Ilkka Säteri</td><td>Tampere</td><td>044 973 4246</td></tr>
+          <tr><td>Carola</td><td>V19559</td><td>M</td><td>9.5</td><td>Marko Hakola</td><td>Kangasala</td><td>044 542 1421</td></tr>
+          <tr><td>Catti</td><td></td><td>P</td><td>5</td><td>Pauli Tossavainen</td><td>Valkeakoski</td><td>0400 790 290</td></tr>
+          <tr><td>Clara</td><td>A13581</td><td>M</td><td>8.3</td><td>Päivi Keränen</td><td>Tampere</td><td>050 365 6652</td></tr>
+          <tr><td>Cri-Cri</td><td>M12673</td><td>M</td><td>11</td><td>Samu Majander</td><td>Tampere</td><td>0414336613</td></tr>
+          <tr><td>Dawn-2-Dusk</td><td>T40325</td><td>M</td><td>10.8</td><td>Tommi Keränen</td><td>Tampere</td><td>0400409897</td></tr>
+          <tr><td>DiipaDaapa</td><td>U54077</td><td>P</td><td>8.05</td><td>Olli Leppänen</td><td>Tampere</td><td>0407552218</td></tr>
+          <tr><td>Dirlanda</td><td></td><td>P</td><td>5.2</td><td></td><td></td><td></td></tr>
+          <tr><td>Elise</td><td>L6630</td><td>P</td><td>9.42</td><td>Pekka Rissanen</td><td>Pirkkala</td><td>050 572 0747</td></tr>
+          <tr><td>Ellida</td><td>T29914</td><td>M</td><td>8.7</td><td>Hannu Nieminen</td><td>Pirkkala</td><td>040 556 6490</td></tr>
+          <tr><td>Elsa</td><td>L8198</td><td>P</td><td>7.7</td><td>Atte Joutsen</td><td>Tampere</td><td>050 327 0314</td></tr>
+          <tr><td>Esteri</td><td></td><td>P</td><td>8</td><td>Luca Vapaavuori</td><td></td><td>0451306380</td></tr>
+          <tr><td>Falco</td><td>T53689</td><td>M</td><td>7.65</td><td>Miisa Nieminen</td><td>Vesilahti</td><td>050 314 3584</td></tr>
+          <tr><td>Felicia</td><td>S18994</td><td>P</td><td>9.1</td><td>Kaius Kaartinen</td><td>Tampere</td><td>0504090707</td></tr>
+          <tr><td>Forza 2</td><td>X11024</td><td>M</td><td>12</td><td>Mari Mäkinen</td><td>Tampere</td><td>040 732 6616</td></tr>
+          <tr><td>Fredrika</td><td>H73568</td><td>M</td><td>8.94</td><td>Mika Kymäläinen</td><td>Tampere</td><td>050 535 8997</td></tr>
+          <tr><td>Frida</td><td>V23829</td><td>P</td><td>8.2</td><td>Jussi Järvinen</td><td>Tampere</td><td>044 541 0047</td></tr>
+          <tr><td>Havilo</td><td>R50435</td><td>P</td><td>8</td><td>Kalle Lento</td><td>Tampere</td><td>0400 697 044</td></tr>
+          <tr><td>Helmiina</td><td>A55878</td><td>M</td><td>11</td><td>Asko Ellman</td><td>Tampere</td><td>040 757 4247</td></tr>
+          <tr><td>Hiisi</td><td>H13799</td><td>M</td><td>10</td><td>Heikki Karjunen</td><td>Tampere</td><td>0443339987</td></tr>
+          <tr><td>Hildegard</td><td></td><td>P</td><td>5.5</td><td>Timotej Kovacic</td><td>Kangasala</td><td>+358404811032</td></tr>
+          <tr><td>Hilla</td><td>T25150</td><td>M</td><td>9.05</td><td>Kari Maunu Juhani Soukka</td><td>Tampere</td><td>050 561 1032</td></tr>
+          <tr><td>Huihai 2</td><td>L11421</td><td>P</td><td>7</td><td>Matti Uusitalo</td><td>Tampere</td><td>0403581137</td></tr>
+          <tr><td>Ii-sakki</td><td>H70864</td><td>M</td><td></td><td></td><td></td><td></td></tr>
+          <tr><td>Jokke</td><td></td><td>P</td><td>5.27</td><td>Esa Sirkkunen</td><td>Tampere</td><td>040 768 0323</td></tr>
+          <tr><td>Josepha</td><td>A57768</td><td>M</td><td>10.5</td><td>Timo Salminen</td><td>Kangasala</td><td>050 313 7400</td></tr>
+          <tr><td>Kaisla 550</td><td></td><td>M</td><td>5.5</td><td>Tuomas Rinne</td><td>Tampere</td><td>040 706 4448</td></tr>
+          <tr><td>La Bianca</td><td></td><td>P</td><td>7</td><td>Elmeri Lumme</td><td>Tampere</td><td>0400158829</td></tr>
+          <tr><td>La Onda</td><td>S18053</td><td>P</td><td>6.6</td><td>Sampo Heino-Hytönen</td><td>Kangasala</td><td>0451331643</td></tr>
+          <tr><td>Leiko</td><td>R16105</td><td>M</td><td>5</td><td>Jarmo Marttinen</td><td>Tampere</td><td>044 239 6490</td></tr>
+          <tr><td>LeiLei</td><td></td><td>P</td><td></td><td>Marko Leino</td><td>Tampere</td><td>040 588 2820</td></tr>
+          <tr><td>Lilli</td><td>T50446</td><td>P</td><td>7.8</td><td>Jukka-Pekka Tanner</td><td>Lempäälä</td><td>0400 956 552</td></tr>
+          <tr><td>Lorna</td><td>X12193</td><td>M</td><td>10</td><td>Jukka-Pekka Tanner</td><td>Lempäälä</td><td>0400 956 552</td></tr>
+          <tr><td>Maininki/Joseline</td><td>H79868</td><td>P</td><td></td><td>Tenho Pimiä</td><td>Siuro</td><td>041 440 6476</td></tr>
+          <tr><td>Mamma Mia!</td><td>X5976</td><td>M</td><td>12</td><td>Jukka Pynnönen</td><td>Pirkkala</td><td>040 767 1949</td></tr>
+          <tr><td>Mantsi</td><td>X10278</td><td>M</td><td>10.4</td><td>Jori Mantsinen</td><td>Tampere</td><td>0405456973</td></tr>
+          <tr><td>Marika</td><td>R52386</td><td>M</td><td>9.56</td><td>Heli Syrjälä</td><td>Tampere</td><td>0505613224</td></tr>
+          <tr><td>Marylin</td><td>T51059</td><td>P</td><td>8.3</td><td>Gabor Szanti</td><td>Pirkkala</td><td>044 416 6543</td></tr>
+          <tr><td>Neitsyt Maria</td><td>T53327</td><td>M</td><td>7.2</td><td>Sirpa Lemmetti</td><td>Tampere</td><td>040 717 6462</td></tr>
+          <tr><td>Nimue</td><td>X15275</td><td>P</td><td>8.8</td><td>Jani Airaksinen</td><td>Kangasala</td><td>040 843 7702</td></tr>
+          <tr><td>Nina</td><td>H71062</td><td>P</td><td>8.1</td><td>Veli Kaipainen</td><td>Tampere</td><td>040 557 4476</td></tr>
+          <tr><td>Oasis</td><td>U27593</td><td>M</td><td>9.85</td><td>Matti Ajo</td><td>Tampere</td><td>050 540 3422</td></tr>
+          <tr><td>Olviina</td><td>L8201</td><td>M</td><td>8.65</td><td>Olli Laurila</td><td>Tampere</td><td>0400 735 371</td></tr>
+          <tr><td>Palmeri</td><td>V21125</td><td>M</td><td>11.5</td><td>Rami Ahmavuo</td><td>Pirkkala</td><td>045 132 1612</td></tr>
+          <tr><td>Papu</td><td>S17702</td><td>P</td><td>5.7</td><td>Teemu Matilainen</td><td>Tampere</td><td>040 779 2040</td></tr>
+          <tr><td>Pii</td><td></td><td>P</td><td>8.3</td><td>Ari Myrskyranta</td><td>Lempäälä</td><td>040 839 3866</td></tr>
+          <tr><td>Piko</td><td>L9056</td><td>P</td><td>6.6</td><td>Ari Selander</td><td>Tampere</td><td>050 550 1388</td></tr>
+          <tr><td>Prima Donna</td><td>L9851</td><td>P</td><td>9.2</td><td>Ismo Nieminen</td><td>Tampere</td><td>040 140 1048</td></tr>
+          <tr><td>Prunella M</td><td>R53107</td><td>P</td><td>8.95</td><td>Jukka Rautiainen</td><td>Ylinen</td><td>040 716 8808</td></tr>
+          <tr><td>Pulu</td><td>A51946</td><td>P</td><td>6.06</td><td>Juha Anttila</td><td>Tampere</td><td>050 406 2981</td></tr>
+          <tr><td>RAN</td><td></td><td>M</td><td>7</td><td>Juha Järvinen</td><td>Pirkkala</td><td>050 569 7747</td></tr>
+          <tr><td>Reija</td><td>H14585</td><td>M</td><td>10.3</td><td>Aarto Lundberg</td><td>Tampere</td><td>0503591835</td></tr>
+          <tr><td>Resande Man 3</td><td>T55622</td><td>P</td><td>7.7</td><td>Aleksi Astor</td><td>Nokia</td><td>0504066077</td></tr>
+          <tr><td>S/Y ChaoX</td><td>X19636</td><td>P</td><td>7.96</td><td>Jarmo Estama</td><td>Tampere</td><td>045 261 5972</td></tr>
+          <tr><td>Samppa</td><td>H3098</td><td>M</td><td>12</td><td>Jyrki Vilppo</td><td>Nokia</td><td>0400 868562</td></tr>
+          <tr><td>Sandels III</td><td>T51843</td><td>P</td><td>8.22</td><td>Joni Virtanen</td><td>Tampere</td><td>0400 524 040</td></tr>
+          <tr><td>Shamima</td><td>L101365</td><td>P</td><td>8.2</td><td>Atte Skogster</td><td>Tampere</td><td>041 740 4857</td></tr>
+          <tr><td>Silver</td><td>P93459</td><td>M</td><td>4.95</td><td>Vesa Heiskanen</td><td>Tampere</td><td>050 407 4966</td></tr>
+          <tr><td>Sindbad</td><td>T51051</td><td>M</td><td>10.55</td><td>Olli Hakala</td><td>Yläjärvi</td><td>050 302 0431</td></tr>
+          <tr><td>Sofia</td><td>A50967</td><td>P</td><td>6.6</td><td>Jussi Salonen</td><td>Tampere</td><td>0405183772</td></tr>
+          <tr><td><strong>Susie Q</strong></td><td>X15207</td><td>P</td><td>8.5</td><td>Miikka Irri</td><td>Kangasala</td><td>040 821 6090</td></tr>
+          <tr><td>Svala</td><td></td><td>M</td><td>9</td><td>Arto Rautajoki</td><td>Tampere</td><td>+358445252200</td></tr>
+          <tr><td>Thalessa</td><td>T55546</td><td>P</td><td>8.56</td><td>Tatu Strengell</td><td>Tampere</td><td>0400567922</td></tr>
+          <tr><td>Tiko-Tiko</td><td>T54913</td><td>P</td><td>9</td><td>Tapani Niininen</td><td>Tampere</td><td>040 572 2700</td></tr>
+          <tr><td>Tuulikki</td><td>T55345</td><td>P</td><td>8</td><td>Timo Raiski</td><td>Ylöjärvi</td><td>0500 724 754</td></tr>
+          <tr><td>Tuulikki</td><td>U57847</td><td>M</td><td>6.8</td><td>Markku Karila</td><td>Tampere</td><td>0400925223</td></tr>
+          <tr><td>Typy</td><td>U51323</td><td>P</td><td>8.22</td><td>Kari Taskinen</td><td>Tampere</td><td>0442485911</td></tr>
+          <tr><td>Vanamo</td><td>P21146</td><td>M</td><td>5.3</td><td>Tommi Mantila</td><td>Ylöjärvi</td><td>0406551146</td></tr>
+          <tr><td>Viktoria</td><td>P59814</td><td>M</td><td>8.5</td><td>Raimo Hakala</td><td>Tampere</td><td>0400 771 996</td></tr>
+          <tr><td>Villiina</td><td>T24147</td><td>M</td><td>8.7</td><td>Jussi Kantolahti</td><td>Tampere</td><td>045 678 9611</td></tr>
+          <tr><td>—</td><td>T25555</td><td>P</td><td>7.8</td><td>Antti Tarhio</td><td>Ylöjärvi</td><td>0400 633 070</td></tr>
+          <tr><td>—</td><td>P46928</td><td>M</td><td>5.8</td><td>Ossi Hakala</td><td>Tampere</td><td>0400 541 272</td></tr>
+          <tr><td>—</td><td>R56592</td><td>M</td><td>6.7</td><td>Lauri Berlin</td><td>Tampere</td><td>041 540 5552</td></tr>
+          <tr><td>—</td><td>P87223</td><td>M</td><td>11.98</td><td>Julius Haarla</td><td>Tampere</td><td>040 779 2910</td></tr>
+          <tr><td>—</td><td>P90764</td><td>M</td><td>4.8</td><td>Jouko Polvinen</td><td>Jyväskylä</td><td>0408387988</td></tr>
+          <tr><td>—</td><td>A53687</td><td>M</td><td>5.62</td><td>Seppo Luosa</td><td>Tampere</td><td>040 730 7808</td></tr>
+          <tr><td>—</td><td></td><td>P</td><td>4</td><td>Mart Kroon</td><td>Kangasala</td><td>0445752819</td></tr>
+          <tr><td>—</td><td>T26638</td><td>M</td><td></td><td>Harri Paltila</td><td>Tampere</td><td>0405232623</td></tr>
+          <tr><td>—</td><td></td><td>M</td><td>4.85</td><td>Mika Lehtinen</td><td>Tampere</td><td>040 551 6882</td></tr>
+          <tr><td>—</td><td></td><td>P</td><td>9.6</td><td>Pirkka Schellhammer</td><td>Tampere</td><td>0408064104</td></tr>
+    </table>
+    </div>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     FOOTER
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="footer">
+  SusieQ — Käyttöopas &middot; C&C 28 (1975) &middot; L-7695<br>
+  Päivitetty: 2026-03-27
+</div>
+
+</div><!-- .content -->
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  // ── Smooth scroll for TOC links ──────────────────────────
+  document.querySelectorAll('.toc a').forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      var target = document.querySelector(this.getAttribute('href'));
+      if (!target) return;
+      // Open the chapter if closed
+      if (!target.open) target.open = true;
+      // Scroll with offset for sticky header
+      var headerH = document.querySelector('.site-header').offsetHeight;
+      var top = target.getBoundingClientRect().top + window.scrollY - headerH - 10;
+      window.scrollTo({ top: top, behavior: 'smooth' });
+    });
+  });
+
+  // ── Toggle all chapters ──────────────────────────────────
+  var allOpen = true;
+  window.toggleAll = function() {
+    allOpen = !allOpen;
+    document.querySelectorAll('.chapter').forEach(function(d) {
+      d.open = allOpen;
+    });
+  };
+
+  // ── Checklist persistence (localStorage) ─────────────────
+  var STORAGE_KEY = 'susieq_checklists';
+
+  function loadChecklists() {
+    var data = {};
+    try { data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch(e) {}
+    document.querySelectorAll('.checklist').forEach(function(list) {
+      var name = list.dataset.list;
+      if (!data[name]) return;
+      list.querySelectorAll('input[type="checkbox"]').forEach(function(cb, i) {
+        cb.checked = !!data[name][i];
+      });
+    });
+  }
+
+  function saveChecklists() {
+    var data = {};
+    document.querySelectorAll('.checklist').forEach(function(list) {
+      var name = list.dataset.list;
+      data[name] = [];
+      list.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+        data[name].push(cb.checked);
+      });
+    });
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+  }
+
+  // Bind change events
+  document.querySelectorAll('.checklist input[type="checkbox"]').forEach(function(cb) {
+    cb.addEventListener('change', saveChecklists);
+  });
+
+  // Reset button
+  window.resetChecklist = function(name) {
+    var list = document.querySelector('.checklist[data-list="' + name + '"]');
+    if (!list) return;
+    list.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+      cb.checked = false;
+    });
+    saveChecklists();
+  };
+
+  // Load on page start
+  loadChecklists();
+})();
+</script>
+
+</body>
+</html>

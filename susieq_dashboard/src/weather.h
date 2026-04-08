@@ -11,7 +11,10 @@ struct WeatherData {
     float humidity   = 0.0f;   // %
     float pressure   = 0.0f;   // hPa
     float water_temp = 0.0f;   // °C
-    bool  valid      = false;
+    bool  valid      = false;  // true if ANY sensor has data
+    bool  aht_valid  = false;  // AHT20: air_temp + humidity
+    bool  bmp_valid  = false;  // BMP280: pressure
+    bool  ds_valid   = false;  // DS18B20: water_temp
 };
 
 void weather_init();

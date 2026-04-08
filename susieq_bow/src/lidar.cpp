@@ -26,7 +26,8 @@ LidarData lidar_read() {
     // Try to read all available frames, keep the latest valid one.
     // Improved sync: read byte-by-byte until 0x59 0x59 header found,
     // then read remaining 7 bytes. Prevents losing valid frames on desync.
-    while (LidarSerial.available() >= 9) {
+    int bytesProcessed = 0;
+    while (LidarSerial.available() >= 9 && bytesProcessed < 72) {
         // Sync: look for first 0x59
         if (LidarSerial.peek() != 0x59) {
             LidarSerial.read();  // discard non-header byte
@@ -54,9 +55,13 @@ LidarData lidar_read() {
         uint16_t dist = buf[2] | (buf[3] << 8);
         uint16_t str  = buf[4] | (buf[5] << 8);
 
+        // Apply mounting offset
+        uint16_t adjusted = (dist > LIDAR_OFFSET_CM) ? (dist - LIDAR_OFFSET_CM) : 0;
+
         // TF-Luna valid range: 20–800 cm, strength > 100
-        if (dist >= 20 && dist <= 800 && str > 100) {
-            _last.distance_cm = dist;
+        bytesProcessed += 9;
+        if (adjusted >= 20 && adjusted <= 800 && str > 100) {
+            _last.distance_cm = adjusted;
             _last.strength    = str;
             _last.valid       = true;
             _lastValidMs      = millis();

@@ -5,15 +5,17 @@
 #include <LittleFS.h>
 #include <HTTPClient.h>
 #include <ArduinoOTA.h>
+#include "esp_timer.h"
+#include "esp_wifi.h"
 
 #include "../include/config.h"
 #include "wind.h"
-#include "battery.h"
 #include "tanks.h"
 #include "fuel.h"
 #include "victron.h"
 #include "gps.h"
 #include "weather.h"
+#include "rum.h"
 
 // ─── Globals ──────────────────────────────────────────────────────────
 AsyncWebServer  server(80);
@@ -27,14 +29,15 @@ static volatile int  bow_rssi   = 0;
 static void check_bow_task(void* param);  // forward declaration
 
 // ─── JSON builder ─────────────────────────────────────────────────────
+static JsonDocument doc;  // pre-allocated to reduce heap fragmentation
+
 static String build_json() {
     WindData    wind    = wind_read();
-    BatteryData batt    = battery_read();
     TankData    water   = tanks_read();
     FuelData    fuel    = fuel_read();
     VictronData victron = victron_get();
 
-    JsonDocument doc;
+    doc.clear();
 
     // Wind
     doc["wind"]["valid"] = wind.valid;
@@ -43,19 +46,13 @@ static String build_json() {
         doc["wind"]["direction"] = round(wind.direction);
     }
 
-    // Battery (prefer Victron if available, fall back to INA219)
+    // Battery (Victron BLE only)
+    doc["battery"]["valid"] = victron.valid;
     if (victron.valid) {
         doc["battery"]["voltage"] = round(victron.battery_voltage * 100) / 100.0;
         doc["battery"]["current"] = round(victron.battery_current * 100) / 100.0;
         doc["battery"]["soc"]     = round(battery_voltage_to_soc(victron.battery_voltage));
-        doc["battery"]["source"]  = "victron";
-    } else if (batt.valid) {
-        doc["battery"]["voltage"] = round(batt.voltage * 100) / 100.0;
-        doc["battery"]["current"] = round(batt.current * 100) / 100.0;
-        doc["battery"]["soc"]     = round(batt.soc_pct);
-        doc["battery"]["source"]  = "ina219";
     }
-    doc["battery"]["valid"] = batt.valid || victron.valid;
 
     // Solar (Victron only)
     doc["solar"]["valid"] = victron.valid;
@@ -79,6 +76,14 @@ static String build_json() {
         doc["fuel"]["pct"]    = round(fuel.pct);
     }
 
+    // Rum
+    RumData rum = rum_read();
+    doc["rum"]["valid"] = rum.valid;
+    if (rum.valid) {
+        doc["rum"]["liters"] = round(rum.liters * 10) / 10.0;
+        doc["rum"]["pct"]    = round(rum.pct);
+    }
+
     // GPS
     GpsData gps = gps_read();
     doc["gps"]["fix"]   = gps.fix;
@@ -96,10 +101,14 @@ static String build_json() {
     // Weather (AHT20 + BMP280 + DS18B20)
     WeatherData weather = weather_read();
     doc["weather"]["valid"] = weather.valid;
-    if (weather.valid) {
+    if (weather.aht_valid) {
         doc["weather"]["air_temp"]   = round(weather.air_temp   * 10) / 10.0;
         doc["weather"]["humidity"]   = round(weather.humidity);
+    }
+    if (weather.bmp_valid) {
         doc["weather"]["pressure"]   = round(weather.pressure   * 10) / 10.0;
+    }
+    if (weather.ds_valid) {
         doc["weather"]["water_temp"] = round(weather.water_temp * 10) / 10.0;
     }
 
@@ -109,8 +118,8 @@ static String build_json() {
         doc["bow"]["rssi"] = (int)bow_rssi;
     }
 
-    // System uptime
-    doc["uptime_s"] = millis() / 1000;
+    // System uptime (64-bit to avoid 49-day millis() overflow)
+    doc["uptime_s"] = (unsigned long)(esp_timer_get_time() / 1000000ULL);
 
     String out;
     serializeJson(doc, out);
@@ -154,6 +163,12 @@ static void setup_routes() {
         req->send(200, "text/plain", "Water tare saved");
     });
 
+    // Tare rum scale (call from browser or curl)
+    server.on("/tare_rum", HTTP_POST, [](AsyncWebServerRequest* req) {
+        rum_tare();
+        req->send(200, "text/plain", "Rum tare saved");
+    });
+
     server.serveStatic("/", LittleFS, "/");
     server.onNotFound([](AsyncWebServerRequest* req) {
         req->send(404, "text/plain", "Not found");
@@ -175,16 +190,19 @@ void setup() {
 
     // Sensors
     wind_init();
-    battery_init();    // also calls Wire.begin() for I2C bus
     tanks_init();
     fuel_init();
     victron_init();
     gps_init();
     weather_init();    // AHT20 + BMP280 (I2C) + DS18B20 (1-Wire)
+    rum_init();
 
     // WiFi AP
     WiFi.mode(WIFI_AP);
     WiFi.softAP(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL);
+    esp_wifi_set_ps(WIFI_PS_NONE);
+    esp_wifi_set_max_tx_power(82);  // 20.5 dBm max
+    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
     Serial.printf("[wifi] AP started: %s  IP: %s\n",
                   WIFI_SSID, WiFi.softAPIP().toString().c_str());
 
