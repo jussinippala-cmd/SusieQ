@@ -85,6 +85,8 @@ static String build_json() {
     if (gps.fix) {
         doc["gps"]["sog_knots"] = round(gps.sog_knots * 10) / 10.0;
         doc["gps"]["cog_deg"]   = (int)round(gps.cog_deg);
+        doc["gps"]["lat"]       = gps.lat;
+        doc["gps"]["lon"]       = gps.lon;
     }
     if (gps.time_valid) {
         doc["gps"]["utc_h"] = gps.hour;

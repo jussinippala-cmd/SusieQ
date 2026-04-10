@@ -1,573 +1,765 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SusieQ — Complete System Wiring Diagram</title>
+<title>SusieQ – Kytkentäkaavio (aloittelijan opas)</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --card2: #11161d;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --warn: #f0883e;
+    --ok: #3fb950;
+    --danger: #f85149;
+    --v12: #f85149;
+    --v5:  #f0883e;
+    --v33: #3fb950;
+    --gnd: #8b949e;
+  }
+  * { box-sizing: border-box; }
   body {
-    background: #0a0a0a;
-    color: #f5f5f7;
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-    line-height: 1.6;
-    padding: 40px 20px;
-  }
-  .container { max-width: 1400px; margin: 0 auto; }
-
-  h1 { font-size: 42px; font-weight: 700; margin-bottom: 4px; }
-  .subtitle { font-size: 18px; color: #86868b; margin-bottom: 12px; }
-  .desc { font-size: 14px; color: #555; margin-bottom: 48px; }
-
-  h2 {
-    font-size: 28px; font-weight: 700; margin-bottom: 24px;
-    padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  h3 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
-
-  .section { margin-bottom: 72px; }
-
-  .diagram-wrapper {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 16px;
-    padding: 32px;
-    overflow-x: auto;
-  }
-
-  svg text { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', monospace; }
-
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 16px;
-  }
-  .card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 14px;
+    margin: 0 auto;
     padding: 24px;
-    transition: border-color 0.2s;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    max-width: 1100px;
   }
-  .card:hover { border-color: rgba(255,255,255,0.15); }
-  .card p { color: #a1a1a6; font-size: 14px; margin-top: 8px; }
-
-  .badge {
-    display: inline-block;
-    padding: 3px 10px;
+  h1 { color: #f0f6fc; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+  h2 {
+    color: var(--accent);
+    margin-top: 40px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  h3 { color: #f0f6fc; margin-top: 24px; }
+  h4 { color: var(--accent); margin-bottom: 6px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin: 16px 0;
+  }
+  .card.step {
+    border-left: 4px solid var(--accent);
+  }
+  .card.danger {
+    border-left: 4px solid var(--danger);
+    background: rgba(248,81,73,.06);
+  }
+  .card.tip {
+    border-left: 4px solid var(--ok);
+    background: rgba(63,185,80,.06);
+  }
+  .card.warn {
+    border-left: 4px solid var(--warn);
+    background: rgba(240,136,62,.06);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .net {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
     border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 10px;
+    padding: 10px 14px;
   }
-  .badge-green { background: rgba(52,199,89,0.15); color: #34c759; }
-  .badge-yellow { background: rgba(255,204,0,0.15); color: #ffcc00; }
-  .badge-red { background: rgba(255,69,58,0.15); color: #ff453a; }
-  .badge-blue { background: rgba(10,132,255,0.15); color: #0a84ff; }
-  .badge-purple { background: rgba(175,82,222,0.15); color: #af52de; }
-
-  .resistor-card {
-    background: rgba(255,69,58,0.04);
-    border: 1px solid rgba(255,69,58,0.25);
-  }
-  .resistor-card:hover { border-color: rgba(255,69,58,0.4); }
-
-  .ok-card {
-    background: rgba(52,199,89,0.04);
-    border: 1px solid rgba(52,199,89,0.15);
-  }
-
-  .note-box {
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin-top: 20px;
-    font-size: 14px;
-  }
-  .note-yellow {
-    background: rgba(255,204,0,0.06);
-    border: 1px solid rgba(255,204,0,0.2);
-  }
-  .note-green {
-    background: rgba(52,199,89,0.06);
-    border: 1px solid rgba(52,199,89,0.2);
-  }
-  .note-red {
-    background: rgba(255,69,58,0.06);
-    border: 1px solid rgba(255,69,58,0.2);
-  }
-
-  .pin-table {
+  .net strong { color: #f0f6fc; }
+  .net code { color: var(--accent); background: transparent; border: none; padding: 0; }
+  table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 12px;
+    margin: 12px 0;
     font-size: 14px;
   }
-  .pin-table th {
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
     text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #1f2937;
+    color: #f0f6fc;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: var(--card2); }
+  td.pin, td.sig {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    color: var(--accent);
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  .v12 { color: var(--v12); font-weight: 700; }
+  .v5  { color: var(--v5);  font-weight: 700; }
+  .v33 { color: var(--v33); font-weight: 700; }
+  .gnd { color: var(--gnd); font-weight: 700; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
     font-size: 11px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #86868b;
-    padding: 10px 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
   }
-  .pin-table td {
-    padding: 10px 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+  .badge.warn   { background: rgba(240,136,62,.15); color: var(--warn);   border-color: var(--warn); }
+  .badge.ok     { background: rgba(63,185,80,.15);  color: var(--ok);     border-color: var(--ok); }
+  .badge.danger { background: rgba(248,81,73,.15);  color: var(--danger); border-color: var(--danger); }
+  pre.ascii {
+    background: #000;
+    color: #c9d1d9;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.45;
   }
-  .pin-table tr:hover td { background: rgba(255,255,255,0.02); }
-  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
-
-  .legend { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
-  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #a1a1a6; }
-  .legend-color { width: 20px; height: 4px; border-radius: 2px; }
-
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
-
-  .resistor-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 16px;
-    margin-top: 24px;
+  .toc {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 22px;
   }
-
-  .accent { color: #DA7756; }
-  strong { color: #f5f5f7; }
+  .toc ol { margin: 6px 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 5px 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  code {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--accent);
+  }
+  .wire {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+    font-family: "SF Mono", monospace;
+  }
+  .wire.red   { background: #7a1f1a; color: #fca49f; }
+  .wire.blk   { background: #1f2937; color: #c9d1d9; border: 1px solid #4b5563; }
+  .wire.wht   { background: #e5e7eb; color: #111; }
+  .wire.grn   { background: #14532d; color: #a7f3d0; }
+  .wire.yel   { background: #78350f; color: #fde68a; }
+  .wire.blu   { background: #1e3a8a; color: #bfdbfe; }
+  .wire.org   { background: #7c2d12; color: #fed7aa; }
+  .tool-list {
+    columns: 2;
+    column-gap: 24px;
+  }
+  @media (max-width: 640px) {
+    .tool-list { columns: 1; }
+  }
+  .step-num {
+    display: inline-block;
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
+    text-align: center;
+    background: var(--accent);
+    color: #0d1117;
+    border-radius: 50%;
+    font-weight: 700;
+    margin-right: 8px;
+  }
+  @media print {
+    body { background: #fff; color: #000; max-width: none; padding: 12px; }
+    .card, .net { background: #fff !important; border-color: #999; }
+    .card.danger, .card.tip, .card.warn { background: #f7f7f7 !important; }
+    th { background: #eee; color: #000; }
+    tr:nth-child(even) td { background: #f7f7f7; }
+    h1, h2, h3, h4 { color: #000; }
+    td.pin, td.sig, code, .net code { color: #0050a0; }
+    pre.ascii { background: #f7f7f7; color: #000; }
+    h2 { page-break-before: auto; }
+    .card { page-break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
-<div class="container">
 
-  <h1>SusieQ — Complete Wiring</h1>
-  <p class="subtitle">C&C 28 Sailboat Electronics System</p>
-  <p class="desc">2 ESP32 units &bull; 10 sensors &bull; WiFi mesh &bull; Victron BLE</p>
+<h1>SusieQ – Kytkentäkaavio &amp; aloittelijan asennusopas</h1>
+<p class="muted">
+  C&amp;C 28 -purjeveneen IoT-järjestelmä. Tämä dokumentti on askel-askeleelta -ohje, jonka avulla myös elektroniikkaa ensi kertaa rakentava saa kytkennät tehtyä oikein. Lue koko dokumentti kertaalleen ennen kuin aloitat.
+</p>
 
-  <!-- ==================== SYSTEM OVERVIEW ==================== -->
-  <div class="section">
-    <h2>System Overview</h2>
-    <div class="diagram-wrapper">
-      <svg viewBox="0 0 1100 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
-        <!-- Bow Unit -->
-        <rect x="30" y="40" width="300" height="200" rx="16" fill="#1a2e1a" stroke="#3a6e3a" stroke-width="2"/>
-        <text x="180" y="75" text-anchor="middle" fill="#34c759" font-size="20" font-weight="700">BOW UNIT</text>
-        <text x="180" y="95" text-anchor="middle" fill="#86868b" font-size="12">ESP32-CAM &bull; 192.168.4.10</text>
-        <text x="50" y="130" fill="#a1a1a6" font-size="13">Camera OV2640</text>
-        <text x="50" y="150" fill="#a1a1a6" font-size="13">TF-Luna LiDAR</text>
-        <text x="50" y="175" fill="#555" font-size="11">Distance + video to dashboard</text>
-        <text x="50" y="195" fill="#555" font-size="11">Auto-sleep after 30s idle</text>
-        <rect x="50" y="210" width="80" height="20" rx="4" fill="rgba(52,199,89,0.15)"/>
-        <text x="90" y="224" text-anchor="middle" fill="#34c759" font-size="10" font-weight="600">0 RESISTORS</text>
-
-        <!-- Dashboard Unit -->
-        <rect x="530" y="20" width="540" height="240" rx="16" fill="#1a1a2e" stroke="#3a3a5c" stroke-width="2"/>
-        <text x="800" y="55" text-anchor="middle" fill="#0a84ff" font-size="20" font-weight="700">DASHBOARD UNIT</text>
-        <text x="800" y="75" text-anchor="middle" fill="#86868b" font-size="12">ESP32 DevKit &bull; AP: 192.168.4.1</text>
-
-        <!-- Sensor list -->
-        <text x="550" y="105" fill="#a1a1a6" font-size="12">Wind Sensor (RS485)</text>
-        <text x="550" y="123" fill="#a1a1a6" font-size="12">INA219 Battery (I²C)</text>
-        <text x="550" y="141" fill="#a1a1a6" font-size="12">Water Tank HX711</text>
-        <text x="550" y="159" fill="#a1a1a6" font-size="12">Fuel Tank HX711</text>
-
-        <text x="780" y="105" fill="#a1a1a6" font-size="12">GPS NEO-6M (UART)</text>
-        <text x="780" y="123" fill="#a1a1a6" font-size="12">AHT20 Temp/Hum (I²C)</text>
-        <text x="780" y="141" fill="#a1a1a6" font-size="12">BMP280 Pressure (I²C)</text>
-        <text x="780" y="159" fill="#ff453a" font-size="12" font-weight="600">DS18B20 Water Temp (1-Wire)</text>
-        <text x="780" y="177" fill="#a1a1a6" font-size="12">Victron MPPT (BLE)</text>
-
-        <rect x="550" y="195" width="130" height="20" rx="4" fill="rgba(255,69,58,0.15)"/>
-        <text x="615" y="209" text-anchor="middle" fill="#ff453a" font-size="10" font-weight="600">1 RESISTOR NEEDED</text>
-        <text x="690" y="209" fill="#86868b" font-size="10">← DS18B20 needs 4.7kΩ pull-up</text>
-
-        <rect x="550" y="225" width="130" height="20" rx="4" fill="rgba(255,204,0,0.15)"/>
-        <text x="615" y="239" text-anchor="middle" fill="#ffcc00" font-size="10" font-weight="600">CHECK I²C PULL-UPS</text>
-        <text x="690" y="239" fill="#86868b" font-size="10">← Most breakout boards include them</text>
-
-        <!-- WiFi connection -->
-        <line x1="330" y1="140" x2="530" y2="140" stroke="#0a84ff" stroke-width="2.5" stroke-dasharray="8,5"/>
-        <rect x="385" y="125" width="90" height="28" rx="6" fill="#0a0a0a" stroke="rgba(10,132,255,0.3)" stroke-width="1"/>
-        <text x="430" y="143" text-anchor="middle" fill="#0a84ff" font-size="12" font-weight="600">WiFi</text>
-      </svg>
-    </div>
+<div class="grid">
+  <div class="net">
+    <strong>Cockpit-yksikkö</strong><br>
+    ESP32-WROOM-32 DevKit V1<br>
+    AP: <code>SusieQ-Data</code><br>
+    IP: <code>192.168.4.1</code> · kanava 6
   </div>
-
-  <!-- ==================== BOW UNIT WIRING ==================== -->
-  <div class="section">
-    <h2>Bow Unit — ESP32-CAM Wiring</h2>
-    <div class="diagram-wrapper">
-      <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
-        <!-- ESP32-CAM -->
-        <rect x="320" y="30" width="260" height="300" rx="14" fill="#1a1a2e" stroke="#3a3a5c" stroke-width="2"/>
-        <text x="450" y="65" text-anchor="middle" fill="#f5f5f7" font-size="18" font-weight="700">ESP32-CAM</text>
-        <text x="450" y="82" text-anchor="middle" fill="#86868b" font-size="11">AI-Thinker</text>
-
-        <!-- Camera on top -->
-        <rect x="380" y="0" width="140" height="35" rx="8" fill="#2a1a3e" stroke="#6a4a8e" stroke-width="1.5"/>
-        <text x="450" y="22" text-anchor="middle" fill="#c4a0e8" font-size="13" font-weight="600">OV2640 Camera</text>
-        <line x1="420" y1="35" x2="420" y2="30" stroke="#6a4a8e" stroke-width="6" opacity="0.3"/>
-        <line x1="450" y1="35" x2="450" y2="30" stroke="#6a4a8e" stroke-width="6" opacity="0.3"/>
-        <line x1="480" y1="35" x2="480" y2="30" stroke="#6a4a8e" stroke-width="6" opacity="0.3"/>
-        <text x="450" y="105" text-anchor="middle" fill="#6a4a8e" font-size="10">Camera: all pins internal</text>
-
-        <!-- WiFi antenna -->
-        <g transform="translate(530, 95)">
-          <path d="M0,14 Q7,-4 14,14" fill="none" stroke="#0a84ff" stroke-width="1.5" opacity="0.6"/>
-          <path d="M-4,18 Q7,-10 18,18" fill="none" stroke="#0a84ff" stroke-width="1.5" opacity="0.4"/>
-          <circle cx="7" cy="16" r="2.5" fill="#0a84ff"/>
-        </g>
-        <text x="543" y="125" text-anchor="middle" fill="#0a84ff" font-size="9" font-weight="600">WiFi STA</text>
-
-        <!-- ESP32 left pins -->
-        <circle cx="320" cy="185" r="5" fill="#34c759"/><text x="335" y="189" fill="#34c759" font-size="11" font-weight="600">GPIO 14 (RX)</text>
-        <circle cx="320" cy="220" r="5" fill="#ff9f0a"/><text x="335" y="224" fill="#ff9f0a" font-size="11" font-weight="600">GPIO 15 (TX)</text>
-        <circle cx="320" cy="270" r="5" fill="#ff453a"/><text x="335" y="274" fill="#ff453a" font-size="11" font-weight="600">5V</text>
-        <circle cx="320" cy="300" r="5" fill="#86868b"/><text x="335" y="304" fill="#86868b" font-size="11" font-weight="600">GND</text>
-
-        <!-- TF-Luna -->
-        <rect x="40" y="150" width="180" height="170" rx="12" fill="#1a2e1a" stroke="#3a6e3a" stroke-width="1.5"/>
-        <text x="130" y="182" text-anchor="middle" fill="#34c759" font-size="16" font-weight="700">TF-Luna</text>
-        <text x="130" y="200" text-anchor="middle" fill="#86868b" font-size="11">LiDAR 20–800 cm (max 8 m)</text>
-        <text x="130" y="220" text-anchor="middle" fill="#555" font-size="10">UART 115200 baud</text>
-
-        <!-- TF-Luna pins -->
-        <circle cx="220" cy="250" r="4" fill="#ff9f0a"/><text x="205" y="248" text-anchor="end" fill="#ff9f0a" font-size="10" font-weight="600">TX</text>
-        <circle cx="220" cy="275" r="4" fill="#34c759"/><text x="205" y="273" text-anchor="end" fill="#34c759" font-size="10" font-weight="600">RX</text>
-        <circle cx="220" cy="295" r="4" fill="#ff453a"/><text x="205" y="293" text-anchor="end" fill="#ff453a" font-size="10" font-weight="600">5V</text>
-        <circle cx="220" cy="310" r="4" fill="#86868b"/><text x="205" y="308" text-anchor="end" fill="#86868b" font-size="10" font-weight="600">GND</text>
-
-        <!-- Wires -->
-        <path d="M224,250 C272,250 272,185 320,185" fill="none" stroke="#34c759" stroke-width="2"/>
-        <path d="M224,275 C272,275 272,220 320,220" fill="none" stroke="#ff9f0a" stroke-width="2"/>
-        <path d="M224,295 L272,295 L272,270 L320,270" fill="none" stroke="#ff453a" stroke-width="1.5" stroke-dasharray="4,3"/>
-        <path d="M224,310 L280,310 L280,300 L320,300" fill="none" stroke="#86868b" stroke-width="1.5" stroke-dasharray="4,3"/>
-
-        <!-- Label -->
-        <rect x="255" y="208" width="44" height="15" rx="3" fill="#0a0a0a" stroke="#3a6e3a" stroke-width="0.5"/>
-        <text x="277" y="219" text-anchor="middle" fill="#86868b" font-size="9" font-weight="600">UART</text>
-
-        <!-- Power source -->
-        <rect x="640" y="240" width="220" height="60" rx="10" fill="rgba(255,69,58,0.06)" stroke="rgba(255,69,58,0.2)" stroke-width="1"/>
-        <text x="750" y="265" text-anchor="middle" fill="#ff453a" font-size="13" font-weight="600">USB-C / 5V Power</text>
-        <text x="750" y="282" text-anchor="middle" fill="#555" font-size="10">Powers ESP32-CAM + TF-Luna</text>
-        <line x1="640" y1="270" x2="580" y2="270" stroke="#ff453a" stroke-width="1.5" stroke-dasharray="4,3"/>
-
-        <!-- No resistors badge -->
-        <rect x="650" y="150" width="200" height="50" rx="10" fill="rgba(52,199,89,0.06)" stroke="rgba(52,199,89,0.2)" stroke-width="1"/>
-        <text x="750" y="172" text-anchor="middle" fill="#34c759" font-size="13" font-weight="700">No Resistors Needed</text>
-        <text x="750" y="190" text-anchor="middle" fill="#86868b" font-size="11">UART is direct connection</text>
-      </svg>
-    </div>
+  <div class="net">
+    <strong>Bow-yksikkö</strong><br>
+    ESP32-CAM AI-Thinker<br>
+    AP: <code>SusieQ-Bow</code><br>
+    IP: <code>192.168.5.1</code> · kanava 11
   </div>
-
-  <!-- ==================== DASHBOARD UNIT WIRING ==================== -->
-  <div class="section">
-    <h2>Dashboard Unit — ESP32 DevKit Wiring</h2>
-    <div class="diagram-wrapper">
-      <svg viewBox="0 0 1100 780" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
-
-        <!-- ESP32 DevKit -->
-        <rect x="400" y="80" width="300" height="620" rx="14" fill="#1a1a2e" stroke="#3a3a5c" stroke-width="2"/>
-        <text x="550" y="115" text-anchor="middle" fill="#f5f5f7" font-size="18" font-weight="700">ESP32 DevKit V1</text>
-        <text x="550" y="132" text-anchor="middle" fill="#86868b" font-size="11">Dashboard &bull; AP: 192.168.4.1</text>
-
-        <!-- WiFi antenna -->
-        <g transform="translate(640, 100)">
-          <path d="M0,14 Q7,-4 14,14" fill="none" stroke="#0a84ff" stroke-width="1.5" opacity="0.6"/>
-          <path d="M-4,18 Q7,-10 18,18" fill="none" stroke="#0a84ff" stroke-width="1.5" opacity="0.4"/>
-          <circle cx="7" cy="16" r="2.5" fill="#0a84ff"/>
-        </g>
-        <text x="653" y="130" text-anchor="middle" fill="#0a84ff" font-size="9" font-weight="600">WiFi AP</text>
-
-        <!-- ===== LEFT SIDE PINS ===== -->
-
-        <!-- RS485 Wind -->
-        <circle cx="400" cy="200" r="5" fill="#34c759"/><text x="415" y="204" fill="#34c759" font-size="10" font-weight="600">GPIO 16 (RX)</text>
-        <circle cx="400" cy="225" r="5" fill="#ff9f0a"/><text x="415" y="229" fill="#ff9f0a" font-size="10" font-weight="600">GPIO 17 (TX)</text>
-        <circle cx="400" cy="250" r="5" fill="#af52de"/><text x="415" y="254" fill="#af52de" font-size="10" font-weight="600">GPIO 4 (DE/RE)</text>
-
-        <!-- I2C Bus -->
-        <circle cx="400" cy="340" r="5" fill="#30d5c8"/><text x="415" y="344" fill="#30d5c8" font-size="10" font-weight="600">GPIO 21 (SDA)</text>
-        <circle cx="400" cy="365" r="5" fill="#30d5c8"/><text x="415" y="369" fill="#30d5c8" font-size="10" font-weight="600">GPIO 22 (SCL)</text>
-
-        <!-- Water HX711 -->
-        <circle cx="400" cy="450" r="5" fill="#ffd60a"/><text x="415" y="454" fill="#ffd60a" font-size="10" font-weight="600">GPIO 19 (DOUT)</text>
-        <circle cx="400" cy="475" r="5" fill="#ffd60a"/><text x="415" y="479" fill="#ffd60a" font-size="10" font-weight="600">GPIO 18 (SCK)</text>
-
-        <!-- Fuel HX711 -->
-        <circle cx="400" cy="530" r="5" fill="#ff9500"/><text x="415" y="534" fill="#ff9500" font-size="10" font-weight="600">GPIO 13 (DOUT)</text>
-        <circle cx="400" cy="555" r="5" fill="#ff9500"/><text x="415" y="559" fill="#ff9500" font-size="10" font-weight="600">GPIO 14 (SCK)</text>
-
-        <!-- ===== RIGHT SIDE PINS ===== -->
-
-        <!-- GPS -->
-        <circle cx="700" cy="200" r="5" fill="#34c759"/><text x="545" y="204" fill="#34c759" font-size="10" font-weight="600" text-anchor="end">GPIO 34 (RX)</text>
-        <circle cx="700" cy="225" r="5" fill="#ff9f0a"/><text x="545" y="229" fill="#ff9f0a" font-size="10" font-weight="600" text-anchor="end">GPIO 27 (TX)</text>
-
-        <!-- DS18B20 -->
-        <circle cx="700" cy="340" r="5" fill="#ff453a"/><text x="545" y="344" fill="#ff453a" font-size="10" font-weight="600" text-anchor="end">GPIO 26 (1-Wire)</text>
-
-        <!-- Power pins -->
-        <circle cx="550" cy="680" r="5" fill="#ff453a"/><text x="550" y="672" text-anchor="middle" fill="#ff453a" font-size="10" font-weight="600">3.3V</text>
-        <circle cx="480" cy="680" r="5" fill="#ff453a"/><text x="480" y="672" text-anchor="middle" fill="#ff453a" font-size="10" font-weight="600">5V</text>
-        <circle cx="620" cy="680" r="5" fill="#86868b"/><text x="620" y="672" text-anchor="middle" fill="#86868b" font-size="10" font-weight="600">GND</text>
-
-        <!-- ===== WIND SENSOR (LEFT) ===== -->
-        <rect x="30" y="135" width="240" height="175" rx="12" fill="rgba(175,82,222,0.06)" stroke="rgba(175,82,222,0.25)" stroke-width="1.5"/>
-        <text x="150" y="162" text-anchor="middle" fill="#af52de" font-size="14" font-weight="700">Wind Sensor</text>
-        <text x="150" y="178" text-anchor="middle" fill="#86868b" font-size="10">RS485 Ultrasonic Anemometer</text>
-
-        <!-- MAX485 sub-box -->
-        <rect x="50" y="190" width="200" height="55" rx="6" fill="rgba(175,82,222,0.08)" stroke="rgba(175,82,222,0.15)" stroke-width="1"/>
-        <text x="150" y="210" text-anchor="middle" fill="#af52de" font-size="11" font-weight="600">MAX485 Module</text>
-        <text x="150" y="226" text-anchor="middle" fill="#555" font-size="9">Level shifter: TTL ↔ RS485</text>
-
-        <text x="150" y="265" text-anchor="middle" fill="#555" font-size="10">Modbus RTU @ 4800 baud</text>
-        <text x="150" y="280" text-anchor="middle" fill="#555" font-size="10">Speed + Direction</text>
-        <text x="150" y="298" text-anchor="middle" fill="#86868b" font-size="9">DE/RE pin HIGH=TX, LOW=RX</text>
-
-        <!-- Wires: wind -->
-        <path d="M270,200 L400,200" fill="none" stroke="#34c759" stroke-width="2"/>
-        <path d="M270,220 L320,220 L320,225 L400,225" fill="none" stroke="#ff9f0a" stroke-width="2"/>
-        <path d="M270,235 L310,235 L310,250 L400,250" fill="none" stroke="#af52de" stroke-width="2"/>
-
-        <!-- ===== I2C BUS (LEFT) ===== -->
-        <rect x="30" y="315" width="240" height="210" rx="12" fill="rgba(48,213,200,0.06)" stroke="rgba(48,213,200,0.2)" stroke-width="1.5"/>
-        <text x="150" y="340" text-anchor="middle" fill="#30d5c8" font-size="14" font-weight="700">I²C Bus</text>
-        <text x="150" y="356" text-anchor="middle" fill="#86868b" font-size="10">SDA: GPIO 21 &bull; SCL: GPIO 22</text>
-
-        <!-- I2C devices -->
-        <rect x="50" y="370" width="200" height="34" rx="6" fill="rgba(48,213,200,0.08)"/>
-        <text x="60" y="392" fill="#30d5c8" font-size="12" font-weight="600">INA219</text>
-        <text x="240" y="392" text-anchor="end" fill="#86868b" font-size="10">0x40 &bull; Battery</text>
-
-        <rect x="50" y="410" width="200" height="34" rx="6" fill="rgba(48,213,200,0.08)"/>
-        <text x="60" y="432" fill="#30d5c8" font-size="12" font-weight="600">AHT20</text>
-        <text x="240" y="432" text-anchor="end" fill="#86868b" font-size="10">0x38 &bull; Temp/Hum</text>
-
-        <rect x="50" y="450" width="200" height="34" rx="6" fill="rgba(48,213,200,0.08)"/>
-        <text x="60" y="472" fill="#30d5c8" font-size="12" font-weight="600">BMP280</text>
-        <text x="240" y="472" text-anchor="end" fill="#86868b" font-size="10">0x76 &bull; Pressure</text>
-
-        <text x="150" y="508" text-anchor="middle" fill="#86868b" font-size="9">3 devices share one bus</text>
-
-        <!-- I2C wires -->
-        <path d="M270,352" fill="none" stroke="#30d5c8" stroke-width="2.5"/>
-        <line x1="270" y1="340" x2="400" y2="340" stroke="#30d5c8" stroke-width="2"/>
-        <line x1="270" y1="365" x2="400" y2="365" stroke="#30d5c8" stroke-width="2"/>
-
-        <!-- ===== WATER TANK HX711 (LEFT) ===== -->
-        <rect x="30" y="555" width="240" height="100" rx="12" fill="rgba(255,214,10,0.06)" stroke="rgba(255,214,10,0.2)" stroke-width="1.5"/>
-        <text x="150" y="580" text-anchor="middle" fill="#ffd60a" font-size="14" font-weight="700">Water Tank</text>
-        <text x="150" y="596" text-anchor="middle" fill="#86868b" font-size="10">HX711 + 50kg Load Cell</text>
-        <text x="150" y="616" text-anchor="middle" fill="#555" font-size="10">Capacity: 15 L</text>
-        <text x="150" y="636" text-anchor="middle" fill="#555" font-size="10">DOUT: GPIO 19 &bull; SCK: GPIO 18</text>
-
-        <line x1="270" y1="590" x2="320" y2="590" stroke="#ffd60a" stroke-width="1.5"/>
-        <path d="M320,590 L320,450 L400,450" fill="none" stroke="#ffd60a" stroke-width="2"/>
-        <path d="M320,610 L310,610 L310,475 L400,475" fill="none" stroke="#ffd60a" stroke-width="2"/>
-        <line x1="270" y1="610" x2="320" y2="610" stroke="#ffd60a" stroke-width="1.5"/>
-
-        <!-- ===== FUEL TANK HX711 (BOTTOM LEFT) ===== -->
-        <rect x="30" y="670" width="240" height="100" rx="12" fill="rgba(255,149,0,0.06)" stroke="rgba(255,149,0,0.2)" stroke-width="1.5"/>
-        <text x="150" y="695" text-anchor="middle" fill="#ff9500" font-size="14" font-weight="700">Fuel Tank</text>
-        <text x="150" y="711" text-anchor="middle" fill="#86868b" font-size="10">HX711 + 50kg Load Cell</text>
-        <text x="150" y="731" text-anchor="middle" fill="#555" font-size="10">Capacity: 25 L &bull; Density: 0.74 kg/L</text>
-        <text x="150" y="751" text-anchor="middle" fill="#555" font-size="10">DOUT: GPIO 13 &bull; SCK: GPIO 14</text>
-
-        <line x1="270" y1="710" x2="290" y2="710" stroke="#ff9500" stroke-width="1.5"/>
-        <path d="M290,710 L290,530 L400,530" fill="none" stroke="#ff9500" stroke-width="2"/>
-        <line x1="270" y1="740" x2="300" y2="740" stroke="#ff9500" stroke-width="1.5"/>
-        <path d="M300,740 L300,555 L400,555" fill="none" stroke="#ff9500" stroke-width="2"/>
-
-        <!-- ===== GPS (RIGHT) ===== -->
-        <rect x="810" y="145" width="240" height="130" rx="12" fill="rgba(52,199,89,0.06)" stroke="rgba(52,199,89,0.2)" stroke-width="1.5"/>
-        <text x="930" y="172" text-anchor="middle" fill="#34c759" font-size="14" font-weight="700">GPS NEO-6M</text>
-        <text x="930" y="188" text-anchor="middle" fill="#86868b" font-size="10">GY-NEO6MV2 Module</text>
-        <text x="930" y="212" text-anchor="middle" fill="#555" font-size="10">UART1 @ 9600 baud</text>
-        <text x="930" y="230" text-anchor="middle" fill="#555" font-size="10">SOG, COG, Position</text>
-        <text x="930" y="252" text-anchor="middle" fill="#555" font-size="10">RX: GPIO 34 &bull; TX: GPIO 27</text>
-
-        <path d="M700,200 L810,200" fill="none" stroke="#34c759" stroke-width="2"/>
-        <path d="M700,225 L810,220" fill="none" stroke="#ff9f0a" stroke-width="2"/>
-
-        <!-- ===== DS18B20 (RIGHT) — THE ONE NEEDING RESISTOR ===== -->
-        <rect x="810" y="300" width="270" height="170" rx="12" fill="rgba(255,69,58,0.06)" stroke="rgba(255,69,58,0.3)" stroke-width="2"/>
-        <text x="945" y="325" text-anchor="middle" fill="#ff453a" font-size="14" font-weight="700">DS18B20</text>
-        <text x="945" y="341" text-anchor="middle" fill="#86868b" font-size="10">Water Temperature (1-Wire)</text>
-        <text x="945" y="365" text-anchor="middle" fill="#555" font-size="10">Data: GPIO 26</text>
-
-        <!-- Resistor symbol! -->
-        <rect x="840" y="385" width="210" height="70" rx="8" fill="rgba(255,69,58,0.1)" stroke="rgba(255,69,58,0.4)" stroke-width="1.5"/>
-        <text x="945" y="405" text-anchor="middle" fill="#ff453a" font-size="13" font-weight="700">4.7 kΩ PULL-UP</text>
-        <text x="945" y="423" text-anchor="middle" fill="#ff453a" font-size="11">Between DATA and 3.3V</text>
-
-        <!-- Resistor schematic symbol -->
-        <g transform="translate(860, 432)">
-          <line x1="0" y1="8" x2="15" y2="8" stroke="#ff453a" stroke-width="2"/>
-          <polyline points="15,8 20,0 30,16 40,0 50,16 60,0 70,16 75,8" fill="none" stroke="#ff453a" stroke-width="2"/>
-          <line x1="75" y1="8" x2="90" y2="8" stroke="#ff453a" stroke-width="2"/>
-          <text x="95" y="12" fill="#ff453a" font-size="10" font-weight="600">4.7kΩ</text>
-          <text x="0" y="22" fill="#86868b" font-size="9">GPIO 26</text>
-          <text x="75" y="22" fill="#86868b" font-size="9">3.3V</text>
-        </g>
-
-        <path d="M700,340 L810,355" fill="none" stroke="#ff453a" stroke-width="2"/>
-
-        <!-- ===== VICTRON BLE (RIGHT) ===== -->
-        <rect x="810" y="500" width="240" height="110" rx="12" fill="rgba(10,132,255,0.06)" stroke="rgba(10,132,255,0.2)" stroke-width="1.5"/>
-        <text x="930" y="525" text-anchor="middle" fill="#0a84ff" font-size="14" font-weight="700">Victron MPPT</text>
-        <text x="930" y="541" text-anchor="middle" fill="#86868b" font-size="10">SmartSolar Charge Controller</text>
-        <text x="930" y="565" text-anchor="middle" fill="#0a84ff" font-size="11" font-weight="600">Bluetooth LE (wireless)</text>
-        <text x="930" y="585" text-anchor="middle" fill="#555" font-size="10">AES-128 encrypted</text>
-        <text x="930" y="600" text-anchor="middle" fill="#555" font-size="10">No wires — BLE passive scan</text>
-
-        <!-- BLE dashed line -->
-        <path d="M700,560 L810,560" fill="none" stroke="#0a84ff" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.5"/>
-        <text x="755" y="553" text-anchor="middle" fill="#0a84ff" font-size="9" font-weight="600">BLE</text>
-
-        <!-- Power -->
-        <rect x="380" y="720" width="340" height="50" rx="10" fill="rgba(255,69,58,0.06)" stroke="rgba(255,69,58,0.2)" stroke-width="1"/>
-        <text x="550" y="742" text-anchor="middle" fill="#ff453a" font-size="13" font-weight="600">12V Boat Battery → USB 5V Regulator</text>
-        <text x="550" y="758" text-anchor="middle" fill="#555" font-size="10">Powers ESP32 + all sensors via 3.3V/5V rails</text>
-        <line x1="550" y1="700" x2="550" y2="720" stroke="#ff453a" stroke-width="1.5" stroke-dasharray="4,3"/>
-
-      </svg>
-    </div>
-
-    <div class="legend">
-      <div class="legend-item"><div class="legend-color" style="background:#34c759"></div> UART RX</div>
-      <div class="legend-item"><div class="legend-color" style="background:#ff9f0a"></div> UART TX</div>
-      <div class="legend-item"><div class="legend-color" style="background:#30d5c8"></div> I²C Bus</div>
-      <div class="legend-item"><div class="legend-color" style="background:#af52de"></div> RS485 DE/RE</div>
-      <div class="legend-item"><div class="legend-color" style="background:#ffd60a"></div> HX711 Water</div>
-      <div class="legend-item"><div class="legend-color" style="background:#ff9500"></div> HX711 Fuel</div>
-      <div class="legend-item"><div class="legend-color" style="background:#ff453a"></div> 1-Wire / Power</div>
-      <div class="legend-item"><div class="legend-color" style="background:#0a84ff"></div> BLE (wireless)</div>
-    </div>
-  </div>
-
-  <!-- ==================== RESISTOR REQUIREMENTS ==================== -->
-  <div class="section">
-    <h2>Where Do You Need Resistors?</h2>
-
-    <div class="resistor-summary">
-      <div class="card resistor-card">
-        <span class="badge badge-red">Resistor Required</span>
-        <h3>DS18B20 Water Temp</h3>
-        <p><strong style="color:#ff453a">4.7 kΩ pull-up resistor</strong> between the data line (GPIO 26) and 3.3V. This is <strong>mandatory</strong> — the 1-Wire protocol will not work without it. The DS18B20 uses an open-drain output that needs an external pull-up to drive the data line HIGH.</p>
-        <div class="note-box note-red" style="margin-top:12px">
-          <strong style="color:#ff453a">Wiring:</strong> Solder a 4.7kΩ resistor between the DS18B20 DATA pin and 3.3V, as close to the sensor as practical. Some DS18B20 breakout boards already include this — check yours before adding one.
-        </div>
-      </div>
-
-      <div class="card" style="border-color:rgba(255,204,0,0.25); background:rgba(255,204,0,0.04)">
-        <span class="badge badge-yellow">Check Your Modules</span>
-        <h3>I²C Pull-ups (INA219, AHT20, BMP280)</h3>
-        <p>I²C needs <strong style="color:#ffcc00">4.7 kΩ pull-ups</strong> on SDA and SCL. However, <strong>most breakout boards already include them</strong>. With 3 devices on the bus, you likely already have pull-ups from at least one module.</p>
-        <div class="note-box note-yellow" style="margin-top:12px">
-          <strong style="color:#ffcc00">Check:</strong> Look for small resistors marked "472" or "4701" near the I²C pins on your breakout boards. If at least one board has them, you're fine. If <em>none</em> do, add 4.7kΩ between SDA→3.3V and SCL→3.3V.
-        </div>
-      </div>
-    </div>
-
-    <h3 style="margin-top:40px; margin-bottom:16px;">All Other Sensors — No Resistors</h3>
-    <div class="card-grid">
-      <div class="card ok-card">
-        <span class="badge badge-green">OK as-is</span>
-        <h3>TF-Luna LiDAR</h3>
-        <p>UART direct connection, 3.3V logic native. No pull-ups needed.</p>
-      </div>
-      <div class="card ok-card">
-        <span class="badge badge-green">OK as-is</span>
-        <h3>Wind Sensor (RS485)</h3>
-        <p>MAX485 module handles all level shifting between TTL and RS485. No external resistors.</p>
-      </div>
-      <div class="card ok-card">
-        <span class="badge badge-green">OK as-is</span>
-        <h3>HX711 Load Cells (×2)</h3>
-        <p>Digital protocol with built-in pull-ups on the HX711 chip. Direct connection to ESP32.</p>
-      </div>
-      <div class="card ok-card">
-        <span class="badge badge-green">OK as-is</span>
-        <h3>GPS NEO-6M</h3>
-        <p>UART at 3.3V logic. Direct connection, no level shifting needed.</p>
-      </div>
-      <div class="card ok-card">
-        <span class="badge badge-green">OK as-is</span>
-        <h3>OV2640 Camera</h3>
-        <p>Built into ESP32-CAM board. All connections internal, SCCB uses ESP32 internal pull-ups.</p>
-      </div>
-      <div class="card ok-card">
-        <span class="badge badge-green">OK as-is</span>
-        <h3>Victron MPPT</h3>
-        <p>Bluetooth LE — no wires at all. Connects wirelessly with AES-128 encryption.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== FULL PIN MAP ==================== -->
-  <div class="section">
-    <h2>Complete Pin Map</h2>
-    <div class="two-col">
-      <div>
-        <h3 style="color:#34c759; margin-bottom:8px;">Bow Unit — ESP32-CAM</h3>
-        <table class="pin-table">
-          <thead><tr><th>GPIO</th><th>Function</th><th>Sensor</th></tr></thead>
-          <tbody>
-            <tr><td class="mono">14</td><td>UART1 RX</td><td>TF-Luna TX</td></tr>
-            <tr><td class="mono">15</td><td>UART1 TX</td><td>TF-Luna RX</td></tr>
-            <tr><td class="mono">32</td><td>PWDN</td><td>Camera power</td></tr>
-            <tr><td class="mono">26</td><td>SCCB SDA</td><td>Camera I²C</td></tr>
-            <tr><td class="mono">27</td><td>SCCB SCL</td><td>Camera I²C</td></tr>
-            <tr><td class="mono">0,22,23,25</td><td>Sync</td><td>Camera timing</td></tr>
-            <tr><td class="mono">5,18,19,21<br>34,35,36,39</td><td>Data Y2–Y9</td><td>Camera pixels</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <h3 style="color:#0a84ff; margin-bottom:8px;">Dashboard — ESP32 DevKit</h3>
-        <table class="pin-table">
-          <thead><tr><th>GPIO</th><th>Function</th><th>Sensor</th></tr></thead>
-          <tbody>
-            <tr><td class="mono">16</td><td>UART2 RX</td><td>MAX485 (Wind)</td></tr>
-            <tr><td class="mono">17</td><td>UART2 TX</td><td>MAX485 (Wind)</td></tr>
-            <tr><td class="mono">4</td><td>Digital Out</td><td>MAX485 DE/RE</td></tr>
-            <tr><td class="mono">21</td><td>I²C SDA</td><td>INA219 + AHT20 + BMP280</td></tr>
-            <tr><td class="mono">22</td><td>I²C SCL</td><td>INA219 + AHT20 + BMP280</td></tr>
-            <tr><td class="mono">19</td><td>HX711 DOUT</td><td>Water tank</td></tr>
-            <tr><td class="mono">18</td><td>HX711 SCK</td><td>Water tank</td></tr>
-            <tr><td class="mono">13</td><td>HX711 DOUT</td><td>Fuel tank</td></tr>
-            <tr><td class="mono">14</td><td>HX711 SCK</td><td>Fuel tank</td></tr>
-            <tr><td class="mono">34</td><td>UART1 RX</td><td>GPS TX</td></tr>
-            <tr><td class="mono">27</td><td>UART1 TX</td><td>GPS RX</td></tr>
-            <tr style="background:rgba(255,69,58,0.06)"><td class="mono">26</td><td>1-Wire</td><td style="color:#ff453a">DS18B20 + 4.7kΩ ↑</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== SHOPPING LIST ==================== -->
-  <div class="section">
-    <h2>Resistor Shopping List</h2>
-    <div class="card-grid" style="max-width:700px">
-      <div class="card resistor-card">
-        <span class="badge badge-red">Must Have</span>
-        <h3>1× 4.7 kΩ Resistor</h3>
-        <p>For DS18B20 1-Wire pull-up. Standard ¼W through-hole or SMD. Any tolerance (1%, 5%) works fine.</p>
-      </div>
-      <div class="card" style="border-color:rgba(255,204,0,0.2); background:rgba(255,204,0,0.03)">
-        <span class="badge badge-yellow">Backup</span>
-        <h3>2× 4.7 kΩ Resistors</h3>
-        <p>For I²C bus pull-ups — only if <em>none</em> of your INA219/AHT20/BMP280 breakout boards have pull-ups built in. Check first.</p>
-      </div>
-    </div>
-  </div>
-
 </div>
+
+<div class="toc">
+  <h3 style="margin-top:0">Sisältö</h3>
+  <ol>
+    <li><a href="#turvallisuus">Turvallisuus ennen aloittamista</a></li>
+    <li><a href="#tarvikkeet">Tarvittavat työkalut ja tarvikkeet</a></li>
+    <li><a href="#perusteet">Perusteet: jännitteet, maat ja johtovärit</a></li>
+    <li><a href="#virta">Virransyöttö (12 V → 5 V → 3.3 V)</a></li>
+    <li><a href="#esp32-pinout">ESP32-pinouttaulukko (cockpit)</a></li>
+    <li><a href="#m-tuuli">Moduuli 1 – Tuulianturi (RS485 / MAX485)</a></li>
+    <li><a href="#m-hx711">Moduuli 2 – HX711-punnitukset (vesi / polttoaine / rommi)</a></li>
+    <li><a href="#m-gps">Moduuli 3 – GPS (NEO-6M)</a></li>
+    <li><a href="#m-saa">Moduuli 4 – Sää (AHT20 + BMP280, I²C)</a></li>
+    <li><a href="#m-ds18b20">Moduuli 5 – Vesilämpö (DS18B20, 1-Wire)</a></li>
+    <li><a href="#m-victron">Moduuli 6 – Victron MPPT (BLE, ei johtoja)</a></li>
+    <li><a href="#bow">Bow-yksikkö – ESP32-CAM + TF-Luna LiDAR</a></li>
+    <li><a href="#testaus">Testausjärjestys ja vianhaku</a></li>
+    <li><a href="#taulukko">Yhteenvetotaulukko – kaikki liitokset</a></li>
+  </ol>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="turvallisuus">1. Turvallisuus ennen aloittamista</h2>
+<div class="card danger">
+  <ul>
+    <li><strong>Kytke pääkatkaisija pois päältä</strong> ennen kuin kosket mihinkään veneen sähköön.</li>
+    <li><strong>Varmista napaisuus</strong> aina yleismittarilla ennen kuin kytket 12 V:n ESP32-laitteeseen. Väärä napaisuus tuhoaa ESP32:n sekunnissa.</li>
+    <li><strong>Älä koskaan kytke 12 V:ta suoraan ESP32:een.</strong> ESP32 ottaa enintään 5 V VIN-pinille tai 3.3 V suoraan 3V3-pinille.</li>
+    <li><strong>Juota ESP32 pois virran päältä</strong> (USB irti, 12 V irti).</li>
+    <li><strong>Sulake</strong> 12 V:n syötön ja buck-muuntimen väliin (esim. 2 A lasiputkisulake).</li>
+  </ul>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="tarvikkeet">2. Tarvittavat työkalut ja tarvikkeet</h2>
+<div class="card">
+  <h4>Työkalut</h4>
+  <ul class="tool-list">
+    <li>Juotin (25–40 W) + tinaa (lyijytön, Ø 0.8 mm)</li>
+    <li>Yleismittari (jännite + jatkuvuus)</li>
+    <li>Kuorintapihdit</li>
+    <li>Sivuleikkurit</li>
+    <li>Ruuvimeisselit (pieni ristipää + tasapää)</li>
+    <li>Kuumailmapuhallin (kutisteletkuja varten)</li>
+    <li>Dupont-johtoja (uros-uros, uros-naaras, naaras-naaras)</li>
+    <li>Kytkentäalusta (breadboard) ensikokeiluun</li>
+  </ul>
+  <h4>Sähkötarvikkeet</h4>
+  <ul>
+    <li>12 V → 5 V buck-muunnin (esim. MP1584, LM2596 tai Pololu D24V10F5) – säädä lähtö <strong>5.0 V</strong> ennen kytkentää!</li>
+    <li>2 A lasiputkisulake + pidike 12 V -syöttöön</li>
+    <li>4.7 kΩ vastus (DS18B20:lle – <strong>pakollinen</strong>)</li>
+    <li>Kutisteletkua (Ø 2–6 mm)</li>
+    <li>Monisäikeinen asennusjohto 0.5–1.0 mm² (12 V -linjoille)</li>
+    <li>Ohut kytkentälanka 0.25 mm² (anturisignaaleille)</li>
+    <li>Jakorima (Wago 221 tai vastaava) GND-tähtipisteeseen</li>
+  </ul>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="perusteet">3. Perusteet: jännitteet, maat ja johtovärit</h2>
+<div class="card tip">
+  <h4>Jännitetasot</h4>
+  <p>Järjestelmässä on kolme eri jännitetasoa – sekoita ne ja rikot jotakin:</p>
+  <ul>
+    <li><span class="v12">12 V</span> – veneen akku. Vain tuulianturille, Victronille ja buck-muuntimen tuloon.</li>
+    <li><span class="v5">5 V</span> – buck-muuntimesta. ESP32:n <code>VIN</code>-pinille ja TF-Luna LiDAR:ille.</li>
+    <li><span class="v33">3.3 V</span> – ESP32 tuottaa itse <code>3V3</code>-pinistä. Kaikille antureille: HX711 ×3, GPS, AHT20, BMP280, DS18B20 <em>ja</em> MAX485 (toimii 3.3 V:llä tässä projektissa).</li>
+  </ul>
+
+  <h4>Yhteinen maa (GND) – tärkein sääntö</h4>
+  <p>
+    <strong>Kaikkien moduulien GND on kytkettävä samaan pisteeseen.</strong> ESP32:n GND, buck-muuntimen GND-out, veneen 12 V -miinus ja jokaisen anturin GND yhteen jakorimalle (ns. tähtimaadoitus). Ilman tätä anturit antavat satunnaisia lukemia tai eivät toimi ollenkaan.
+  </p>
+
+  <h4>Johtovärikoodit (suositus)</h4>
+  <table>
+    <thead><tr><th>Väri</th><th>Käyttö</th></tr></thead>
+    <tbody>
+      <tr><td><span class="wire red">PUNAINEN</span></td><td>+12 V</td></tr>
+      <tr><td><span class="wire org">ORANSSI</span></td><td>+5 V</td></tr>
+      <tr><td><span class="wire yel">KELTAINEN</span></td><td>+3.3 V</td></tr>
+      <tr><td><span class="wire blk">MUSTA</span></td><td>GND (maa)</td></tr>
+      <tr><td><span class="wire grn">VIHREÄ</span></td><td>Data / signaali</td></tr>
+      <tr><td><span class="wire blu">SININEN</span></td><td>Data / signaali (toinen)</td></tr>
+      <tr><td><span class="wire wht">VALKOINEN</span></td><td>Kello (SCK, SCL)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="virta">4. Virransyöttö (12 V → 5 V → 3.3 V)</h2>
+<div class="card step">
+  <h3><span class="step-num">1</span>Buck-muuntimen säätö</h3>
+  <p>Ennen kuin kytket buck-muuntimen ESP32:een:</p>
+  <ol>
+    <li>Syötä buckin tuloon 12 V veneen akusta (sulakkeen kautta).</li>
+    <li>Mittaa yleismittarilla buckin lähtö.</li>
+    <li>Säädä sinistä säätöruuvia pikkuruuvarilla kunnes lähtö on <strong>5.0 V ±0.1 V</strong>.</li>
+    <li>Sammuta virta ja kytke vasta sitten ESP32:een.</li>
+  </ol>
+
+  <h3><span class="step-num">2</span>Virtalohkokaavio</h3>
+<pre class="ascii">
+ ┌──────────────┐    ┌────────┐    ┌──────────────┐    ┌──────────────┐
+ │ Vene-akku    │    │ Sulake │    │ 12V→5V buck  │    │ ESP32 VIN    │
+ │   12 V  (+)──┼────┤  2 A   ├────┤  IN+    OUT+ ├────┤  5 V         │
+ │         (−)──┼──┐ └────────┘    │  IN−    OUT− ├──┐ │              │
+ └──────────────┘  │                └──────────────┘  │ │  GND         │
+                   │                                  │ └──────┬───────┘
+                   │                                  │        │
+                   └──────────────────────────────────┴────────┘
+                                  YHTEINEN GND (jakorima)
+                                          │
+         ┌────────────────────────────────┼────────────────────────────┐
+         │                                │                            │
+    MAX485 GND                    Jokaisen anturin GND            Victron GND
+    TF-Luna GND                   (HX711, GPS, AHT20,             (ei tarvita –
+    (5 V -laitteet)                BMP280, DS18B20 …)              BLE)
+</pre>
+
+  <h3><span class="step-num">3</span>ESP32:n omat virtapinit</h3>
+  <ul>
+    <li>ESP32:n <code>VIN</code> ← buckin <span class="v5">+5 V</span> out</li>
+    <li>ESP32:n <code>GND</code> ← buckin GND out ja tähtimaa</li>
+    <li>ESP32 tuottaa <code>3V3</code>-pinistä säädetyn <span class="v33">3.3 V</span>:n kaikille 3.3 V -antureille (max ~500 mA yhteensä)</li>
+  </ul>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="esp32-pinout">5. ESP32-pinouttaulukko (cockpit)</h2>
+<div class="card">
+  <p>Nämä pinit on määritelty tiedostossa <code>susieq_dashboard/include/config.h</code>. Älä muuta niitä ennen kuin olet varma mitä teet – ne on valittu välttämään ESP32:n strapping- ja input-only-pinit.</p>
+  <table>
+    <thead><tr><th>GPIO</th><th>Käyttö</th><th>Huomautus</th></tr></thead>
+    <tbody>
+      <tr><td class="pin">GPIO 4</td>  <td>MAX485 DE+RE</td> <td>Ulostulo</td></tr>
+      <tr><td class="pin">GPIO 13</td> <td>HX711 Fuel DOUT</td> <td>Sisääntulo</td></tr>
+      <tr><td class="pin">GPIO 14</td> <td>HX711 Fuel SCK</td> <td>Ulostulo</td></tr>
+      <tr><td class="pin">GPIO 16</td> <td>UART2 RX – tuulianturi</td> <td>MAX485 RO → ESP32</td></tr>
+      <tr><td class="pin">GPIO 17</td> <td>UART2 TX – tuulianturi</td> <td>ESP32 → MAX485 DI</td></tr>
+      <tr><td class="pin">GPIO 18</td> <td>HX711 Water SCK</td> <td>Ulostulo</td></tr>
+      <tr><td class="pin">GPIO 19</td> <td>HX711 Water DOUT</td> <td>Sisääntulo</td></tr>
+      <tr><td class="pin">GPIO 21</td> <td>I²C SDA (AHT20 + BMP280)</td> <td>Jaettu väylä</td></tr>
+      <tr><td class="pin">GPIO 22</td> <td>I²C SCL (AHT20 + BMP280)</td> <td>Jaettu väylä</td></tr>
+      <tr><td class="pin">GPIO 23</td> <td>HX711 Rum SCK</td> <td>Ulostulo</td></tr>
+      <tr><td class="pin">GPIO 25</td> <td>HX711 Rum DOUT</td> <td>Sisääntulo</td></tr>
+      <tr><td class="pin">GPIO 26</td> <td>1-Wire DS18B20</td> <td><span class="badge warn">4.7 kΩ pull-up pakollinen</span></td></tr>
+      <tr><td class="pin">GPIO 27</td> <td>UART1 TX – GPS</td> <td>ESP32 → GPS RX</td></tr>
+      <tr><td class="pin">GPIO 34</td> <td>UART1 RX – GPS</td> <td><span class="badge warn">Vain sisääntulo</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="m-tuuli">6. Moduuli 1 – Tuulianturi (RS485 / MAX485)</h2>
+<div class="card">
+  <h4>Komponentit</h4>
+  <ul>
+    <li>Ultraäänianemometri (Veinasa Mini-C2A tai vastaava), RS485-lähtö, 9–30 V syöttö</li>
+    <li>MAX485-moduuli (punainen/sininen pieni piirilevy, 8 pinniä)</li>
+  </ul>
+
+  <h4>MAX485-moduulin pinit</h4>
+  <pre class="ascii">
+         ┌──────────────┐
+         │   MAX485     │
+    RO ──┤              ├── VCC   (5 V)
+    RE ──┤   ●          ├── B     (RS485 B / −)
+    DE ──┤              ├── A     (RS485 A / +)
+    DI ──┤              ├── GND
+         └──────────────┘
+  </pre>
+
+  <h4>Kytkennät – ESP32 ↔ MAX485</h4>
+  <table>
+    <thead><tr><th>ESP32</th><th>Johto</th><th>MAX485</th><th>Huomautus</th></tr></thead>
+    <tbody>
+      <tr><td class="pin">3V3 <em>tai</em> 5V</td><td><span class="wire yel">KELTAINEN</span></td><td class="sig">VCC</td><td>Tässä projektissa <strong>3.3 V</strong> ESP32:sta on todettu toimivan (lyhyt kaapeli, 9600 bps). Datasheet suosittaa 5 V pitkille kaapeleille.</td></tr>
+      <tr><td class="pin">GND</td><td><span class="wire blk">MUSTA</span></td><td class="sig">GND</td><td>Tähtimaahan</td></tr>
+      <tr><td class="pin">GPIO 16 (RX2)</td><td><span class="wire grn">VIHREÄ</span></td><td class="sig">RO</td><td>Receiver Out</td></tr>
+      <tr><td class="pin">GPIO 17 (TX2)</td><td><span class="wire blu">SININEN</span></td><td class="sig">DI</td><td>Driver In</td></tr>
+      <tr><td class="pin">GPIO 4</td><td><span class="wire wht">VALKOINEN</span></td><td class="sig">DE + RE</td><td><strong>DE ja RE sidotaan yhteen</strong> juottamalla tai pienellä johtimella</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Kytkennät – MAX485 ↔ tuulianturi</h4>
+  <table>
+    <thead><tr><th>MAX485</th><th>Tuulianturi</th></tr></thead>
+    <tbody>
+      <tr><td class="sig">A</td><td>RS485 A (+)</td></tr>
+      <tr><td class="sig">B</td><td>RS485 B (−)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Tuulianturin virransyöttö (erillinen!)</h4>
+  <table>
+    <thead><tr><th>Tuulianturi</th><th>Johto</th><th>Mihin</th></tr></thead>
+    <tbody>
+      <tr><td>+V (9–30 V)</td><td><span class="wire red">PUNAINEN</span></td><td>Vene-akun +12 V (sulakkeen jälkeen)</td></tr>
+      <tr><td>0 V / GND</td><td><span class="wire blk">MUSTA</span></td><td>Tähtimaa</td></tr>
+    </tbody>
+  </table>
+
+  <p class="muted"><strong>Huom:</strong> Tuulianturi saa virtansa suoraan 12 V:sta, <em>ei</em> ESP32:sta. Vain RS485 A/B -signaalit menevät MAX485:lle.</p>
+
+  <div class="card warn" style="margin-top:12px">
+    <strong>Yleisimmät virheet:</strong>
+    <ul>
+      <li>A ja B vaihtuneet keskenään → ei dataa. Vaihda ne ja kokeile uudestaan (ei vahingoita mitään).</li>
+      <li>DE ja RE unohdettu yhdistää → ESP32 ei pysty lähettämään Modbus-kyselyä.</li>
+      <li>Jos dataa tulee epäluotettavasti pitkällä kaapelilla → kokeile kytkeä MAX485:n VCC 5 V:iin ESP32:n 3.3 V:n sijaan. Tässä veneessä 3.3 V riittää, mutta marginaali on pienempi.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="m-hx711">7. Moduuli 2 – HX711-punnitukset (×3)</h2>
+<div class="card">
+  <p>
+    Järjestelmässä on kolme identtistä HX711-punnitusyksikköä: <strong>vesi</strong> (15 L), <strong>polttoaine</strong> (25 L) ja <strong>rommi</strong> (0.7 L). Kukin koostuu HX711 ADC-moduulista ja kuormasolusta (load cell).
+  </p>
+
+  <h4>Kuormasolun (load cell) johdot</h4>
+  <table>
+    <thead><tr><th>Väri</th><th>HX711-napa</th><th>Merkitys</th></tr></thead>
+    <tbody>
+      <tr><td><span class="wire red">PUNAINEN</span></td><td class="sig">E+</td><td>Excitation +</td></tr>
+      <tr><td><span class="wire blk">MUSTA</span></td><td class="sig">E−</td><td>Excitation −</td></tr>
+      <tr><td><span class="wire wht">VALKOINEN</span></td><td class="sig">A−</td><td>Analog −</td></tr>
+      <tr><td><span class="wire grn">VIHREÄ</span></td><td class="sig">A+</td><td>Analog +</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Jos kuormasolussasi on eri värit (esim. keltainen A+:lle), tarkista aina anturin datalehti. Napojen nimet <code>E+/E−/A+/A−</code> löytyvät HX711:n piirilevyltä.</p>
+
+  <h4>HX711 → ESP32 (kytkentä kaikille kolmelle)</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>HX711-pin</th>
+        <th>Johto</th>
+        <th>Vesi (ESP32)</th>
+        <th>Polttoaine (ESP32)</th>
+        <th>Rommi (ESP32)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="sig">VCC</td>
+        <td><span class="wire yel">KELTAINEN</span></td>
+        <td class="pin">3V3</td>
+        <td class="pin">3V3</td>
+        <td class="pin">3V3</td>
+      </tr>
+      <tr>
+        <td class="sig">GND</td>
+        <td><span class="wire blk">MUSTA</span></td>
+        <td class="pin">GND</td>
+        <td class="pin">GND</td>
+        <td class="pin">GND</td>
+      </tr>
+      <tr>
+        <td class="sig">DT (DOUT)</td>
+        <td><span class="wire grn">VIHREÄ</span></td>
+        <td class="pin">GPIO 19</td>
+        <td class="pin">GPIO 13</td>
+        <td class="pin">GPIO 25</td>
+      </tr>
+      <tr>
+        <td class="sig">SCK</td>
+        <td><span class="wire wht">VALKOINEN</span></td>
+        <td class="pin">GPIO 18</td>
+        <td class="pin">GPIO 14</td>
+        <td class="pin">GPIO 23</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="muted">Kaikki kolme HX711 voidaan jakaa sama 3V3- ja GND-linja. Vain DT ja SCK menevät omille GPIO-pinneilleen, jotta jokainen punnitus on itsenäinen.</p>
+
+  <div class="card tip" style="margin-top:12px">
+    <strong>Kalibrointi:</strong> Asennuksen jälkeen:
+    <ol>
+      <li>Aseta tankki/pullo tyhjänä paikoilleen.</li>
+      <li>Kutsu HTTP-endpointtia: <code>/tare_water</code>, <code>/tare</code> (fuel) tai <code>/rum_tare</code>.</li>
+      <li>Aseta tunnetun painoinen esine kennolle ja tarkista lukema dashboardista.</li>
+      <li>Säädä kalibrointikerrointa <code>config.h</code>:ssa kunnes lukema täsmää. Oletusarvo 420.0.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="m-gps">8. Moduuli 3 – GPS (NEO-6M)</h2>
+<div class="card">
+  <h4>GY-NEO6MV2 pinit</h4>
+  <table>
+    <thead><tr><th>GPS-moduuli</th><th>Johto</th><th>ESP32</th><th>Huomautus</th></tr></thead>
+    <tbody>
+      <tr><td class="sig">VCC</td><td><span class="wire yel">KELTAINEN</span></td><td class="pin">3V3</td><td>3.3 V (<em>ei</em> 5 V – rikkoo moduulin)</td></tr>
+      <tr><td class="sig">GND</td><td><span class="wire blk">MUSTA</span></td><td class="pin">GND</td><td>&nbsp;</td></tr>
+      <tr>
+        <td class="sig">TX</td>
+        <td><span class="wire grn">VIHREÄ</span></td>
+        <td class="pin">GPIO 34</td>
+        <td>GPS:n TX → ESP32 RX. <strong>GPIO 34 on vain sisääntulo.</strong></td>
+      </tr>
+      <tr>
+        <td class="sig">RX</td>
+        <td><span class="wire blu">SININEN</span></td>
+        <td class="pin">GPIO 27</td>
+        <td>ESP32 TX → GPS RX</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="card tip">
+    <ul>
+      <li><strong>Antenni taivaalle:</strong> GPS vaatii suoran näkyvyyden taivaalle. Ensimmäinen fix voi kestää 1–15 min kylmäkäynnistyksessä.</li>
+      <li>Moduulin LED vilkkuu kun fix on saatu.</li>
+      <li>Baudinopeus on 9600 (oletus).</li>
+      <li><strong>Muista:</strong> TX ja RX menevät ristiin (GPS TX → ESP32 RX, ESP32 TX → GPS RX).</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="m-saa">9. Moduuli 4 – Sää (AHT20 + BMP280, jaettu I²C-väylä)</h2>
+<div class="card">
+  <p>
+    AHT20 (lämpötila + kosteus) ja BMP280 (ilmanpaine) jakavat saman I²C-väylän. Moduulit ovat usein yhdistettynä samalle pikkulevylle ("AHT20+BMP280 combo"), mutta toimivat myös erillisinä.
+  </p>
+
+  <h4>I²C-väylän kytkentä</h4>
+  <table>
+    <thead><tr><th>Signaali</th><th>Johto</th><th>ESP32</th><th>AHT20</th><th>BMP280</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="sig">VCC</td>
+        <td><span class="wire yel">KELTAINEN</span></td>
+        <td class="pin">3V3</td>
+        <td class="sig">VIN</td>
+        <td class="sig">VCC</td>
+      </tr>
+      <tr>
+        <td class="sig">GND</td>
+        <td><span class="wire blk">MUSTA</span></td>
+        <td class="pin">GND</td>
+        <td class="sig">GND</td>
+        <td class="sig">GND</td>
+      </tr>
+      <tr>
+        <td class="sig">SDA</td>
+        <td><span class="wire grn">VIHREÄ</span></td>
+        <td class="pin">GPIO 21</td>
+        <td class="sig">SDA</td>
+        <td class="sig">SDA / SDI</td>
+      </tr>
+      <tr>
+        <td class="sig">SCL</td>
+        <td><span class="wire wht">VALKOINEN</span></td>
+        <td class="pin">GPIO 22</td>
+        <td class="sig">SCL</td>
+        <td class="sig">SCL / SCK</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="muted">
+    I²C-osoitteet: AHT20 = <code>0x38</code>, BMP280 = <code>0x76</code> (kun SDO on maassa) tai <code>0x77</code> (kun SDO on VCC:ssä). Ne eivät mene päällekkäin, joten molemmat toimivat samassa väylässä ilman konflikteja.
+  </p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="m-ds18b20">10. Moduuli 5 – Vesilämpö (DS18B20, 1-Wire)</h2>
+<div class="card">
+  <p>DS18B20 on vedenkestävä metalliletkuversio – kolme johtoa (punainen/musta/keltainen tai musta/punainen/valkoinen).</p>
+
+  <h4>Kytkentä</h4>
+  <table>
+    <thead><tr><th>DS18B20</th><th>Johto</th><th>ESP32</th></tr></thead>
+    <tbody>
+      <tr><td class="sig">VDD (punainen)</td><td><span class="wire yel">KELTAINEN</span></td><td class="pin">3V3</td></tr>
+      <tr><td class="sig">GND (musta)</td><td><span class="wire blk">MUSTA</span></td><td class="pin">GND</td></tr>
+      <tr><td class="sig">DATA (keltainen/valkoinen)</td><td><span class="wire grn">VIHREÄ</span></td><td class="pin">GPIO 26</td></tr>
+    </tbody>
+  </table>
+
+  <div class="card danger">
+    <strong>Pakollinen 4.7 kΩ pull-up-vastus:</strong>
+    <pre class="ascii">
+        3V3 ─────┬──── DS18B20 VDD (punainen)
+                 │
+               [4.7 kΩ]
+                 │
+        GPIO 26 ─┴──── DS18B20 DATA (keltainen)
+        GND ─────────── DS18B20 GND (musta)
+    </pre>
+    <p>Ilman tätä vastusta DS18B20 näyttää <code>−127 °C</code>. Vastus juotetaan 3V3:n ja GPIO 26:n väliin – helpointa juottaa se suoraan ESP32:n pinnien jatkeeksi tai DS18B20:n johtopäähän.</p>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="m-victron">11. Moduuli 6 – Victron MPPT (BLE, ei johtoja)</h2>
+<div class="card">
+  <p>
+    Victron SmartSolar MPPT 75/15 on jo asennettu veneeseen ja se puhuu ESP32:lle <strong>langattomasti Bluetooth LE:n yli</strong>. Mitään johtoja ei tarvitse vetää ESP32:een.
+  </p>
+  <h4>Käyttöönotto (ohjelmisto)</h4>
+  <ol>
+    <li>Asenna puhelimeen <strong>VictronConnect</strong>.</li>
+    <li>Yhdistä Victron-laitteeseen.</li>
+    <li>Mene <em>Settings → Product info</em> ja ota talteen <strong>Encryption key</strong> (32 heksamerkkiä).</li>
+    <li>Kopioi avain tiedostoon <code>susieq_dashboard/include/config.h</code> kohtaan <code>VICTRON_KEY</code>.</li>
+    <li>Käännä ja lataa firmware.</li>
+  </ol>
+  <p class="muted">Jos jätät <code>VICTRON_KEY</code>-kentän tyhjäksi (<code>""</code>), Victron-osio on pois käytöstä – kaikki muut anturit toimivat silti.</p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="bow">12. Bow-yksikkö – ESP32-CAM + TF-Luna LiDAR</h2>
+<div class="card">
+  <p>
+    Bow-yksikkö on <strong>täysin erillinen</strong> järjestelmä keulassa: ESP32-CAM (kamera sisäänrakennettuna) + TF-Luna -laser-etäisyysanturi. Sillä on oma WiFi-tukiasema <code>SusieQ-Bow</code>, eikä se kommunikoi cockpit-yksikön kanssa.
+  </p>
+
+  <h4>TF-Luna LiDAR -kytkentä</h4>
+  <table>
+    <thead><tr><th>TF-Luna</th><th>Johto</th><th>ESP32-CAM</th><th>Huomautus</th></tr></thead>
+    <tbody>
+      <tr><td class="sig">Pin 1: +5V</td><td><span class="wire org">ORANSSI</span></td><td class="pin">5V</td><td><strong>5 V</strong> – ei 3.3 V</td></tr>
+      <tr><td class="sig">Pin 2: RXD</td><td><span class="wire blu">SININEN</span></td><td class="pin">GPIO 15</td><td>ESP32 TX → LiDAR RX</td></tr>
+      <tr><td class="sig">Pin 3: TXD</td><td><span class="wire grn">VIHREÄ</span></td><td class="pin">GPIO 14</td><td>LiDAR TX → ESP32 RX</td></tr>
+      <tr><td class="sig">Pin 4: GND</td><td><span class="wire blk">MUSTA</span></td><td class="pin">GND</td><td>Yhteinen maa</td></tr>
+      <tr><td class="sig">Pin 5: —</td><td>—</td><td>—</td><td>Ei kytketä (config mode)</td></tr>
+      <tr><td class="sig">Pin 6: —</td><td>—</td><td>—</td><td>Ei kytketä</td></tr>
+    </tbody>
+  </table>
+
+  <div class="card warn">
+    <strong>ESP32-CAM:n omat erikoisuudet:</strong>
+    <ul>
+      <li>ESP32-CAM:ssa ei ole USB-liitintä – tarvitset FTDI-ohjelmointiadapterin ensiohjelmointiin (sen jälkeen OTA).</li>
+      <li>Ohjelmointitila: yhdistä <code>GPIO 0</code> ja <code>GND</code> ennen resetointia.</li>
+      <li>Kamera (OV2640) on jo kiinni piirilevyllä – ei tarvitse johdottaa mitään.</li>
+      <li>GPIO 14 ja 15 ovat vapaita <em>vain jos et käytä SD-korttia</em>.</li>
+    </ul>
+  </div>
+
+  <h4>Bow-virransyöttö</h4>
+  <p>ESP32-CAM saa virtansa omasta 5 V -syötöstään (esim. USB-laturista tai pienestä buckista keulassa). Ei yhteyttä cockpit-yksikköön.</p>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="testaus">13. Testausjärjestys ja vianhaku</h2>
+<div class="card step">
+  <p>Älä kytke kaikkea kerralla. Testaa yksi moduuli kerrallaan – näin viat on helppo paikantaa.</p>
+
+  <ol>
+    <li><strong>Pelkkä ESP32 + USB:</strong> lataa firmware, avaa <code>SusieQ-Data</code>-verkko puhelimella, varmista että dashboard aukeaa osoitteesta <code>http://192.168.4.1</code>.</li>
+    <li><strong>Lisää virransyöttö:</strong> mittaa buckin lähtö (5.0 V), kytke ESP32 VIN-pinille, varmista ettei ESP32 kuumene.</li>
+    <li><strong>I²C-väylä (sää):</strong> kytke AHT20 ja BMP280. Dashboardin Sää-välilehdelle pitäisi tulla lukemat.</li>
+    <li><strong>DS18B20:</strong> muista pull-up-vastus. Jos näyttää −127 °C, vastus puuttuu tai data-johto on väärässä pinissä.</li>
+    <li><strong>GPS:</strong> vie antenni ulos, odota 1–15 min ensimmäistä fixiä. Jos ei signaalia: tarkista että TX/RX eivät ole ristissä väärin päin.</li>
+    <li><strong>HX711:t:</strong> kytke yksi kerrallaan. Aja tarelle HTTP-endpoint. Jos lukema heittelee rajusti: GND-yhteys puuttuu.</li>
+    <li><strong>Tuulianturi:</strong> kytke viimeiseksi (tarvitsee 12 V ja MAX485). Jos ei dataa: vaihda A ja B keskenään.</li>
+    <li><strong>Victron:</strong> laita <code>VICTRON_KEY</code> config.h:hon, käännä uudestaan.</li>
+  </ol>
+
+  <h4>Tavallisimmat viat</h4>
+  <table>
+    <thead><tr><th>Oire</th><th>Todennäköinen syy</th></tr></thead>
+    <tbody>
+      <tr><td>ESP32 ei käynnisty / bootloop</td><td>Virtalähde ei riitä, buck ei ole 5 V:ssa, tai strapping-pin maassa (GPIO 0/2/12/15)</td></tr>
+      <tr><td>Kaikki anturit antavat roskaa</td><td>GND-tähtimaa puuttuu – moduulit eivät jaa samaa maata ESP32:n kanssa</td></tr>
+      <tr><td>DS18B20 = −127 °C</td><td>4.7 kΩ pull-up puuttuu</td></tr>
+      <tr><td>GPS ei saa fixiä</td><td>Antenni sisätiloissa, tai TX/RX ristissä väärin</td></tr>
+      <tr><td>HX711 heittelee satoja</td><td>Kuormasolun johdot löysällä, tai GND puuttuu</td></tr>
+      <tr><td>Tuulianturi hiljaa</td><td>A/B ristissä, DE+RE ei yhdistetty, tai MAX485 3.3 V:ssa (pitää olla 5 V)</td></tr>
+      <tr><td>Victron ei näy</td><td>VICTRON_KEY tyhjä tai väärä, laite kauempana kuin ~5 m</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 id="taulukko">14. Yhteenvetotaulukko – kaikki liitokset</h2>
+<div class="card">
+  <h3>Cockpit – ESP32-WROOM-32</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>GPIO</th>
+        <th>Signaali</th>
+        <th>Laite</th>
+        <th>Jännite</th>
+        <th>Huomautus</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="pin">GPIO 4</td>  <td class="sig">DE+RE</td>       <td>MAX485 (tuuli)</td>            <td><span class="v33">3.3 V</span></td> <td>DE ja RE sidottu yhteen</td></tr>
+      <tr><td class="pin">GPIO 16</td> <td class="sig">UART2 RX</td>    <td>MAX485 RO</td>                 <td><span class="v33">3.3 V</span></td> <td>Modbus 9600 bps, addr 1</td></tr>
+      <tr><td class="pin">GPIO 17</td> <td class="sig">UART2 TX</td>    <td>MAX485 DI</td>                 <td><span class="v33">3.3 V</span></td> <td>&nbsp;</td></tr>
+      <tr><td class="pin">GPIO 13</td> <td class="sig">DOUT</td>        <td>HX711 polttoaine (25 L)</td>   <td><span class="v33">3.3 V</span></td> <td>bensiini 0.74 kg/L</td></tr>
+      <tr><td class="pin">GPIO 14</td> <td class="sig">SCK</td>         <td>HX711 polttoaine</td>          <td><span class="v33">3.3 V</span></td> <td>&nbsp;</td></tr>
+      <tr><td class="pin">GPIO 19</td> <td class="sig">DOUT</td>        <td>HX711 vesi (15 L)</td>         <td><span class="v33">3.3 V</span></td> <td>50 kg load cell</td></tr>
+      <tr><td class="pin">GPIO 18</td> <td class="sig">SCK</td>         <td>HX711 vesi</td>                <td><span class="v33">3.3 V</span></td> <td>&nbsp;</td></tr>
+      <tr><td class="pin">GPIO 25</td> <td class="sig">DOUT</td>        <td>HX711 rommi (0.7 L)</td>       <td><span class="v33">3.3 V</span></td> <td>0.94 kg/L</td></tr>
+      <tr><td class="pin">GPIO 23</td> <td class="sig">SCK</td>         <td>HX711 rommi</td>               <td><span class="v33">3.3 V</span></td> <td>&nbsp;</td></tr>
+      <tr><td class="pin">GPIO 34</td> <td class="sig">UART1 RX</td>    <td>GPS NEO-6M TX</td>             <td><span class="v33">3.3 V</span></td> <td><span class="badge warn">input-only</span> 9600 bps</td></tr>
+      <tr><td class="pin">GPIO 27</td> <td class="sig">UART1 TX</td>    <td>GPS NEO-6M RX</td>             <td><span class="v33">3.3 V</span></td> <td>&nbsp;</td></tr>
+      <tr><td class="pin">GPIO 21</td> <td class="sig">SDA</td>         <td>AHT20 + BMP280</td>            <td><span class="v33">3.3 V</span></td> <td>0x38 &amp; 0x76</td></tr>
+      <tr><td class="pin">GPIO 22</td> <td class="sig">SCL</td>         <td>AHT20 + BMP280</td>            <td><span class="v33">3.3 V</span></td> <td>&nbsp;</td></tr>
+      <tr><td class="pin">GPIO 26</td> <td class="sig">1-Wire</td>      <td>DS18B20 vesilämpö</td>         <td><span class="v33">3.3 V</span></td> <td><span class="badge danger">4.7 kΩ pull-up pakollinen</span></td></tr>
+      <tr><td class="pin">—</td>       <td class="sig">BLE</td>         <td>Victron MPPT 75/15</td>        <td>—</td>                             <td>VICTRON_KEY (32-hex) vaaditaan</td></tr>
+      <tr><td class="pin">VIN</td>     <td class="sig">+5 V</td>        <td>Buck-muunnin out</td>          <td><span class="v5">5 V</span></td>   <td>12V→5V buck akusta</td></tr>
+      <tr><td class="pin">3V3</td>     <td class="sig">+3.3 V out</td>  <td>Anturien syöttö</td>           <td><span class="v33">3.3 V</span></td> <td>max ~500 mA yhteensä</td></tr>
+      <tr><td class="pin">GND</td>     <td class="sig">GND</td>         <td>Tähtimaa</td>                   <td><span class="gnd">0 V</span></td>  <td>Kaikki moduulit jakavat saman GND:n</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Bow – ESP32-CAM</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>GPIO</th>
+        <th>Signaali</th>
+        <th>Laite</th>
+        <th>Jännite</th>
+        <th>Huomautus</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="pin">GPIO 14</td> <td class="sig">UART RX</td> <td>TF-Luna TX</td> <td><span class="v33">3.3 V log.</span> / <span class="v5">5 V teho</span></td> <td>115200 bps, 20 Hz</td></tr>
+      <tr><td class="pin">GPIO 15</td> <td class="sig">UART TX</td> <td>TF-Luna RX</td> <td><span class="v33">3.3 V log.</span></td> <td>Vapaa kun SD-korttia ei käytetä</td></tr>
+      <tr><td class="pin">5V</td>     <td class="sig">+5 V</td>   <td>TF-Luna VCC</td> <td><span class="v5">5 V</span></td> <td>Oma virtalähde keulassa</td></tr>
+      <tr><td class="pin">GND</td>    <td class="sig">GND</td>    <td>TF-Luna GND</td> <td><span class="gnd">0 V</span></td> <td>&nbsp;</td></tr>
+      <tr><td class="pin">(sis.)</td> <td class="sig">—</td>      <td>OV2640-kamera</td> <td>—</td> <td>Sisäinen kytkentä ESP32-CAM-kortilla</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="muted" style="margin-top:30px; text-align:center; padding-top:16px; border-top:1px solid var(--border)">
+  Pinit vahvistettu suoraan lähdekoodista:<br>
+  <code>susieq_dashboard/include/config.h</code> · <code>susieq_bow/include/config.h</code>
+</p>
+
 </body>
 </html>

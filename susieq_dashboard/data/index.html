@@ -173,6 +173,19 @@
     font-size: 1.3rem;
   }
 
+  /* GPS coordinates (tiny, below boat speed) */
+  .boat-coords-row {
+    margin-top: 4px;
+    font-size: 0.72rem;
+    color: #8b949e;
+    text-align: center;
+    letter-spacing: 0.03em;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .boat-coords-row #boat-coords-val {
+    color: #c9d1d9;
+  }
+
   /* Wind min/max history row */
   .wind-history {
     display: flex;
@@ -746,6 +759,11 @@
       <!-- Veneen nopeus (GPS SOG) -->
       <div class="boat-speed-row" id="boat-speed-row">
         vauhti <strong id="boat-speed-val">—</strong> solmua
+      </div>
+
+      <!-- Sijainti (GPS lat/lon DDM-muodossa) -->
+      <div class="boat-coords-row" id="boat-coords-row">
+        sijainti <span id="boat-coords-val">—</span>
       </div>
 
     </div>
@@ -1506,6 +1524,19 @@ function toBeaufort(mps) {
   return              { n:12,    label: "B12 — Hurrikaani", color: "#f85149" };
 }
 
+// ─── GPS coordinate formatting (DDM: degrees + decimal minutes) ───────
+function formatDDM(value, posChar, negChar, degWidth) {
+  var hemi = value >= 0 ? posChar : negChar;
+  var abs = Math.abs(value);
+  var deg = Math.floor(abs);
+  var min = (abs - deg) * 60;
+  var degStr = String(deg);
+  while (degStr.length < degWidth) degStr = "0" + degStr;
+  var minStr = min.toFixed(3);
+  if (min < 10) minStr = "0" + minStr;
+  return degStr + "° " + minStr + "′ " + hemi;
+}
+
 // ─── Wind direction arrow smooth rotation ─────────────────────────────
 var _currentWindDeg = 0;
 
@@ -1652,6 +1683,12 @@ function update(d) {
   var gpsOk = d.gps && d.gps.valid && d.gps.fix && d.gps.sog_knots != null;
   document.getElementById("boat-speed-val").textContent = gpsOk
     ? d.gps.sog_knots.toFixed(1)
+    : "—";
+
+  // GPS → coordinates (DDM format, below boat speed)
+  var coordsOk = d.gps && d.gps.valid && d.gps.fix && d.gps.lat != null && d.gps.lon != null;
+  document.getElementById("boat-coords-val").textContent = coordsOk
+    ? formatDDM(d.gps.lat, "N", "S", 2) + "   " + formatDDM(d.gps.lon, "E", "W", 3)
     : "—";
 
   // Battery
