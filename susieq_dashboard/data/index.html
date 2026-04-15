@@ -2488,7 +2488,7 @@ function updateRumOClock(rumLiters) {
   var diffMin = ((_solar.sunsetUtcMin - nowMin) + 1440) % 1440;
 
   // Vain näytetään kun auringonlasku < 3h päässä tai hetki sitten
-  var afterSunset = nowMin > _solar.sunsetUtcMin && nowMin < _solar.sunsetUtcMin + 30;
+  var afterSunset = ((nowMin - _solar.sunsetUtcMin + 1440) % 1440) < 30;
   if (diffMin > 180 && !afterSunset) { el.style.display = "none"; _rumOClockFired = false; return; }
 
   el.style.display = "";
@@ -2527,6 +2527,7 @@ function rumOClockCelebrate() {
       gain.gain.linearRampToValueAtTime(0.25, t + 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
       osc.start(t); osc.stop(t + 0.5);
+      if (i === 2) { osc.onended = function() { ctx.close(); }; }
     });
   } catch(e) {}
 }
