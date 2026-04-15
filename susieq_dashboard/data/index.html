@@ -936,6 +936,10 @@
       </div>
 
     </div>
+    <!-- Rum o'clock countdown -->
+    <div id="rum-oclock-row" style="display:none;padding:8px 0 4px;text-align:center;font-size:0.8rem;">
+      <span id="rum-oclock-text" style="color:var(--orange);font-weight:600;"></span>
+    </div>
     <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;">
       <button onclick="tareWater()"
         style="padding:5px 14px;background:#21262d;border:1px solid var(--border);
@@ -1942,6 +1946,8 @@ function update(d) {
     document.getElementById("rum-pct").textContent   = Math.round(rumPct) + "%";
     setBarColor(document.getElementById("rum-fill"), rumPct, "rum");
   }
+  // Rum o'clock countdown
+  updateRumOClock(rumOk ? d.rum.liters : null);
 
   // Weather
   var weatherOk = d.weather && d.weather.valid;
@@ -2468,6 +2474,62 @@ function updateTripHistoryUI() {
 
 // Päivitä live-UI kerran minuutissa vaikka GPS ei päivity
 setInterval(function() { if (_trip) updateTripLiveUI(); }, 30000);
+
+// ─── Rum o'clock ───────────────────────────────────────────────────────
+var _rumOClockFired = false;
+
+function updateRumOClock(rumLiters) {
+  var el = document.getElementById("rum-oclock-row");
+  var txt = document.getElementById("rum-oclock-text");
+  if (!_solar) { el.style.display = "none"; return; }
+
+  var now = new Date();
+  var nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  var diffMin = ((_solar.sunsetUtcMin - nowMin) + 1440) % 1440;
+
+  // Vain näytetään kun auringonlasku < 3h päässä tai hetki sitten
+  var afterSunset = nowMin > _solar.sunsetUtcMin && nowMin < _solar.sunsetUtcMin + 30;
+  if (diffMin > 180 && !afterSunset) { el.style.display = "none"; _rumOClockFired = false; return; }
+
+  el.style.display = "";
+  var shots = rumLiters != null ? Math.floor(rumLiters / 0.06) : null;
+  var shotStr = shots != null ? " · " + shots + " annosta jäljellä" : "";
+
+  if (afterSunset) {
+    txt.textContent = "🌅 Rum o'clock!" + shotStr;
+    if (!_rumOClockFired) {
+      _rumOClockFired = true;
+      rumOClockCelebrate();
+    }
+  } else {
+    var h = Math.floor(diffMin / 60), m = diffMin % 60;
+    txt.textContent = "🌅 Rum o'clock " + h + "h " + m + "m päästä" + shotStr;
+  }
+}
+
+function rumOClockCelebrate() {
+  // Visuaalinen välähdys
+  var card = document.getElementById("card-tanks");
+  card.classList.add("rum-flash-active");
+  setTimeout(function() { card.classList.remove("rum-flash-active"); }, 5000);
+
+  // Web Audio -fanfaari (3 nousevaa ääntä)
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [440, 554, 659].forEach(function(freq, i) {
+      var osc  = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      var t = ctx.currentTime + i * 0.2;
+      gain.gain.setValueAtTime(0.0, t);
+      gain.gain.linearRampToValueAtTime(0.25, t + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.5);
+    });
+  } catch(e) {}
+}
 
 // ─── Boot ──────────────────────────────────────────────────────────────
 connect();
