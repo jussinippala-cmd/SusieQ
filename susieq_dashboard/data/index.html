@@ -1844,6 +1844,9 @@ function update(d) {
   updateNightModeAuto();
   refreshSolarBar();
   updateNavTab(d.gps);
+  if (d.gps && d.gps.lat != null && d.gps.lon != null) {
+    checkAnchorAlarm(d.gps.lat, d.gps.lon);
+  }
 
   // Battery
   var battOk = d.battery && d.battery.valid;
@@ -2238,6 +2241,81 @@ function refreshSolarBar() {
 })();
 
 setInterval(refreshSolarBar, 30000);
+
+// ─── Ankkurialarmi ─────────────────────────────────────────────────────
+var _anchorLat = null, _anchorLon = null;
+var _anchorSetLat = null, _anchorSetLon = null;
+var _anchorRadiusM = 50;
+var _anchorAlarmFiring = false;
+var _anchorBeepCtx = null;
+var _anchorBeepInterval = null;
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  var R = 6371000;
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLon = (lon2 - lon1) * Math.PI / 180;
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2)
+        + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180)
+          * Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function setAnchor() {
+  if (_anchorLat == null) { alert("GPS-signaali puuttuu — odota fixiä."); return; }
+  _anchorSetLat = _anchorLat;
+  _anchorSetLon = _anchorLon;
+  document.getElementById("anchor-set-btn").style.display   = "none";
+  document.getElementById("anchor-clear-btn").style.display = "";
+  document.getElementById("anchor-live").style.display      = "";
+  document.getElementById("anchor-radius-val").textContent  = _anchorRadiusM + " m";
+}
+
+function clearAnchor() {
+  _anchorSetLat = null; _anchorSetLon = null;
+  _anchorAlarmFiring = false;
+  if (_anchorBeepInterval) { clearInterval(_anchorBeepInterval); _anchorBeepInterval = null; }
+  document.getElementById("anchor-set-btn").style.display   = "";
+  document.getElementById("anchor-clear-btn").style.display = "none";
+  document.getElementById("anchor-live").style.display      = "none";
+  document.getElementById("card-nav").classList.remove("nav-alarm-active");
+}
+
+function updateAnchorRadius(val) {
+  _anchorRadiusM = parseInt(val);
+  document.getElementById("anchor-radius-val").textContent = _anchorRadiusM + " m";
+}
+
+function anchorBeep() {
+  try {
+    if (!_anchorBeepCtx) _anchorBeepCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = _anchorBeepCtx.createOscillator();
+    var gain = _anchorBeepCtx.createGain();
+    osc.connect(gain); gain.connect(_anchorBeepCtx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.3, _anchorBeepCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, _anchorBeepCtx.currentTime + 0.6);
+    osc.start(); osc.stop(_anchorBeepCtx.currentTime + 0.6);
+  } catch(e) {}
+}
+
+function checkAnchorAlarm(lat, lon) {
+  _anchorLat = lat; _anchorLon = lon;
+  if (_anchorSetLat == null) return;
+  if (lat == null || lon == null) return;
+  var dist = haversineMeters(_anchorSetLat, _anchorSetLon, lat, lon);
+  document.getElementById("anchor-dist").textContent = Math.round(dist) + " m";
+  var alarm = dist > _anchorRadiusM;
+  document.getElementById("card-nav").classList.toggle("nav-alarm-active", alarm);
+  if (alarm && !_anchorAlarmFiring) {
+    _anchorAlarmFiring = true;
+    anchorBeep();
+    _anchorBeepInterval = setInterval(anchorBeep, 3000);
+  }
+  if (!alarm && _anchorAlarmFiring) {
+    _anchorAlarmFiring = false;
+    if (_anchorBeepInterval) { clearInterval(_anchorBeepInterval); _anchorBeepInterval = null; }
+  }
+}
 
 // ─── Navigointi-välilehti ──────────────────────────────────────────────
 function updateNavTab(gps) {
