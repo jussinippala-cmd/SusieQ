@@ -1851,6 +1851,10 @@ function update(d) {
   if (d.gps && d.gps.fix && d.gps.sog_knots != null) {
     checkSpeedRecord(d.gps.sog_knots);
   }
+  // Matkaetäisyys
+  if (d.gps && d.gps.fix && d.gps.sog_knots != null) {
+    updateTripDistance(d.gps.sog_knots);
+  }
 
   // Battery
   var battOk = d.battery && d.battery.valid;
@@ -2384,6 +2388,86 @@ function checkSpeedRecord(kn) {
     }
   }
 }
+
+// ─── Matkatilastot ──────────────────────────────────────────────────────
+var _trip = null;   // { startTime_ms, nm, maxKn, lastTime_ms }
+
+function startTrip() {
+  var now = Date.now();
+  _trip = { startTime_ms: now, nm: 0, maxKn: 0, lastTime_ms: now };
+  document.getElementById("trip-start-btn").style.display = "none";
+  document.getElementById("trip-stop-btn").style.display  = "";
+  document.getElementById("trip-live").style.display = "";
+  updateTripLiveUI();
+}
+
+function stopTrip() {
+  if (!_trip) return;
+  var now = Date.now();
+  var durationMin = Math.round((now - _trip.startTime_ms) / 60000);
+  var avgKn = durationMin > 0 ? _trip.nm / (durationMin / 60) : 0;
+  var summary = {
+    date:         new Date().toLocaleDateString("fi-FI"),
+    duration_min: durationMin,
+    nm:           Math.round(_trip.nm * 10) / 10,
+    avg_kn:       Math.round(avgKn * 10) / 10,
+    max_kn:       Math.round(_trip.maxKn * 10) / 10
+  };
+  // Lisää matkan nm kausiyhteensä
+  _records.season_nm = Math.round((_records.season_nm + summary.nm) * 10) / 10;
+  // Prepend ja rajoita 20:een
+  _records.trips = [summary].concat((_records.trips || []).slice(0, 19));
+  postRecords();
+  updateRecordsUI();
+  _trip = null;
+  document.getElementById("trip-start-btn").style.display = "";
+  document.getElementById("trip-stop-btn").style.display  = "none";
+  document.getElementById("trip-live").style.display = "none";
+  updateTripHistoryUI();
+}
+
+function updateTripDistance(sogKn) {
+  if (!_trip || sogKn == null) return;
+  var now = Date.now();
+  var dtHours = (now - _trip.lastTime_ms) / 3600000;
+  if (dtHours > 0.1) dtHours = 0.1;  // katkaise jos >6min tauko (esim. yhteys poikki)
+  _trip.nm += sogKn * dtHours;
+  if (sogKn > _trip.maxKn) _trip.maxKn = sogKn;
+  _trip.lastTime_ms = now;
+  updateTripLiveUI();
+}
+
+function updateTripLiveUI() {
+  if (!_trip) return;
+  var now  = Date.now();
+  var elapsed = Math.floor((now - _trip.startTime_ms) / 60000);
+  var h = Math.floor(elapsed / 60), m = elapsed % 60;
+  document.getElementById("trip-duration").textContent = h + "h " + m + "m";
+  document.getElementById("trip-nm").textContent       = _trip.nm.toFixed(1) + " nm";
+  var avgKn = elapsed > 0 ? _trip.nm / (elapsed / 60) : 0;
+  document.getElementById("trip-avg-kn").textContent   = avgKn.toFixed(1) + " kn";
+  document.getElementById("trip-max-kn").textContent   = _trip.maxKn.toFixed(1) + " kn";
+}
+
+function updateTripHistoryUI() {
+  var el = document.getElementById("trip-history");
+  if (!_records.trips || _records.trips.length === 0) { el.innerHTML = ""; return; }
+  var html = '<div style="font-size:0.72rem;color:var(--muted);font-weight:600;'
+    + 'letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px;">Viimeisimmät matkat</div>';
+  _records.trips.slice(0, 3).forEach(function(t) {
+    html += '<div style="display:flex;justify-content:space-between;padding:3px 0;'
+      + 'border-top:1px solid var(--border);font-size:0.8rem;">'
+      + '<span style="color:var(--muted);">' + t.date + '</span>'
+      + '<span>' + t.nm + ' nm</span>'
+      + '<span>' + Math.floor(t.duration_min/60) + 'h ' + (t.duration_min%60) + 'm</span>'
+      + '<span style="color:var(--muted);">↑' + t.max_kn + ' kn</span>'
+      + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// Päivitä live-UI kerran minuutissa vaikka GPS ei päivity
+setInterval(function() { if (_trip) updateTripLiveUI(); }, 30000);
 
 // ─── Boot ──────────────────────────────────────────────────────────────
 connect();
