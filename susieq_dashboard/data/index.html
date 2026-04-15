@@ -1847,6 +1847,10 @@ function update(d) {
   if (d.gps && d.gps.lat != null && d.gps.lon != null) {
     checkAnchorAlarm(d.gps.lat, d.gps.lon);
   }
+  // Nopeusennätys
+  if (d.gps && d.gps.fix && d.gps.sog_knots != null) {
+    checkSpeedRecord(d.gps.sog_knots);
+  }
 
   // Battery
   var battOk = d.battery && d.battery.valid;
@@ -2326,8 +2330,64 @@ function updateNavTab(gps) {
     ? Math.round(gps.cog_deg) : "—";
 }
 
+// ─── Nopeusennätykset & matkatilastot (tallennus ESP32 /records) ────────
+var _records = { best_knots: 0, best_date: "", season_nm: 0, trips: [] };
+var _sessionMaxKn = 0;
+var _lastRecordPost = 0;
+
+function postRecords() {
+  fetchWithTimeout("/records", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(_records)
+  }, 5000).catch(function() {});
+}
+
+function loadRecords() {
+  fetchWithTimeout("/records", {}, 5000)
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      if (j && (j.best_knots || j.trips)) {
+        _records.best_knots = j.best_knots || 0;
+        _records.best_date  = j.best_date  || "";
+        _records.season_nm  = j.season_nm  || 0;
+        _records.trips      = j.trips      || [];
+        updateRecordsUI();
+        // updateTripHistoryUI määritellään Task 7:ssa — guard estää virheet jos toteutettu erikseen
+        if (typeof updateTripHistoryUI === "function") updateTripHistoryUI();
+      }
+    })
+    .catch(function() {});  // offline — ei haittaa
+}
+
+function updateRecordsUI() {
+  document.getElementById("speed-season-best").textContent =
+    _records.best_knots > 0 ? _records.best_knots.toFixed(1) + " kn" : "— kn";
+  document.getElementById("speed-season-date").textContent =
+    _records.best_date ? _records.best_date : "";
+  document.getElementById("season-nm").textContent =
+    _records.season_nm > 0 ? _records.season_nm.toFixed(1) + " nm kaudella" : "— nm kaudella";
+}
+
+function checkSpeedRecord(kn) {
+  if (kn == null || kn <= _sessionMaxKn) return;
+  _sessionMaxKn = kn;
+  document.getElementById("speed-session-max").textContent = kn.toFixed(1) + " kn";
+  if (kn > _records.best_knots) {
+    _records.best_knots = Math.round(kn * 10) / 10;
+    _records.best_date  = new Date().toLocaleDateString("fi-FI");
+    updateRecordsUI();
+    var now = Date.now();
+    if (now - _lastRecordPost > 60000) {   // throttle: max 1 POST/min
+      _lastRecordPost = now;
+      postRecords();
+    }
+  }
+}
+
 // ─── Boot ──────────────────────────────────────────────────────────────
 connect();
+loadRecords();
 </script>
 </body>
 </html>
