@@ -490,6 +490,32 @@
     color: var(--muted);
   }
 
+  /* ── Navigointi-kortti ────────────────────────────────────────────── */
+  .nav-big { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em;
+             color: var(--text); font-variant-numeric: tabular-nums; }
+  .nav-big-unit { font-size: 0.85rem; color: var(--muted); margin-left: 2px; }
+  .nav-row { display: flex; justify-content: space-between; align-items: baseline;
+             padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .nav-row:last-child { border-bottom: none; }
+  .nav-label { color: var(--muted); }
+  .nav-section { margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--border); }
+  .nav-btn {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-family: inherit;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .nav-btn:hover { background: var(--border); }
+  .nav-btn-danger { border-color: var(--red); color: var(--red); }
+  .nav-btn-danger:hover { background: rgba(248,81,73,0.12); }
+  .nav-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .nav-alarm-active { animation: nav-blink 1s ease-in-out infinite; }
+  @keyframes nav-blink { 0%,100% { background: var(--card); } 50% { background: rgba(248,81,73,0.2); } }
+  @keyframes rum-flash {
+    0%,100% { background: var(--card); }
+    50%      { background: rgba(219,109,40,0.25); }
+  }
+  .rum-flash-active { animation: rum-flash 0.8s ease-in-out 6; }
+
   .water-temp-big {
     font-size: 3rem;
     font-weight: 700;
@@ -719,6 +745,7 @@
   <button class="tab" data-tab="battery">Akku</button>
   <button class="tab" data-tab="tanks">Tankit</button>
   <button class="tab" data-tab="weather">Sää</button>
+  <button class="tab" data-tab="nav">Nav</button>
 </nav>
 
 <div id="tab-wind" class="tab-panel active">
@@ -969,6 +996,85 @@
   </div>
 
 </div><!-- #tab-weather -->
+
+<div id="tab-nav" class="tab-panel">
+  <div class="card" id="card-nav">
+    <h2>Navigointi</h2>
+
+    <!-- SOG + COG -->
+    <div style="display:flex;gap:24px;padding:8px 0 12px;border-bottom:1px solid var(--border);">
+      <div>
+        <div class="nav-big"><span id="nav-sog">—</span><span class="nav-big-unit">kn</span></div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">vauhti</div>
+      </div>
+      <div>
+        <div class="nav-big"><span id="nav-cog">—</span><span class="nav-big-unit">°</span></div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">suunta</div>
+      </div>
+    </div>
+
+    <!-- Nopeusennätykset -->
+    <div class="nav-section" id="records-section">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;
+                  letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;">Nopeus</div>
+      <div class="nav-row">
+        <span class="nav-label">Sessio max</span>
+        <span id="speed-session-max">— kn</span>
+      </div>
+      <div class="nav-row">
+        <span class="nav-label">Kauden ennätys</span>
+        <span id="speed-season-best">— kn</span>
+      </div>
+      <div class="nav-row" style="border:none;padding-top:0;">
+        <span class="nav-label" style="font-size:0.72rem;" id="speed-season-date"></span>
+        <span id="season-nm" style="font-size:0.8rem;color:var(--muted);">— nm kaudella</span>
+      </div>
+    </div>
+
+    <!-- Ankkurialarmi -->
+    <div class="nav-section" id="anchor-section">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;
+                  letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;">Ankkuri</div>
+      <div class="nav-btn-row">
+        <button id="anchor-set-btn" class="nav-btn" onclick="setAnchor()">⚓ Laske ankkuri</button>
+        <button id="anchor-clear-btn" class="nav-btn nav-btn-danger" onclick="clearAnchor()"
+                style="display:none">✕ Nosta ankkuri</button>
+      </div>
+      <div id="anchor-live" style="display:none">
+        <div class="nav-row">
+          <span class="nav-label">Etäisyys ankkurista</span>
+          <span id="anchor-dist">— m</span>
+        </div>
+        <div class="nav-row" style="gap:8px;flex-wrap:wrap;">
+          <span class="nav-label">Hälytysraja</span>
+          <input type="range" id="anchor-radius" min="20" max="150" value="50"
+                 oninput="updateAnchorRadius(this.value)"
+                 style="width:80px;accent-color:var(--blue);">
+          <span id="anchor-radius-val" style="min-width:36px;text-align:right;">50 m</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matkatilastot -->
+    <div class="nav-section" id="trip-section">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;
+                  letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;">Matka</div>
+      <div class="nav-btn-row">
+        <button id="trip-start-btn" class="nav-btn" onclick="startTrip()">▶ Aloita matka</button>
+        <button id="trip-stop-btn" class="nav-btn nav-btn-danger" onclick="stopTrip()"
+                style="display:none">⏹ Lopeta matka</button>
+      </div>
+      <div id="trip-live" style="display:none">
+        <div class="nav-row"><span class="nav-label">Kesto</span><span id="trip-duration">0h 0m</span></div>
+        <div class="nav-row"><span class="nav-label">Matka</span><span id="trip-nm">0.0 nm</span></div>
+        <div class="nav-row"><span class="nav-label">Keskinopeus</span><span id="trip-avg-kn">— kn</span></div>
+        <div class="nav-row"><span class="nav-label">Huippu</span><span id="trip-max-kn">— kn</span></div>
+      </div>
+      <div id="trip-history" style="margin-top:8px;font-size:0.8rem;color:var(--muted);"></div>
+    </div>
+
+  </div>
+</div><!-- #tab-nav -->
 
 <!-- ═══ Help overlay + slide-over panel ═══ -->
 <div class="help-overlay" id="help-overlay" onclick="toggleHelp()"></div>
@@ -1737,6 +1843,7 @@ function update(d) {
 
   updateNightModeAuto();
   refreshSolarBar();
+  updateNavTab(d.gps);
 
   // Battery
   var battOk = d.battery && d.battery.valid;
@@ -2131,6 +2238,15 @@ function refreshSolarBar() {
 })();
 
 setInterval(refreshSolarBar, 30000);
+
+// ─── Navigointi-välilehti ──────────────────────────────────────────────
+function updateNavTab(gps) {
+  var fix = gps && gps.fix;
+  document.getElementById("nav-sog").textContent = fix && gps.sog_knots != null
+    ? gps.sog_knots.toFixed(1) : "—";
+  document.getElementById("nav-cog").textContent = fix && gps.cog_deg != null
+    ? Math.round(gps.cog_deg) : "—";
+}
 
 // ─── Boot ──────────────────────────────────────────────────────────────
 connect();
