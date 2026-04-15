@@ -20,6 +20,37 @@
     --orange:  #db6d28;
   }
 
+  /* ── Yöteema — punainen palette silmille ─────────────────────────── */
+  body.night-mode {
+    --bg:    #000000;
+    --card:  #0a0000;
+    --border:#330000;
+    --text:  #ff4444;
+    --muted: #882200;
+    --blue:  #cc3300;
+  }
+
+  .night-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.3s;
+  }
+
+  #solar-info {
+    font-size: 0.72rem;
+    color: var(--orange);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    margin-left: auto;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
@@ -664,6 +695,7 @@
     <circle cx="61" cy="39" r="1.2" fill="#ffffff" opacity="0.6"/>
   </svg> SusieQ</h1>
   <div style="display:flex;align-items:center;gap:10px;">
+    <button class="night-btn" id="night-btn" onclick="toggleNightMode()" title="Yöteema">☀️</button>
     <button id="help-btn" onclick="toggleHelp()" title="Käyttöopas"
       style="background:none;border:1px solid var(--border);color:var(--muted);
              width:28px;height:28px;border-radius:50%;font-size:0.85rem;
@@ -679,6 +711,7 @@
 <div id="gps-time-bar">
   <span id="gps-time-local">--:--:--</span>
   <span id="gps-time-utc">UTC --:--:--</span>
+  <span id="solar-info" style="display:none"></span>
 </div>
 
 <nav class="tab-bar">
@@ -1691,11 +1724,19 @@ function update(d) {
     ? d.gps.sog_knots.toFixed(1)
     : "—";
 
+  // Solar: laske auringonlasku koordinaateista
+  if (d.gps && d.gps.lat != null && d.gps.lon != null) {
+    updateSolarInfo(d.gps.lat, d.gps.lon);
+  }
+
   // GPS → coordinates (DDM format, below boat speed)
   var coordsOk = d.gps && d.gps.valid && d.gps.fix && d.gps.lat != null && d.gps.lon != null;
   document.getElementById("boat-coords-val").textContent = coordsOk
     ? formatDDM(d.gps.lat, "N", "S", 2) + "   " + formatDDM(d.gps.lon, "E", "W", 3)
     : "—";
+
+  updateNightModeAuto();
+  refreshSolarBar();
 
   // Battery
   var battOk = d.battery && d.battery.valid;
@@ -1988,6 +2029,108 @@ function updatePressTrend() {
     el.style.color = "var(--muted)";
   }
 }
+
+// ─── Auringonlasku-laskin (NOAA simplified) ────────────────────────────
+function calcSunriseSunset(lat, lon) {
+  var now = new Date();
+  var JD = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(),
+                               now.getUTCDate()) / 86400000) + 2440587.5 + 0.5;
+  var n  = JD - 2451545.0;
+  var L  = ((280.460 + 0.9856474 * n) % 360 + 360) % 360;
+  var g  = ((357.528 + 0.9856003 * n) % 360 + 360) % 360;
+  var gR = g * Math.PI / 180;
+  var lam = L + 1.915 * Math.sin(gR) + 0.020 * Math.sin(2 * gR);
+  var lamR = lam * Math.PI / 180;
+  var sinDec = Math.sin(23.439 * Math.PI / 180) * Math.sin(lamR);
+  var dec = Math.asin(sinDec);
+  var latR = lat * Math.PI / 180;
+  var cosH = (Math.sin(-0.01454) - Math.sin(latR) * sinDec)
+             / (Math.cos(latR) * Math.cos(dec));
+  if (cosH < -1) return { sunriseUtcMin: 0,    sunsetUtcMin: 1440 };
+  if (cosH >  1) return null;
+  var H = Math.acos(cosH) * 180 / Math.PI;
+  var B   = 2 * Math.PI * (n - 1) / 365;
+  var EoT = (0.000075 + 0.001868*Math.cos(B) - 0.032077*Math.sin(B)
+             - 0.014615*Math.cos(2*B) - 0.04089*Math.sin(2*B)) * 229.18 / 60;
+  var noonUtc = 12 - lon / 15 - EoT;
+  return {
+    sunriseUtcMin: (noonUtc - H / 15) * 60,
+    sunsetUtcMin:  (noonUtc + H / 15) * 60
+  };
+}
+
+var _solar = null;
+var _solarLat = null;
+var _solarLon = null;
+var _nightModeManual = null;
+
+function updateSolarInfo(lat, lon) {
+  if (lat == null || lon == null) return;
+  if (_solarLat != null && Math.abs(lat - _solarLat) < 0.005 && Math.abs(lon - _solarLon) < 0.005) return;
+  _solarLat = lat; _solarLon = lon;
+  _solar = calcSunriseSunset(lat, lon);
+  updateNightModeAuto();
+}
+
+function updateNightModeAuto() {
+  if (_nightModeManual !== null) return;
+  if (!_solar) return;
+  var now = new Date();
+  var utcMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  var isNight = utcMin < _solar.sunriseUtcMin || utcMin > _solar.sunsetUtcMin;
+  applyNightMode(isNight);
+}
+
+function applyNightMode(on) {
+  document.body.classList.toggle("night-mode", on);
+  document.getElementById("night-btn").textContent = on ? "🌙" : "☀️";
+  localStorage.setItem("nightMode", on ? "1" : "0");
+}
+
+function toggleNightMode() {
+  var isNight = document.body.classList.contains("night-mode");
+  _nightModeManual = !isNight;
+  applyNightMode(_nightModeManual);
+  setTimeout(function() { _nightModeManual = null; updateNightModeAuto(); }, 300000);
+}
+
+function solarCountdownText(utcMin) {
+  var now = new Date();
+  var nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  var diffMin = ((utcMin - nowMin) + 1440) % 1440;
+  if (diffMin > 12 * 60) return null;
+  var h = Math.floor(diffMin / 60), m = diffMin % 60;
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  var localD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(),
+                                 now.getUTCDate(), 0, utcMin));
+  var timeStr = pad(localD.getHours()) + ':' + pad(localD.getMinutes());
+  return { timeStr: timeStr, diffMin: diffMin, h: h, m: m };
+}
+
+function refreshSolarBar() {
+  var el = document.getElementById("solar-info");
+  if (!_solar) { el.style.display = "none"; return; }
+  var su = solarCountdownText(_solar.sunriseUtcMin);
+  var ss = solarCountdownText(_solar.sunsetUtcMin);
+  var now = new Date();
+  var nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  var isDay = nowMin >= _solar.sunriseUtcMin && nowMin <= _solar.sunsetUtcMin;
+  var text = "";
+  if (isDay && ss) {
+    text = "🌅 " + ss.timeStr + " (" + ss.h + "h " + ss.m + "m)";
+  } else if (!isDay && su) {
+    text = "🌄 " + su.timeStr + " (" + su.h + "h " + su.m + "m)";
+  }
+  if (text) { el.textContent = text; el.style.display = ""; }
+  else el.style.display = "none";
+}
+
+(function() {
+  var saved = localStorage.getItem("nightMode");
+  if (saved === "1") { applyNightMode(true); _nightModeManual = true; }
+})();
+
+setInterval(refreshSolarBar, 30000);
 
 // ─── Boot ──────────────────────────────────────────────────────────────
 connect();
