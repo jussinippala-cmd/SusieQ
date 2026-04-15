@@ -1728,28 +1728,6 @@ function windMinMax() {
   return { min: mn, max: mx };
 }
 
-// ─── Pressure trend (3 min window, 2s interval → 90 samples) ──────────
-var PRESS_HISTORY_MAX = 90;
-var pressHistory = [];
-
-function pushPressHistory(hpa) {
-  pressHistory.push(hpa);
-  if (pressHistory.length > PRESS_HISTORY_MAX) pressHistory.shift();
-}
-
-function pressureTrend() {
-  if (pressHistory.length < 10) return { symbol: "→", label: "Vakaa", color: "var(--muted)" };
-  var half = Math.floor(pressHistory.length / 2);
-  var old = pressHistory.slice(0, half);
-  var rec = pressHistory.slice(half);
-  var avgOld = old.reduce(function(a, b) { return a + b; }, 0) / old.length;
-  var avgRec = rec.reduce(function(a, b) { return a + b; }, 0) / rec.length;
-  var delta = avgRec - avgOld;
-  if (delta > 0.3)  return { symbol: "↑", label: "Nouseva", color: "var(--green)" };
-  if (delta < -0.3) return { symbol: "↓", label: "Laskeva", color: "var(--red)" };
-  return               { symbol: "→", label: "Vakaa",   color: "var(--muted)" };
-}
-
 // ─── State ────────────────────────────────────────────────────────────
 var ws;
 var reconnectDelay = 1000;
@@ -2020,12 +1998,8 @@ function updateWeather(w) {
     w.water_temp != null ? w.water_temp.toFixed(1) : "—";
 
   if (w.pressure != null) {
-    pushPressHistory(w.pressure);
+    pushPressure(w.pressure);
   }
-  var trend = pressureTrend();
-  var trendEl = document.getElementById("press-trend");
-  trendEl.textContent = trend.symbol + " " + trend.label;
-  trendEl.style.color = trend.color;
 }
 
 // ─── Fetch with timeout helper ────────────────────────────────────────
