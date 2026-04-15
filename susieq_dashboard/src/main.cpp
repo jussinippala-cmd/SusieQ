@@ -22,7 +22,7 @@ AsyncWebSocket  ws("/ws");
 
 static unsigned long last_sensor_read = 0;
 static String cached_json;             // cached for /data and WS connect
-static SemaphoreHandle_t hx711_mutex = NULL;  // protects HX711 access
+static SemaphoreHandle_t hx711_mutex = nullptr;  // protects HX711 access
 
 // ─── JSON builder ─────────────────────────────────────────────────────
 static String build_json() {
