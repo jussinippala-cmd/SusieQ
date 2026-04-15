@@ -1826,7 +1826,7 @@ function update(d) {
   updateNightModeAuto();
   refreshSolarBar();
   updateNavTab(d.gps);
-  if (d.gps && d.gps.lat != null && d.gps.lon != null) {
+  if (d.gps && d.gps.fix && d.gps.lat != null && d.gps.lon != null) {
     checkAnchorAlarm(d.gps.lat, d.gps.lon);
   }
   // Nopeusennätys
