@@ -453,10 +453,10 @@
   }
 
   .pressure-trend {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
     color: var(--muted);
-    margin-top: 2px;
-    text-align: right;
   }
 
   .water-temp-big {
@@ -915,7 +915,11 @@
           <div class="weather-label"><span class="emoji">📊</span> Ilmanpaine</div>
           <div class="weather-value"><span id="air-press">—</span> hPa</div>
         </div>
-        <div class="pressure-trend" id="press-trend" style="align-self:flex-end;">→ Vakaa</div>
+        <div style="display:flex;align-items:center;gap:8px;align-self:flex-end;">
+          <svg id="press-sparkline" width="100" height="30"
+               style="overflow:visible;flex-shrink:0;"></svg>
+          <div class="pressure-trend" id="press-trend">→ Vakaa</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1645,6 +1649,7 @@ function connect() {
   ws.onclose = ws.onerror = function() {
     if (_wsReconnecting) return;  // L: prevent double-fire
     _wsReconnecting = true;
+    clearTimeout(staleTimer);
     document.getElementById("dot").classList.remove("live");
     document.getElementById("status-text").textContent = "Yhdistetään…";
     var jitter = Math.random() * 500;
@@ -1663,6 +1668,7 @@ function update(d) {
   // Wind
   var windOk = d.wind && d.wind.valid;
   document.getElementById("card-wind").classList.toggle("stale", !windOk);
+  if (!windOk) windHistory = [];  // clear stale history on sensor outage
   if (windOk) {
     var windSpeed = d.wind.speed != null ? d.wind.speed : 0;
     updateWindCompass(windSpeed, d.wind.direction != null ? d.wind.direction : 0);
@@ -1806,19 +1812,20 @@ function updateFlowDiagram(solPower, battPower) {
     : "— W";
   battEl.style.color = battW >= 0 ? "var(--green)" : "var(--red)";
 
-  var loadW = (solPower != null ? solPower : 0) - battW;
-  document.getElementById("flow-load-w").textContent = loadW.toFixed(0) + " W";
+  var loadW = (solPower != null && battPower != null) ? solPower - battW : null;
+  document.getElementById("flow-load-w").textContent =
+    loadW != null ? loadW.toFixed(0) + " W" : "— W";
 
   var arrowSolar = document.getElementById("flow-arrow-solar");
   var arrowLoad  = document.getElementById("flow-arrow-load");
 
   arrowSolar.style.animationPlayState = solPower > 0 ? "running" : "paused";
   arrowSolar.className = "flow-arrow-fill" + (solPower > 0 ? " solar-color" : "");
-  arrowLoad.style.animationPlayState  = loadW > 0 ? "running" : "paused";
-  arrowLoad.className  = "flow-arrow-fill " + (loadW > 0 ? "load-color" : "charge-off");
+  arrowLoad.style.animationPlayState  = (loadW != null && loadW > 0) ? "running" : "paused";
+  arrowLoad.className  = "flow-arrow-fill " + ((loadW != null && loadW > 0) ? "load-color" : "charge-off");
 
   document.getElementById("flow-label-solar").textContent = solPower > 0 ? "→" : "—";
-  document.getElementById("flow-label-load").textContent  = loadW > 0 ? "→" : "—";
+  document.getElementById("flow-label-load").textContent  = (loadW != null && loadW > 0) ? "→" : "—";
 }
 
 function setBarColor(el, pct, type) {
@@ -1837,6 +1844,7 @@ function setBarColor(el, pct, type) {
 
 function updateWeather(w) {
   if (!w || !w.valid) return;
+  if (w.pressure != null) pushPressure(w.pressure);
   document.getElementById("air-temp").textContent =
     w.air_temp != null ? w.air_temp.toFixed(1) : "—";
   document.getElementById("air-hum").textContent =
@@ -1853,6 +1861,15 @@ function updateWeather(w) {
   var trendEl = document.getElementById("press-trend");
   trendEl.textContent = trend.symbol + " " + trend.label;
   trendEl.style.color = trend.color;
+}
+
+// ─── Fetch with timeout helper ────────────────────────────────────────
+function fetchWithTimeout(url, options, timeoutMs) {
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  options = options || {};
+  options.signal = controller.signal;
+  return fetch(url, options).finally(function() { clearTimeout(timer); });
 }
 
 // ─── Tare scales ───────────────────────────────────────────────────────
@@ -1901,8 +1918,8 @@ function updateGpsTime() {
   document.getElementById('gps-time-local').textContent =
     pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
 
-  // UTC: prefer GPS time, extrapolate seconds since last update
-  if (_gpsUtc) {
+  // UTC: prefer GPS time, extrapolate seconds since last update (expire after 60s)
+  if (_gpsUtc && (Date.now() - _gpsUtc.receivedAt) < 60000) {
     var elapsed = Math.floor((Date.now() - _gpsUtc.receivedAt) / 1000);
     var totalSec = _gpsUtc.h * 3600 + _gpsUtc.m * 60 + _gpsUtc.s + elapsed;
     totalSec = ((totalSec % 86400) + 86400) % 86400;  // wrap at midnight
@@ -1918,6 +1935,59 @@ function updateGpsTime() {
 }
 updateGpsTime();
 setInterval(updateGpsTime, 1000);
+
+// ─── Painetrendi ───────────────────────────────────────────────────────
+var _pressHistory = [];     // { t: ms, p: hPa }
+var _pressLastSample = 0;
+var PRESS_SAMPLE_MS = 60000;   // yksi näyte per minuutti
+var PRESS_MAX_SAMPLES = 360;   // 6 tuntia
+
+function pushPressure(hpa) {
+  if (hpa == null) return;
+  var now = Date.now();
+  if (now - _pressLastSample < PRESS_SAMPLE_MS) return;
+  _pressLastSample = now;
+  _pressHistory.push({ t: now, p: hpa });
+  if (_pressHistory.length > PRESS_MAX_SAMPLES) _pressHistory.shift();
+  drawPressSparkline();
+  updatePressTrend();
+}
+
+function drawPressSparkline() {
+  var svg = document.getElementById("press-sparkline");
+  if (!svg || _pressHistory.length < 2) { if (svg) svg.innerHTML = ""; return; }
+  var ps = _pressHistory.map(function(x) { return x.p; });
+  var min = Math.min.apply(null, ps);
+  var max = Math.max.apply(null, ps);
+  var range = max - min || 1;
+  var W = 100, H = 28;
+  var pts = ps.map(function(p, i) {
+    var x = (i / (ps.length - 1)) * W;
+    var y = H - ((p - min) / range) * (H - 2) - 1;
+    return x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  svg.innerHTML = '<polyline fill="none" stroke="var(--blue)" stroke-width="1.5"'
+    + ' stroke-linejoin="round" points="' + pts + '"/>';
+}
+
+function updatePressTrend() {
+  if (_pressHistory.length < 6) return;  // tarvitaan vähintään 6 min dataa
+  var recent = _pressHistory.slice(-Math.min(31, _pressHistory.length));
+  var old    = _pressHistory.slice(0, Math.min(30, _pressHistory.length));
+  function avg(arr) { return arr.reduce(function(s,x) { return s+x.p; }, 0) / arr.length; }
+  var diff = avg(recent) - avg(old);
+  var el = document.getElementById("press-trend");
+  if (diff > 2) {
+    el.textContent = "↑ Nouseva";
+    el.style.color = "var(--green)";
+  } else if (diff < -2) {
+    el.textContent = "↓ Laskeva";
+    el.style.color = "var(--red)";
+  } else {
+    el.textContent = "→ Vakaa";
+    el.style.color = "var(--muted)";
+  }
+}
 
 // ─── Boot ──────────────────────────────────────────────────────────────
 connect();
