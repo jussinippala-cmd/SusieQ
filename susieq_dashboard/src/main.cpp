@@ -21,11 +21,12 @@ AsyncWebServer  server(80);
 AsyncWebSocket  ws("/ws");
 
 static unsigned long last_sensor_read = 0;
+static String cached_json;             // cached for /data and WS connect
+static SemaphoreHandle_t hx711_mutex = NULL;  // protects HX711 access
 
 // ─── JSON builder ─────────────────────────────────────────────────────
-static JsonDocument doc;  // pre-allocated to reduce heap fragmentation
-
 static String build_json() {
+    JsonDocument doc;
     WindData    wind    = wind_read();
     TankData    water   = tanks_read();
     FuelData    fuel    = fuel_read();
@@ -122,8 +123,8 @@ void on_ws_event(AsyncWebSocket* server, AsyncWebSocketClient* client,
     if (type == WS_EVT_CONNECT) {
         Serial.printf("[ws] client #%u connected from %s\n",
                       client->id(), client->remoteIP().toString().c_str());
-        // Send current readings immediately on connect
-        client->text(build_json());
+        // Send cached readings immediately on connect
+        if (cached_json.length() > 0) client->text(cached_json);
     } else if (type == WS_EVT_DISCONNECT) {
         Serial.printf("[ws] client #%u disconnected\n", client->id());
     }
@@ -138,26 +139,68 @@ static void setup_routes() {
 
     // JSON snapshot endpoint (for debugging without WebSocket)
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(200, "application/json", build_json());
+        req->send(200, "application/json", cached_json.length() > 0 ? cached_json : "{}");
     });
 
     // Tare fuel scale (call from browser or curl)
+    // Uses hx711_mutex to avoid concurrent HX711 access with loop()
     server.on("/tare", HTTP_POST, [](AsyncWebServerRequest* req) {
-        fuel_tare();
-        req->send(200, "text/plain", "Tare saved");
+        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(2000))) {
+            fuel_tare();
+            xSemaphoreGive(hx711_mutex);
+            req->send(200, "text/plain", "Tare saved");
+        } else {
+            req->send(503, "text/plain", "Sensor busy");
+        }
     });
 
-    // Tare water scale (call from browser or curl)
+    // Tare water scale
     server.on("/tare_water", HTTP_POST, [](AsyncWebServerRequest* req) {
-        water_tare();
-        req->send(200, "text/plain", "Water tare saved");
+        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(2000))) {
+            water_tare();
+            xSemaphoreGive(hx711_mutex);
+            req->send(200, "text/plain", "Water tare saved");
+        } else {
+            req->send(503, "text/plain", "Sensor busy");
+        }
     });
 
-    // Tare rum scale (call from browser or curl)
+    // Tare rum scale
     server.on("/tare_rum", HTTP_POST, [](AsyncWebServerRequest* req) {
-        rum_tare();
-        req->send(200, "text/plain", "Rum tare saved");
+        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(2000))) {
+            rum_tare();
+            xSemaphoreGive(hx711_mutex);
+            req->send(200, "text/plain", "Rum tare saved");
+        } else {
+            req->send(503, "text/plain", "Sensor busy");
+        }
     });
+
+    // GET /records → lue /records.json LittleFS:stä
+    server.on("/records", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!LittleFS.exists("/records.json")) {
+            req->send(200, "application/json", "{}");
+            return;
+        }
+        File f = LittleFS.open("/records.json", "r");
+        String body = f.readString();
+        f.close();
+        req->send(200, "application/json", body);
+    });
+
+    // POST /records → kirjoita /records.json LittleFS:ään
+    // index==0: avaa kirjoitukseen; index>0: lisää perään (multi-chunk body)
+    server.on("/records", HTTP_POST,
+        [](AsyncWebServerRequest* req) {
+            req->send(200, "text/plain", "OK");
+        },
+        nullptr,
+        [](AsyncWebServerRequest* req, uint8_t* data, size_t len,
+           size_t index, size_t total) {
+            File f = LittleFS.open("/records.json", index == 0 ? "w" : "a");
+            if (f) { f.write(data, len); f.close(); }
+        }
+    );
 
     server.serveStatic("/", LittleFS, "/");
     server.onNotFound([](AsyncWebServerRequest* req) {
@@ -177,6 +220,9 @@ void setup() {
     } else {
         Serial.println("[fs] LittleFS mounted");
     }
+
+    // HX711 mutex (protects concurrent tare vs read)
+    hx711_mutex = xSemaphoreCreateMutex();
 
     // Sensors
     wind_init();
@@ -228,9 +274,12 @@ void loop() {
     unsigned long now = millis();
     if (now - last_sensor_read >= SENSOR_INTERVAL_MS) {
         last_sensor_read = now;
+        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(50))) {
+            cached_json = build_json();
+            xSemaphoreGive(hx711_mutex);
+        }
         if (ws.count() > 0) {
-            String json = build_json();
-            ws.textAll(json);
+            ws.textAll(cached_json);
         }
     }
 
