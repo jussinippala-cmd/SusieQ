@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <cmath>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
