@@ -10,6 +10,5 @@ guides/
 .pio/
 .vscode/
 
-# Superpowers plugin files
+# Superpowers plugin cache (ei projektin koodia)
 .superpowers/
-docs/
