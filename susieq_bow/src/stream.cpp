@@ -54,6 +54,7 @@ static esp_err_t stream_handler(httpd_req_t* req) {
     int nodelay = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
 
+    int cam_fail_count = 0;
     while (true) {
         if (_powerState != POWER_AWAKE) break;
 
@@ -70,9 +71,12 @@ static esp_err_t stream_handler(httpd_req_t* req) {
         camera_fb_t* fb = esp_camera_fb_get();
         if (!fb) {
             xSemaphoreGive(_camMutex);
-            vTaskDelay(pdMS_TO_TICKS(50));  // brief pause, then retry
+            cam_fail_count++;
+            if (cam_fail_count >= 20) break;  // 1s of failures — give up
+            vTaskDelay(pdMS_TO_TICKS(50));
             continue;
         }
+        cam_fail_count = 0;
 
         // Build header + JPEG into single buffer for one TCP write
         int headerLen = snprintf((char*)_streamBuf, 128, STREAM_PART_FMT, fb->len);
@@ -88,13 +92,13 @@ static esp_err_t stream_handler(httpd_req_t* req) {
             // Fixed 10fps pacing — gives WiFi AP enough headroom for smooth stream
             vTaskDelay(pdMS_TO_TICKS(100));
         } else {
-            // Frame too large for buffer — send in two chunks (fallback)
+            // Frame too large for buffer — release mutex first, then send in two chunks
+            xSemaphoreGive(_camMutex);
             res = httpd_resp_send_chunk(req, (const char*)_streamBuf, headerLen);
             if (res == ESP_OK) {
                 res = httpd_resp_send_chunk(req, (const char*)fb->buf, fb->len);
             }
             esp_camera_fb_return(fb);
-            xSemaphoreGive(_camMutex);
             vTaskDelay(pdMS_TO_TICKS(100));
         }
 
@@ -102,6 +106,9 @@ static esp_err_t stream_handler(httpd_req_t* req) {
 
         _lastActivity = millis();
     }
+
+    // Send zero-length chunk to properly terminate chunked response
+    httpd_resp_send_chunk(req, NULL, 0);
 
     return res;
 }

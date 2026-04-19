@@ -53,7 +53,7 @@ FuelData fuel_read() {
     FuelData d;
     if (!scale.is_ready()) return d;
 
-    float gross_kg = scale.get_units(5);   // average 5 readings
+    float gross_kg = scale.get_units(3);   // average 3 readings
     if (gross_kg < 0) gross_kg = 0;
 
     float net_kg = gross_kg;               // tare already applied via set_offset

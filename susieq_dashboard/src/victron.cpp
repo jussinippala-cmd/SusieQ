@@ -111,7 +111,7 @@ class VictronAdvCB : public NimBLEAdvertisedDeviceCallbacks {
         // bytes 2-12 remain zero (protocol spec)
 
         size_t   payload_len = mfr.size() - 5;   // ciphertext + tag start at offset 5
-        if (payload_len < 5) return;  // need at least 1 byte data + 4 byte tag
+        if (payload_len < 5 || payload_len > 36) return;  // need at least 1 byte data + 4 byte tag; plain[32] holds at most 32 bytes
         uint8_t  plain[32] = {};
 
         if (!decrypt_payload((const uint8_t*)VICTRON_KEY,
@@ -131,6 +131,7 @@ class VictronAdvCB : public NimBLEAdvertisedDeviceCallbacks {
             for (int i = 0; i < len && i < 4; i++) val |= plain[pos+i] << (8*i);
             pos += len;
 
+            portENTER_CRITICAL(&victron_mux);
             switch (id) {
                 case 0x01: latest.charge_state    = val & 0xFF; break;
                 case 0x0B: latest.pv_power_w      = (float)val; break;
@@ -138,6 +139,7 @@ class VictronAdvCB : public NimBLEAdvertisedDeviceCallbacks {
                 case 0x0E: latest.battery_current = (int16_t)val / 1000.0f; break;
                 case 0x15: latest.pv_voltage      = val / 1000.0f; break;
             }
+            portEXIT_CRITICAL(&victron_mux);
         }
         portENTER_CRITICAL(&victron_mux);
         latest.valid       = true;

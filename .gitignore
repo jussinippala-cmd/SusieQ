@@ -9,3 +9,7 @@ guides/
 # PlatformIO build artifacts
 .pio/
 .vscode/
+
+# Superpowers plugin files
+.superpowers/
+docs/

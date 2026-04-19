@@ -52,7 +52,7 @@ TankData tanks_read() {
     TankData d;
     if (!water_scale.is_ready()) return d;
 
-    float gross_kg = water_scale.get_units(5);   // average 5 readings
+    float gross_kg = water_scale.get_units(3);   // average 3 readings
     if (gross_kg < 0) gross_kg = 0;
 
     // Water density = 1.0 kg/L

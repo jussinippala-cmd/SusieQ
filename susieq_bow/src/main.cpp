@@ -172,7 +172,9 @@ bool bow_wake() {
     vTaskDelay(pdMS_TO_TICKS(10));
 
     if (!init_camera()) {
-        Serial.println("[power] WARNING: camera reinit failed — staying in sleep");
+        Serial.println("[power] WARNING: camera reinit failed — reverting to sleep");
+        digitalWrite(PWDN_GPIO_NUM, HIGH);     // power camera back down
+        esp_wifi_set_ps(WIFI_PS_MIN_MODEM);    // revert WiFi to modem sleep
         xSemaphoreGive(_camMutex);
         return false;
     }
@@ -251,7 +253,7 @@ static void handle_distance(AsyncWebServerRequest* request) {
 static void handle_status(AsyncWebServerRequest* request) {
     JsonDocument doc;
     doc["uptime_s"]   = (millis() - _bootTime) / 1000;
-    doc["wifi_rssi"]  = WiFi.RSSI();
+    doc["wifi_clients"] = WiFi.softAPgetStationNum();
     doc["free_heap"]  = ESP.getFreeHeap();
     doc["sleeping"]   = (_powerState != POWER_AWAKE);
     doc["camera_ok"]  = (bool)_cameraOk;
@@ -371,7 +373,7 @@ void setup() {
 
 // ─── Loop ────────────────────────────────────────────────────────────
 static unsigned long _lastLidarPoll = 0;
-static const unsigned long LIDAR_POLL_MS = 1000 / LIDAR_READ_HZ;  // 250ms at 4Hz
+static const unsigned long LIDAR_POLL_MS = 1000 / LIDAR_READ_HZ;  // 50ms at 20Hz
 
 void loop() {
     ArduinoOTA.handle();

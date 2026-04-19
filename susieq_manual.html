@@ -807,6 +807,13 @@
       <li style="color:var(--green)">Vihreä = yhteys toimii</li>
       <li style="color:var(--red)">Punainen = yhteys katkennut</li>
     </ul>
+    <p>Dashboard on jaettu kolmeen välilehteen:</p>
+    <table>
+      <tr><th>Välilehti</th><th>Sisältö</th></tr>
+      <tr><td><strong>Tuuli</strong></td><td>Tuulennopeus, suunta, kompassiruusu, akku, aurinko, tankit</td></tr>
+      <tr><td><strong>Sää</strong></td><td>Ilman ja veden lämpötila, kosteus, ilmanpaine, windchill, auringonnousu/-lasku</td></tr>
+      <tr><td><strong>Nav</strong></td><td>GPS-nopeus ja -kurssi, nopeusennätykset, ankkurivahti, matkatilastot, MOB, rum o'clock</td></tr>
+    </table>
 
     <h3>7.3 Tuulimittari</h3>
     <table>
@@ -877,7 +884,11 @@
       <tr><td>Ilmankosteus</td><td>AHT20</td></tr>
       <tr><td>Ilmanpaine</td><td>BMP280</td></tr>
       <tr><td>Veden lämpötila</td><td>DS18B20 (1-Wire)</td></tr>
+      <tr><td>Tuntuu kuin (windchill)</td><td>Laskettu ilman lämpötilasta ja tuulennopeudesta</td></tr>
     </table>
+    <div class="info">
+      <strong>Windchill</strong> näytetään automaattisesti ilmanlämpötilan alla kun lämpötila on ≤ 10 °C ja tuulennopeus yli 1,3 m/s. Kaava: Environment Canada -standardi.
+    </div>
 
     <h3>7.11 Keulayksikkö (Bow Unit)</h3>
     <table>
@@ -903,15 +914,56 @@
     <h4>Rommipullo</h4>
     <p>Taraus: <code>GET http://192.168.4.1/tare_rum</code></p>
     <div class="info">
-      <strong>Kalibrointikerroin:</strong> Jos vaa'an lukema on väärä, säädä <code>CALIBRATION_FACTOR</code> tiedostossa <code>config.h</code>. Aloita arvosta 420.0 ja säädä tunnetulla painolla.
+      <strong>Kalibrointikerroin:</strong> Jos vaa'an lukema on väärä, säädä kerrointa tiedostossa <code>config.h</code>. Aseta tunnettu paino vaa'alle ja laske: <em>uusi_kerroin = vanha_kerroin × (näytetty_arvo / todellinen_arvo)</em>.<br>
+      Nykyiset kertoimet: vesitankki <code>55335.0</code>, polttoaine katso config.h.
     </div>
 
-    <h3>7.13 JSON API</h3>
+    <h3>7.13 Navigointi-välilehti (Nav)</h3>
+
+    <h4>GPS-tiedot</h4>
+    <p>Näyttää reaaliaikaisen nopeuden (SOG, solmut) ja kurssin (COG, asteet) GPS:ltä.</p>
+
+    <h4>Nopeusennätykset</h4>
+    <p>Dashboard seuraa automaattisesti session ja kauden huippunopeutta. Kauden ennätys tallennetaan ESP32:n flash-muistiin.</p>
+
+    <h4>Ankkurivahti</h4>
+    <ol>
+      <li>Laske ankkuri</li>
+      <li>Paina <strong>⚓ Laske ankkuri</strong> — tallentuu nykyinen GPS-sijainti</li>
+      <li>Säädä hälytysraja liukusäätimellä (20–150 m, oletus 50 m)</li>
+      <li>Jos vene ajautuu rajan ulkopuolelle: nav-kortti vilkkuu punaisena ja kahdesti piippaa 3 s välein</li>
+      <li>Paina <strong>✕ Nosta ankkuri</strong> kuitataksesi</li>
+    </ol>
+    <div class="info">GPS-kohina (~5–10 m) on tasoitettu 8 mittauksen liukuvalla keskiarvolla, joten etäisyys pysyy vakaana paikallaan ollessa.</div>
+
+    <h4>Matkatilastot</h4>
+    <ol>
+      <li>Paina <strong>▶ Aloita matka</strong> lähdettäessä</li>
+      <li>Dashboard laskee keston, merimailit, keskinopeuden ja huippunopeuden</li>
+      <li>Paina <strong>⏹ Lopeta matka</strong> — matka tallentuu historiaan (20 viimeistä)</li>
+    </ol>
+
+    <h4>MOB — Mies yli laidan</h4>
+    <div class="warn">
+      <strong>Hätäpainike:</strong> Paina <strong>⚠ MOB</strong> heti kun joku putoaa veteen.
+    </div>
+    <ul>
+      <li>Tallentuu välittömästi putoamishetken GPS-sijainti</li>
+      <li>Näyttää etäisyyden (m) ja suuntiman (°) MOB-pisteeseen</li>
+      <li>Laskee ajan MOB-hetkestä</li>
+      <li>Nav-kortti vilkkuu punaisena nopeasti, kolme terävää piippausta 2 s välein</li>
+      <li>Kuittaa painamalla <strong>✕ Kuittaa MOB</strong></li>
+    </ul>
+
+    <h4>Rum o'clock</h4>
+    <p>Näkyy 3 tuntia ennen auringonlaskua ja 30 minuuttia sen jälkeen. Laskuri näyttää täydet minuutit ja tunnit auringonlaskuun. Auringonlaskun hetkellä näytetään juhlaviesti.</p>
+
+    <h3>7.14 JSON API</h3>
     <p>Dashboard-datan voi hakea ohjelmallisesti:</p>
     <p><code>GET http://192.168.4.1/data</code></p>
     <p>Vastaus sisältää kaikkien sensorien lukemat JSON-muodossa (tuuli, akku, aurinko, vesi, polttoaine, GPS, sää).</p>
 
-    <h3>7.14 Vianetsintä</h3>
+    <h3>7.15 Vianetsintä</h3>
     <table>
       <tr><th>Ongelma</th><th>Tarkista</th></tr>
       <tr><td>Tuulianturi ei vastaa</td><td>Modbus slave ID (1), baudinopeus (4800), DE-nasta GPIO 4</td></tr>
@@ -1395,7 +1447,7 @@
   });
 
   // ── Toggle all chapters ──────────────────────────────────
-  var allOpen = true;
+  var allOpen = false;
   window.toggleAll = function() {
     allOpen = !allOpen;
     document.querySelectorAll('.chapter').forEach(function(d) {

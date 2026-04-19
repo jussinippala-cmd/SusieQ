@@ -40,13 +40,13 @@
 // until the reading matches.
 #define WATER_HX711_DOUT_PIN      19
 #define WATER_HX711_SCK_PIN       18
-#define WATER_CALIBRATION_FACTOR  420.0f   // adjust during calibration
+#define WATER_CALIBRATION_FACTOR  55335.0f // calibrated 2026-04-17: 2.5 kg → 2.5 L
 #define WATER_TANK_CAPACITY_L     15.0f    // 15 L tank
 
 // ─── HX711 fuel weight sensor ─────────────────────────────────────────
 #define HX711_DOUT_PIN   13
 #define HX711_SCK_PIN    14
-#define FUEL_CALIBRATION_FACTOR  420.0f   // adjust during calibration
+#define FUEL_CALIBRATION_FACTOR  56600.0f // calibrated: 500g → raw ~28300
 #define FUEL_DENSITY     0.74f         // kg/L for petrol
 #define FUEL_CANISTER_MAX_L  25.0f     // max capacity of your fuel canister (25L)
 

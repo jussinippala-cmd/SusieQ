@@ -508,8 +508,10 @@
   .nav-btn-danger { border-color: var(--red); color: var(--red); }
   .nav-btn-danger:hover { background: rgba(248,81,73,0.12); }
   .nav-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-  .nav-alarm-active { animation: nav-blink 1s ease-in-out infinite; }
-  @keyframes nav-blink { 0%,100% { background: var(--card); } 50% { background: rgba(248,81,73,0.2); } }
+  .nav-alarm-active { animation: nav-blink 0.6s ease-in-out infinite; outline: 2px solid var(--red); }
+  @keyframes nav-blink { 0%,100% { background: var(--card); } 50% { background: rgba(248,81,73,0.55); } }
+  .mob-alarm-active { animation: mob-blink 0.4s ease-in-out infinite; outline: 3px solid var(--red); }
+  @keyframes mob-blink { 0%,100% { background: var(--card); } 50% { background: rgba(248,81,73,0.75); } }
   @keyframes rum-flash {
     0%,100% { background: var(--card); }
     50%      { background: rgba(219,109,40,0.25); }
@@ -970,6 +972,10 @@
         <div class="weather-label"><span class="emoji">🌡️</span> Ilmanlämpötila</div>
         <div class="weather-value"><span id="air-temp">—</span> °C</div>
       </div>
+      <div class="weather-row" id="windchill-row" style="display:none">
+        <div class="weather-label"><span class="emoji">🌬️</span> Tuntuu kuin</div>
+        <div class="weather-value"><span id="windchill-val">—</span> °C</div>
+      </div>
       <div class="weather-row">
         <div class="weather-label"><span class="emoji">💧</span> Kosteus</div>
         <div class="weather-value"><span id="air-hum">—</span> %</div>
@@ -997,6 +1003,21 @@
       </div>
     </div>
     <div style="font-size:0.75rem; color:var(--muted); letter-spacing:0.04em;">🌊 Järviveden lämpötila</div>
+  </div>
+
+  <!-- Aurinko (laskettu GPS-koordinaateista) -->
+  <div class="card" id="card-sun" style="margin-top: 12px; display:none;">
+    <h2>Aurinko</h2>
+    <div class="weather-rows">
+      <div class="weather-row">
+        <div class="weather-label"><span class="emoji">🌄</span> Auringonnousu</div>
+        <div class="weather-value" id="sun-rise">—</div>
+      </div>
+      <div class="weather-row">
+        <div class="weather-label"><span class="emoji">🌅</span> Auringonlasku</div>
+        <div class="weather-value" id="sun-set">—</div>
+      </div>
+    </div>
   </div>
 
 </div><!-- #tab-weather -->
@@ -1075,6 +1096,33 @@
         <div class="nav-row"><span class="nav-label">Huippu</span><span id="trip-max-kn">— kn</span></div>
       </div>
       <div id="trip-history" style="margin-top:8px;font-size:0.8rem;color:var(--muted);"></div>
+    </div>
+
+    <!-- MOB — mies yli laidan -->
+    <div class="nav-section" id="mob-section">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;
+                  letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;">Hätätilanne</div>
+      <div class="nav-btn-row">
+        <button id="mob-btn" class="nav-btn"
+                style="background:var(--red);color:#fff;border-color:var(--red);font-weight:700;font-size:1rem;padding:10px 20px;"
+                onclick="mobActivate()">⚠ MOB</button>
+        <button id="mob-clear-btn" class="nav-btn nav-btn-danger" onclick="mobClear()"
+                style="display:none">✕ Kuittaa MOB</button>
+      </div>
+      <div id="mob-live" style="display:none">
+        <div class="nav-row">
+          <span class="nav-label">Etäisyys</span>
+          <span id="mob-dist" style="font-size:1.1rem;font-weight:700;color:var(--red);">— m</span>
+        </div>
+        <div class="nav-row">
+          <span class="nav-label">Suuntima</span>
+          <span id="mob-bearing" style="font-size:1.1rem;font-weight:700;">—°</span>
+        </div>
+        <div class="nav-row" style="border:none;">
+          <span class="nav-label">Aika MOB:sta</span>
+          <span id="mob-elapsed">—</span>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -1188,8 +1236,15 @@
           <li><strong>Tuuli:</strong> Tuulennopeus (m/s), suunta (kompassi), Beaufort-asteikko, GPS-nopeus (solmut). 10 min min/max-historia.</li>
           <li><strong>Akku:</strong> Jännite, virta, SOC %, teho (W). Aurinkopaneelin tuotto ja latausvaihe. Energiavirtakaavio.</li>
           <li><strong>Tankit:</strong> Vesitankki (15 L), polttoaine (25 L), rommi (0,7 L). Tara-napit kalibrointiin.</li>
-          <li><strong>Sää:</strong> Ilman lämpötila, kosteus, ilmanpaine + trendi (AHT20/BMP280). Järviveden lämpötila (DS18B20).</li>
+          <li><strong>Sää:</strong> Ilman lämpötila, kosteus, ilmanpaine + trendi, veden lämpötila. Windchill (tuntuu kuin) näkyy kun T ≤ 10 °C ja tuuli > 1,3 m/s.</li>
+          <li><strong>Nav:</strong> GPS-nopeus ja -kurssi, nopeusennätykset, ankkurivahti, matkatilastot, rum o'clock, MOB.</li>
         </ul>
+
+        <h4>Nav-välilehti</h4>
+        <p><strong>Ankkurivahti:</strong> Laske ankkuri → paina ⚓ Laske ankkuri → säädä hälytysraja (20–150 m). Hälytys: nav-kortti vilkkuu punaisena ja piippaa.</p>
+        <p><strong>Matkatilastot:</strong> Paina ▶ Aloita matka lähdettäessä ja ⏹ Lopeta matka perillä. Matka tallentuu historiaan (20 viimeistä).</p>
+        <p><strong>MOB — Mies yli laidan:</strong> Paina ⚠ MOB heti kun joku putoaa veteen — tallentuu GPS-sijainti, näyttää etäisyyden (m) ja suuntiman (°) sekä ajan MOB-hetkestä. Kuittaa ✕ Kuittaa MOB.</p>
+        <p><strong>Rum o'clock:</strong> Näkyy 3 h ennen auringonlaskua. Laskuri näyttää täydet minuutit ja tunnit.</p>
 
         <h4>Keulakamera satamassa</h4>
         <p>Satamaan saavuttaessa keulayksikön kamera ja etäisyysmittari ovat käytössä bow-yksikön omasta WiFi-verkosta. Vaihda puhelin/iPad verkkoon <strong>SusieQ-Bow</strong> (salasana <code>susieq123</code>) ja avaa selaimessa <a href="http://192.168.5.1">http://192.168.5.1</a>. Siellä näet kameran live-kuvan ja etäisyyden laituriin. Palaa tähän dashboardiin vaihtamalla takaisin <strong>SusieQ-Data</strong>-verkkoon.</p>
@@ -1352,7 +1407,7 @@
           <ol>
             <li>Huuda "MIES YLI LAIDAN!" — osoita kädellä</li>
             <li>Heitä pelastusrengas</li>
-            <li>Merkitse paikka (GPS)</li>
+            <li>Paina dashboardin <strong>⚠ MOB</strong> (Nav-välilehti) — merkitsee GPS-sijainnin ja näyttää suuntiman</li>
             <li>Käynnistä moottori, laske purjeet</li>
             <li>Palaa uhrin luokse (Williamson-käännös)</li>
             <li>Lähesty tuulen puolelta, nosta peräportaista</li>
@@ -1827,7 +1882,11 @@ function update(d) {
   refreshSolarBar();
   updateNavTab(d.gps);
   if (d.gps && d.gps.fix && d.gps.lat != null && d.gps.lon != null) {
-    checkAnchorAlarm(d.gps.lat, d.gps.lon);
+    var sg = smoothedGps(d.gps.lat, d.gps.lon);
+    checkAnchorAlarm(sg.lat, sg.lon);
+    updateMob(d.gps.lat, d.gps.lon);
+  } else {
+    _gpsLatBuf = []; _gpsLonBuf = [];  // fix kadotettu — nollaa puskuri
   }
   // Nopeusennätys
   if (d.gps && d.gps.fix && d.gps.sog_knots != null) {
@@ -1934,6 +1993,20 @@ function update(d) {
   if (weatherOk) {
     updateWeather(d.weather);
   }
+
+  // Windchill — näytetään kun T ≤ 10°C ja tuuli > 1.3 m/s (4.8 km/h)
+  (function() {
+    var wcRow = document.getElementById("windchill-row");
+    var t = d.weather && d.weather.air_temp != null ? d.weather.air_temp : null;
+    var v = d.wind && d.wind.speed != null ? d.wind.speed * 3.6 : null; // m/s → km/h
+    if (t != null && v != null && t <= 10 && v > 4.8) {
+      var wc = 13.12 + 0.6215*t - 11.37*Math.pow(v,0.16) + 0.3965*t*Math.pow(v,0.16);
+      document.getElementById("windchill-val").textContent = wc.toFixed(1);
+      wcRow.style.display = "";
+    } else {
+      wcRow.style.display = "none";
+    }
+  })();
 
   // Uptime in status bar
   if (d.uptime_s != null) {
@@ -2162,20 +2235,40 @@ var _solarLat = null;
 var _solarLon = null;
 var _nightModeManual = null;
 
+function utcMinToLocalStr(utcMin) {
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  var now = new Date();
+  var d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, utcMin));
+  return pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function updateSunCard() {
+  var card = document.getElementById("card-sun");
+  if (!_solar) { card.style.display = "none"; return; }
+  card.style.display = "";
+  document.getElementById("sun-rise").textContent = utcMinToLocalStr(_solar.sunriseUtcMin);
+  document.getElementById("sun-set").textContent  = utcMinToLocalStr(_solar.sunsetUtcMin);
+}
+
 function updateSolarInfo(lat, lon) {
   if (lat == null || lon == null) return;
   if (_solarLat != null && Math.abs(lat - _solarLat) < 0.005 && Math.abs(lon - _solarLon) < 0.005) return;
   _solarLat = lat; _solarLon = lon;
   _solar = calcSunriseSunset(lat, lon);
   updateNightModeAuto();
+  updateSunCard();
 }
 
 function updateNightModeAuto() {
-  if (_nightModeManual !== null) return;
   if (!_solar) return;
   var now = new Date();
   var utcMin = now.getUTCHours() * 60 + now.getUTCMinutes();
   var isNight = utcMin < _solar.sunriseUtcMin || utcMin > _solar.sunsetUtcMin;
+  // Vapautetaan manuaalioverride kun automaattitila sopii yhteen käyttäjän valintaan
+  if (_nightModeManual !== null && _nightModeManual === isNight) {
+    _nightModeManual = null;
+  }
+  if (_nightModeManual !== null) return;
   applyNightMode(isNight);
 }
 
@@ -2189,13 +2282,13 @@ function toggleNightMode() {
   var isNight = document.body.classList.contains("night-mode");
   _nightModeManual = !isNight;
   applyNightMode(_nightModeManual);
-  setTimeout(function() { _nightModeManual = null; updateNightModeAuto(); }, 300000);
+  // Manuaalioverride pysyy kunnes automaattitila sopii yhteen käyttäjän valintaan
 }
 
 function solarCountdownText(utcMin) {
   var now = new Date();
   var nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
-  var diffMin = ((utcMin - nowMin) + 1440) % 1440;
+  var diffMin = Math.round(((utcMin - nowMin) + 1440) % 1440);
   if (diffMin > 12 * 60) return null;
   var h = Math.floor(diffMin / 60), m = diffMin % 60;
   var pad = function(n) { return String(n).padStart(2, '0'); };
@@ -2230,6 +2323,18 @@ function refreshSolarBar() {
 
 setInterval(refreshSolarBar, 30000);
 
+// ─── Yhteinen AudioContext (iOS vaatii herätyksen käyttäjäinteraktiosta) ──
+var _sharedAudioCtx = null;
+function getAudioCtx() {
+  if (!_sharedAudioCtx)
+    _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_sharedAudioCtx.state === "suspended") _sharedAudioCtx.resume();
+  return _sharedAudioCtx;
+}
+// Herätetään heti ensimmäisellä kosketuksella tai klikkauksella
+document.addEventListener("touchstart", function() { getAudioCtx(); }, { once: true, passive: true });
+document.addEventListener("click",      function() { getAudioCtx(); }, { once: true, passive: true });
+
 // ─── Ankkurialarmi ─────────────────────────────────────────────────────
 var _anchorLat = null, _anchorLon = null;
 var _anchorSetLat = null, _anchorSetLon = null;
@@ -2237,6 +2342,18 @@ var _anchorRadiusM = 50;
 var _anchorAlarmFiring = false;
 var _anchorBeepCtx = null;
 var _anchorBeepInterval = null;
+
+// GPS-kohinan tasoitus — liukuva keskiarvo 8 lukemasta (~8 s)
+var _gpsLatBuf = [], _gpsLonBuf = [];
+var GPS_SMOOTH_N = 8;
+function smoothedGps(lat, lon) {
+  _gpsLatBuf.push(lat); _gpsLonBuf.push(lon);
+  if (_gpsLatBuf.length > GPS_SMOOTH_N) { _gpsLatBuf.shift(); _gpsLonBuf.shift(); }
+  var n = _gpsLatBuf.length;
+  var avgLat = _gpsLatBuf.reduce(function(a,b){return a+b;},0) / n;
+  var avgLon = _gpsLonBuf.reduce(function(a,b){return a+b;},0) / n;
+  return { lat: avgLat, lon: avgLon };
+}
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   var R = 6371000;
@@ -2250,6 +2367,9 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
 
 function setAnchor() {
   if (_anchorLat == null) { alert("GPS-signaali puuttuu — odota fixiä."); return; }
+  // Herätetään AudioContext käyttäjäinteraktion yhteydessä (iOS-vaatimus)
+  if (!_anchorBeepCtx) _anchorBeepCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_anchorBeepCtx.state === "suspended") _anchorBeepCtx.resume();
   _anchorSetLat = _anchorLat;
   _anchorSetLon = _anchorLon;
   document.getElementById("anchor-set-btn").style.display   = "none";
@@ -2276,13 +2396,18 @@ function updateAnchorRadius(val) {
 function anchorBeep() {
   try {
     if (!_anchorBeepCtx) _anchorBeepCtx = new (window.AudioContext || window.webkitAudioContext)();
-    var osc = _anchorBeepCtx.createOscillator();
-    var gain = _anchorBeepCtx.createGain();
-    osc.connect(gain); gain.connect(_anchorBeepCtx.destination);
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.3, _anchorBeepCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, _anchorBeepCtx.currentTime + 0.6);
-    osc.start(); osc.stop(_anchorBeepCtx.currentTime + 0.6);
+    // Kaksi terävää piippausta 0.25 s välein
+    [0, 0.25].forEach(function(delay) {
+      var osc = _anchorBeepCtx.createOscillator();
+      var gain = _anchorBeepCtx.createGain();
+      osc.connect(gain); gain.connect(_anchorBeepCtx.destination);
+      osc.frequency.value = 1100;
+      var t = _anchorBeepCtx.currentTime + delay;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(1.0, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.start(t); osc.stop(t + 0.22);
+    });
   } catch(e) {}
 }
 
@@ -2303,6 +2428,80 @@ function checkAnchorAlarm(lat, lon) {
     _anchorAlarmFiring = false;
     if (_anchorBeepInterval) { clearInterval(_anchorBeepInterval); _anchorBeepInterval = null; }
   }
+}
+
+// ─── MOB — mies yli laidan ─────────────────────────────────────────────
+var _mobLat = null, _mobLon = null;
+var _mobTime = null;
+var _mobBeepCtx = null;
+var _mobBeepInterval = null;
+var _mobElapsedInterval = null;
+
+function mobActivate() {
+  if (_anchorLat == null) { alert("GPS-signaali puuttuu — sijaintia ei tiedetä."); return; }
+  _mobLat = _anchorLat; _mobLon = _anchorLon;
+  _mobTime = Date.now();
+  // Herätä AudioContext käyttäjäinteraktion yhteydessä
+  if (!_mobBeepCtx) _mobBeepCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_mobBeepCtx.state === "suspended") _mobBeepCtx.resume();
+  mobBeep();
+  _mobBeepInterval = setInterval(mobBeep, 2000);
+  _mobElapsedInterval = setInterval(mobUpdateElapsed, 1000);
+  document.getElementById("mob-btn").style.display       = "none";
+  document.getElementById("mob-clear-btn").style.display = "";
+  document.getElementById("mob-live").style.display      = "";
+  document.getElementById("card-nav").classList.add("mob-alarm-active");
+}
+
+function mobClear() {
+  _mobLat = null; _mobLon = null; _mobTime = null;
+  if (_mobBeepInterval)   { clearInterval(_mobBeepInterval);   _mobBeepInterval = null; }
+  if (_mobElapsedInterval){ clearInterval(_mobElapsedInterval); _mobElapsedInterval = null; }
+  document.getElementById("mob-btn").style.display       = "";
+  document.getElementById("mob-clear-btn").style.display = "none";
+  document.getElementById("mob-live").style.display      = "none";
+  document.getElementById("card-nav").classList.remove("mob-alarm-active");
+}
+
+function mobBeep() {
+  try {
+    // Kolme nopeaa piippausta — erottuu ankkurihälytyksestä
+    [0, 0.18, 0.36].forEach(function(delay) {
+      var osc = _mobBeepCtx.createOscillator();
+      var gain = _mobBeepCtx.createGain();
+      osc.connect(gain); gain.connect(_mobBeepCtx.destination);
+      osc.frequency.value = 1400;
+      var t = _mobBeepCtx.currentTime + delay;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(1.0, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+      osc.start(t); osc.stop(t + 0.15);
+    });
+  } catch(e) {}
+}
+
+function mobUpdateElapsed() {
+  if (!_mobTime) return;
+  var s = Math.floor((Date.now() - _mobTime) / 1000);
+  var m = Math.floor(s / 60), sec = s % 60;
+  document.getElementById("mob-elapsed").textContent =
+    m + "m " + String(sec).padStart(2,"0") + "s";
+}
+
+function bearingDeg(lat1, lon1, lat2, lon2) {
+  var dLon = (lon2 - lon1) * Math.PI / 180;
+  var y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+  var x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180)
+        - Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function updateMob(lat, lon) {
+  if (_mobLat == null || lat == null || lon == null) return;
+  var dist = haversineMeters(_mobLat, _mobLon, lat, lon);
+  var brg  = bearingDeg(lat, lon, _mobLat, _mobLon);
+  document.getElementById("mob-dist").textContent    = Math.round(dist) + " m";
+  document.getElementById("mob-bearing").textContent = Math.round(brg) + "°";
 }
 
 // ─── Navigointi-välilehti ──────────────────────────────────────────────
@@ -2459,10 +2658,10 @@ function updateRumOClock(rumLiters) {
 
   var now = new Date();
   var nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
-  var diffMin = ((_solar.sunsetUtcMin - nowMin) + 1440) % 1440;
+  var diffMin = Math.round(((_solar.sunsetUtcMin - nowMin) + 1440) % 1440);
 
   // Vain näytetään kun auringonlasku < 3h päässä tai hetki sitten
-  var afterSunset = ((nowMin - _solar.sunsetUtcMin + 1440) % 1440) < 30;
+  var afterSunset = (Math.round((nowMin - _solar.sunsetUtcMin + 1440) % 1440)) < 30;
   if (diffMin > 180 && !afterSunset) { el.style.display = "none"; _rumOClockFired = false; return; }
 
   el.style.display = "";
@@ -2489,7 +2688,7 @@ function rumOClockCelebrate() {
 
   // Web Audio -fanfaari (3 nousevaa ääntä)
   try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = getAudioCtx();
     [440, 554, 659].forEach(function(freq, i) {
       var osc  = ctx.createOscillator();
       var gain = ctx.createGain();
@@ -2501,7 +2700,6 @@ function rumOClockCelebrate() {
       gain.gain.linearRampToValueAtTime(0.25, t + 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
       osc.start(t); osc.stop(t + 0.5);
-      if (i === 2) { osc.onended = function() { ctx.close(); }; }
     });
   } catch(e) {}
 }

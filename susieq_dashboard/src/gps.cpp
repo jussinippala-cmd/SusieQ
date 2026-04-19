@@ -16,8 +16,8 @@ GpsData gps_read() {
     d.valid = gps.speed.isValid();
     if (gps.speed.isValid()) {
         d.sog_knots = (float)gps.speed.knots();
-        d.fix = true;
     }
+    d.fix = gps.location.isValid();
     if (gps.course.isValid()) d.cog_deg = (float)gps.course.deg();
     if (gps.location.isValid()) {
         d.lat = gps.location.lat();

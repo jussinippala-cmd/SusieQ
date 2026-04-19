@@ -1942,11 +1942,11 @@ function tareRum() {
 }
 
 // ─── Satama: camera stream + LiDAR distance ──────────────────────────
-var CAM_STREAM_URL   = "http://192.168.4.10:81/stream";
-var CAM_DISTANCE_URL = "http://192.168.4.10/distance";
-var CAM_STATUS_URL   = "http://192.168.4.10/status";
-var CAM_SLEEP_URL    = "http://192.168.4.10/sleep";
-var CAM_WAKE_URL     = "http://192.168.4.10/wake";
+var CAM_STREAM_URL   = "http://192.168.5.1:81/stream";
+var CAM_DISTANCE_URL = "http://192.168.5.1/distance";
+var CAM_STATUS_URL   = "http://192.168.5.1/status";
+var CAM_SLEEP_URL    = "http://192.168.5.1/sleep";
+var CAM_WAKE_URL     = "http://192.168.5.1/wake";
 var _distanceTimer   = null;
 var _satamaActive    = false;
 var _satamaAbort     = null;  // H5: AbortController to cancel pending sleep/wake

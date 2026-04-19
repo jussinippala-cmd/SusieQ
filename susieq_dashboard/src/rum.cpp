@@ -48,7 +48,7 @@ RumData rum_read() {
     RumData d;
     if (!rum_scale.is_ready()) return d;
 
-    float net_kg = rum_scale.get_units(5);   // average 5 readings, tare applied
+    float net_kg = rum_scale.get_units(3);   // average 3 readings, tare applied
     if (net_kg < 0) net_kg = 0;
 
     d.liters = net_kg / RUM_DENSITY;
