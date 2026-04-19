@@ -12,3 +12,6 @@ guides/
 
 # Superpowers plugin cache (ei projektin koodia)
 .superpowers/
+
+# Git worktrees
+.worktrees/
