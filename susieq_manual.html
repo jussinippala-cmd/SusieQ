@@ -1417,11 +1417,62 @@
 </details>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
+     14. ETÄSEURANTA
+     ═══════════════════════════════════════════════════════════════════════ -->
+<details class="chapter" id="ch14">
+  <summary>14. Etäseuranta — SusieQ Remote</summary>
+  <div class="chapter-body">
+
+    <h3>14.1 Yleiskuva</h3>
+    <p>SusieQ Remote on Supabase-pohjainen verkkosivusto, joka mahdollistaa veneen sensoridatan seurannan etänä — ilman yhteyttä veneen WiFi-verkkoon. Sivu toimii tavallisessa mobiiliselaimessa.</p>
+
+    <h3>14.2 Arkkitehtuuri</h3>
+    <table>
+      <tr><th>Komponentti</th><th>Kuvaus</th></tr>
+      <tr><td>ESP32 (cockpit)</td><td>Kerää sensoridatan ja lähettää Supabaseen (sensor_readings-taulukko)</td></tr>
+      <tr><td>Supabase</td><td>PostgreSQL-tietokanta + autentikointi + REST API</td></tr>
+      <tr><td>Cloudflare Pages</td><td>Staattinen hosting — index.html + boat-scene.js</td></tr>
+      <tr><td>Selain (puhelin)</td><td>Lukee datan Supabasesta suoraan JS-clientillä</td></tr>
+    </table>
+
+    <h3>14.3 Tietorakenne (Supabase)</h3>
+    <table>
+      <tr><th>Taulu</th><th>Sisältö</th></tr>
+      <tr><td>sensor_readings</td><td>Kaikki sensorimittaukset (JSON-sarakkeessa data-kenttä)</td></tr>
+      <tr><td>camera_commands</td><td>Kamerakomentojen välitys (bow-yksikkö)</td></tr>
+    </table>
+    <div class="info">
+      <strong>Supabase Row Level Security:</strong> sensor_readings-taulu on julkinen lukuoikeudella (anon key). Kirjoitus vaatii service_role-avaimen (vain ESP32:lla).
+    </div>
+
+    <h3>14.4 Sivun välilehdet</h3>
+    <table>
+      <tr><th>Välilehti</th><th>Sisältö</th></tr>
+      <tr><td>Kotisivu</td><td>3D-venepyöritys (Three.js), sensorien pikatieto</td></tr>
+      <tr><td>Mittarit</td><td>Akku, tuuli, lämpötila, vesitankki, polttoaine, rommi</td></tr>
+      <tr><td>Kartta</td><td>GPS-sijainti Leaflet.js-kartalla (dark-teema)</td></tr>
+      <tr><td>Aikakirja</td><td>Tuntihistoria: tuulen suunta nuolina, akun jännite, matkatiedot</td></tr>
+      <tr><td>Säiliöt &amp; Rommi</td><td>Vesitankki ja polttoaine tasonäyttö + kulutusgraafi</td></tr>
+      <tr><td>Käyttöohje</td><td>Tiivis käyttöohje (tämän manuaalin tiivistelmä)</td></tr>
+    </table>
+
+    <h3>14.5 Kehitys ja käyttöönotto</h3>
+    <ol>
+      <li>Kloonaa repo ja siirry <code>.worktrees/remote-monitoring/</code> -hakemistoon</li>
+      <li>Aseta Supabase-tunnukset <code>index.html</code>:n SUPABASE_URL ja SUPABASE_ANON_KEY -vakioihin</li>
+      <li>Julkaise Cloudflare Pages -palvelun kautta (yhdistä GitHub-repo)</li>
+      <li>ESP32:n firmware lähettää POST-pyynnön Supabase REST API:iin säännöllisesti (60 s välein)</li>
+    </ol>
+
+  </div>
+</details>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
      FOOTER
      ═══════════════════════════════════════════════════════════════════════ -->
 <div class="footer">
   SusieQ — Käyttöopas &middot; C&C 28 (1975) &middot; L-7695<br>
-  Päivitetty: 2026-03-27
+  Päivitetty: 2026-04-20
 </div>
 
 </div><!-- .content -->
