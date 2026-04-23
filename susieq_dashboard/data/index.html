@@ -1979,7 +1979,7 @@ function update(d) {
     var rumPct    = d.rum.pct != null ? d.rum.pct : 0;
     var rumLiters = d.rum.liters != null ? d.rum.liters : 0;
     document.getElementById("rum-fill").style.height = rumPct + "%";
-    document.getElementById("rum-val").textContent   = rumLiters.toFixed(1);
+    document.getElementById("rum-val").textContent   = rumLiters.toFixed(2);
     document.getElementById("rum-pct").textContent   = Math.round(rumPct) + "%";
     setBarColor(document.getElementById("rum-fill"), rumPct, "rum");
   }

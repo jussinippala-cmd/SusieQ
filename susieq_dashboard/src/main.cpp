@@ -76,7 +76,7 @@ static String build_json() {
     RumData rum = rum_read();
     doc["rum"]["valid"] = rum.valid;
     if (rum.valid) {
-        doc["rum"]["liters"] = round(rum.liters * 10) / 10.0;
+        doc["rum"]["liters"] = round(rum.liters * 100) / 100.0;
         doc["rum"]["pct"]    = round(rum.pct);
     }
 
@@ -177,6 +177,47 @@ static void setup_routes() {
         }
     });
 
+    // Calibrate rum scale — POST /calibrate_rum?g=<grams>
+    // e.g. curl -X POST "http://192.168.4.1/calibrate_rum?g=500"
+    server.on("/calibrate_rum", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!req->hasParam("g")) {
+            req->send(400, "text/plain", "Missing ?g=<grams>");
+            return;
+        }
+        float grams = req->getParam("g")->value().toFloat();
+        if (grams <= 0.0f) {
+            req->send(400, "text/plain", "Invalid weight");
+            return;
+        }
+        float known_kg = grams / 1000.0f;
+        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(5000))) {
+            bool ok = rum_calibrate(known_kg);
+            xSemaphoreGive(hx711_mutex);
+            if (ok) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "Calibrated with %.0f g — OK", grams);
+                req->send(200, "text/plain", buf);
+            } else {
+                req->send(500, "text/plain", "Calibration failed — scale not ready?");
+            }
+        } else {
+            req->send(503, "text/plain", "Sensor busy");
+        }
+    });
+
+    // Debug: raw rum reading in kg — GET /rum_raw
+    server.on("/rum_raw", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(2000))) {
+            float kg = rum_get_raw_units();
+            xSemaphoreGive(hx711_mutex);
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%.4f kg", kg);
+            req->send(200, "text/plain", buf);
+        } else {
+            req->send(503, "text/plain", "Sensor busy");
+        }
+    });
+
     // GET /records → lue /records.json LittleFS:stä
     server.on("/records", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!LittleFS.exists("/records.json")) {
@@ -268,9 +309,57 @@ void setup() {
     Serial.println("[SusieQ] ready — open http://192.168.4.1 on iPad");
 }
 
+// ─── Serial command handler ───────────────────────────────────────────
+// Commands (send via Serial Monitor, line ending = newline):
+//   tare_rum              — tare with empty scale
+//   calibrate_rum <grams> — calibrate with known weight on scale
+//   rum_raw               — print current reading in kg
+static String serial_buf;
+
+static void handle_serial() {
+    while (Serial.available()) {
+        char c = Serial.read();
+        if (c == '\n' || c == '\r') {
+            serial_buf.trim();
+            if (serial_buf.length() == 0) { serial_buf = ""; return; }
+
+            if (serial_buf == "tare_rum") {
+                if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(2000))) {
+                    rum_tare();
+                    xSemaphoreGive(hx711_mutex);
+                    Serial.println("[serial] tare_rum done");
+                }
+            } else if (serial_buf.startsWith("calibrate_rum ")) {
+                float grams = serial_buf.substring(14).toFloat();
+                if (grams > 0) {
+                    if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(8000))) {
+                        bool ok = rum_calibrate(grams / 1000.0f);
+                        xSemaphoreGive(hx711_mutex);
+                        Serial.printf("[serial] calibrate_rum %s\n", ok ? "OK" : "FAILED");
+                    }
+                } else {
+                    Serial.println("[serial] usage: calibrate_rum <grams>");
+                }
+            } else if (serial_buf == "rum_raw") {
+                if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(2000))) {
+                    float kg = rum_get_raw_units();
+                    xSemaphoreGive(hx711_mutex);
+                    Serial.printf("[serial] rum_raw = %.4f kg\n", kg);
+                }
+            } else {
+                Serial.printf("[serial] unknown: %s\n", serial_buf.c_str());
+            }
+            serial_buf = "";
+        } else {
+            serial_buf += c;
+        }
+    }
+}
+
 // ─── Loop ─────────────────────────────────────────────────────────────
 void loop() {
     ArduinoOTA.handle();
+    handle_serial();
 
     unsigned long now = millis();
     if (now - last_sensor_read >= SENSOR_INTERVAL_MS) {

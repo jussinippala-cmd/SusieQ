@@ -8,5 +8,7 @@ struct RumData {
 };
 
 void    rum_init();
-void    rum_tare();            // call once with empty bottle on scale
+void    rum_tare();                        // call with empty bottle on scale
+bool    rum_calibrate(float known_kg);    // call with known weight on scale; saves factor to NVS
+float   rum_get_raw_units();              // raw reading for debugging
 RumData rum_read();

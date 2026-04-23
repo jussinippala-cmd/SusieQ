@@ -66,8 +66,8 @@
 // ─── HX711 rum bottle weight sensor ─────────────────────────────────
 #define RUM_HX711_DOUT_PIN        25
 #define RUM_HX711_SCK_PIN         23
-#define RUM_CALIBRATION_FACTOR    420.0f   // adjust during calibration
-#define RUM_BOTTLE_FULL_KG        0.7f     // full 0.7L bottle net weight in kg
+#define RUM_CALIBRATION_FACTOR    446639.0f  // calibrated 2026-04-23 with 1.25 kg reference
+#define RUM_BOTTLE_FULL_KG        0.94f    // 1.0 L × 0.94 kg/L — 1L bottle
 #define RUM_DENSITY               0.94f    // kg/L (approx for rum ~40% ABV)
 
 // ─── Victron SmartSolar MPPT BLE ──────────────────────────────────────
