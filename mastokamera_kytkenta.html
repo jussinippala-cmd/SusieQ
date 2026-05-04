@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SusieQ — Mastokamera Kytkentäkaavio</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --border: rgba(255,255,255,0.08);
+    --text: #f0f0f5;
+    --muted: #7a7a8a;
+    --accent: #DA7756;
+    --blue: #4a9eff;
+    --green: #4adb8f;
+    --yellow: #f5c842;
+    --red: #ff5c5c;
+    --purple: #a855f7;
+    --wire-pos: #ff4444;
+    --wire-neg: #111;
+    --wire-5v: #f5c842;
+    --wire-bat: #ff8c00;
+    --wire-gnd: #555;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    padding: 40px 20px 80px;
+    min-height: 100vh;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .page-header h1 {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .page-header h1 span { color: var(--accent); }
+  .page-header .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(74,158,255,0.15);
+    border: 1px solid rgba(74,158,255,0.3);
+    color: var(--blue);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-top: 12px;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  /* ── Section headings ── */
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Alert box ── */
+  .alert {
+    background: rgba(255,92,92,0.08);
+    border: 1px solid rgba(255,92,92,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .alert-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .alert strong { color: var(--red); }
+  .alert p { font-size: 14px; color: var(--text); }
+
+  /* ── Main wiring diagram ── */
+  .wiring-diagram {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 32px;
+    overflow-x: auto;
+  }
+
+  .diagram-svg-wrap {
+    min-width: 800px;
+  }
+
+  /* ── Component cards ── */
+  .components-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .comp-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .comp-card:hover { border-color: rgba(255,255,255,0.18); }
+  .comp-card .comp-icon { font-size: 28px; margin-bottom: 10px; }
+  .comp-card .comp-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .comp-card .comp-spec {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .comp-card .comp-spec strong { color: var(--yellow); }
+
+  /* ── Pin tables ── */
+  .pin-tables {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 700px) { .pin-tables { grid-template-columns: 1fr; } }
+
+  .pin-table-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .pin-table-header {
+    background: var(--bg3);
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--blue);
+    border-bottom: 1px solid var(--border);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  td, th {
+    padding: 9px 16px;
+    font-size: 13px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { font-family: 'SF Mono', 'Fira Code', monospace; color: var(--yellow); font-size: 12px; }
+  td:nth-child(2) { color: var(--text); }
+  td:nth-child(3) { color: var(--muted); font-size: 12px; }
+
+  /* ── Wire legend ── */
+  .wire-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .wire-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .wire-line {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+  }
+
+  /* ── Enclosure layout ── */
+  .enclosure-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 32px;
+  }
+  .enclosure-box {
+    border: 3px solid rgba(74,158,255,0.5);
+    border-radius: 20px;
+    background: rgba(74,158,255,0.04);
+    padding: 24px;
+    position: relative;
+    display: flex;
+    gap: 0;
+    min-height: 180px;
+    overflow: hidden;
+  }
+  .enc-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 12px;
+    position: relative;
+    text-align: center;
+  }
+  .enc-section:not(:last-child) {
+    border-right: 2px dashed rgba(255,255,255,0.12);
+  }
+  .enc-section .enc-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .enc-section .enc-icon { font-size: 36px; margin-bottom: 8px; }
+  .enc-section .enc-detail {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .enc-section .enc-chip {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--green);
+    font-family: 'SF Mono', monospace;
+    margin: 4px 0;
+    width: 100%;
+    max-width: 160px;
+  }
+  .enc-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: rgba(255,255,255,0.2);
+  }
+  .enc-section.cam-left { background: rgba(168,85,247,0.05); border-radius: 18px 0 0 18px; }
+  .enc-section.cam-right { background: rgba(74,219,143,0.05); border-radius: 0 18px 18px 0; }
+  .enc-section.electronics { background: rgba(245,200,66,0.04); }
+
+  /* ── Measurements ── */
+  .enc-dims {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .enc-dims strong { color: var(--blue); }
+
+  /* ── Tips ── */
+  .tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .tip-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .tip-card .tip-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .tip-card .tip-text { font-size: 14px; color: var(--text); line-height: 1.6; }
+  .tip-card .tip-text strong { color: var(--yellow); }
+
+  /* ── WiFi summary ── */
+  .wifi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 600px) { .wifi-grid { grid-template-columns: 1fr; } }
+  .wifi-card {
+    background: var(--bg2);
+    border: 1px solid rgba(74,158,255,0.2);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .wifi-card .wifi-ssid {
+    font-family: 'SF Mono', monospace;
+    font-size: 14px;
+    color: var(--blue);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .wifi-card .wifi-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--muted);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .wifi-card .wifi-row:last-child { border-bottom: none; }
+  .wifi-card .wifi-row span { color: var(--text); font-family: 'SF Mono', monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1>SusieQ — <span>Mastokamera</span> Kytkentäkaavio</h1>
+    <p class="subtitle">ESP32-CAM × 2 · 10 W aurinkopaneeli · IP67 kotelo</p>
+    <div class="badge">⚡ Ei kaapelia mastoon</div>
+  </div>
+
+  <!-- Warning -->
+  <div class="alert">
+    <div class="alert-icon">⚠️</div>
+    <div>
+      <p><strong>TÄRKEÄÄ ennen kytkentää:</strong> Säädä molemmat MT3608 boost-muuntimet tarkasti <strong>5.00 V</strong> yleismittarilla <em>ennen</em> kuin kytket ESP32-CAMin. Liika jännite tuhoaa MCU:n. TP4056 ei sovi tähän projektiin — se tukee vain 1 A:ta, käytä <strong>TP5100</strong> tai <strong>CN3791</strong>.</p>
+    </div>
+  </div>
+  <div class="alert" style="background:rgba(74,219,143,0.06);border-color:rgba(74,219,143,0.3);">
+    <div class="alert-icon">✅</div>
+    <div>
+      <p><strong>TP5100 SET-padi — ei juotosta tarvita.</strong> Tämä moduulivariantti on oletuksena <strong>yksikennotilaissa (4.2 V)</strong> — SET on jo valmiiksi kytketty GND:hen PCB:n sisäisellä vedolla. Tarkista yleismittarilla BAT-padien jännite: jos näyttää ~4.2 V täyteen ladattuna, moduuli toimii oikein. SET-padi on tarkoitettu <em>muuttamaan</em> toiminta kahden kennon tilaan (8.4 V) — älä kytke sitä mihinkään.</p>
+    </div>
+  </div>
+
+  <!-- Main wiring diagram (SVG) -->
+  <div class="section-title">Kytkentäkaavio</div>
+
+  <!-- Wire legend -->
+  <div class="wire-legend" style="margin-bottom:20px;">
+    <div class="wire-item"><div class="wire-line" style="background:#ff4444;"></div><span>Aurinkopaneeli +</span></div>
+    <div class="wire-item"><div class="wire-line" style="background:#444;border:1px solid #888;"></div><span>GND / −</span></div>
+    <div class="wire-item"><div class="wire-line" style="background:#ff8c00;"></div><span>Akku 3.7 V</span></div>
+    <div class="wire-item"><div class="wire-line" style="background:#f5c842;"></div><span>5 V boost-lähtö</span></div>
+    <div class="wire-item"><div class="wire-line" style="background:#4adb8f;"></div><span>ESP32 signaali</span></div>
+  </div>
+
+  <div class="wiring-diagram">
+    <div class="diagram-svg-wrap">
+      <svg viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:-apple-system,sans-serif;">
+
+        <!-- ── Solar panel ── -->
+        <rect x="340" y="20" width="220" height="70" rx="10" fill="#1a1a24" stroke="#f5c842" stroke-width="2"/>
+        <text x="450" y="48" text-anchor="middle" fill="#f5c842" font-size="13" font-weight="700">☀️  AURINKOPANEELI</text>
+        <text x="450" y="68" text-anchor="middle" fill="#86868b" font-size="11">10 W epoxy · 12 V</text>
+        <!-- pins -->
+        <circle cx="390" cy="90" r="5" fill="#ff4444"/>
+        <text x="390" y="106" text-anchor="middle" fill="#ff4444" font-size="10">IN+</text>
+        <circle cx="510" cy="90" r="5" fill="#666"/>
+        <text x="510" y="106" text-anchor="middle" fill="#888" font-size="10">IN−</text>
+
+        <!-- ── TP5100 charger ── -->
+        <rect x="340" y="130" width="220" height="75" rx="10" fill="#1a1a24" stroke="#4a9eff" stroke-width="2"/>
+        <text x="450" y="156" text-anchor="middle" fill="#4a9eff" font-size="13" font-weight="700">TP5100</text>
+        <text x="450" y="172" text-anchor="middle" fill="#86868b" font-size="11">Solar lataaja · 2 A max</text>
+        <!-- pins -->
+        <circle cx="375" cy="130" r="5" fill="#ff4444"/>
+        <text x="375" y="122" text-anchor="middle" fill="#ff4444" font-size="10">IN+</text>
+        <circle cx="420" cy="130" r="5" fill="#444"/>
+        <text x="420" y="122" text-anchor="middle" fill="#888" font-size="10">IN−</text>
+        <circle cx="375" cy="205" r="5" fill="#ff8c00"/>
+        <text x="375" y="220" text-anchor="middle" fill="#ff8c00" font-size="10">BAT+</text>
+        <circle cx="420" cy="205" r="5" fill="#444"/>
+        <text x="420" y="220" text-anchor="middle" fill="#888" font-size="10">BAT−</text>
+        <circle cx="480" cy="205" r="5" fill="#ff8c00"/>
+        <text x="480" y="220" text-anchor="middle" fill="#ff8c00" font-size="10">OUT+</text>
+        <circle cx="525" cy="205" r="5" fill="#444"/>
+        <text x="525" y="220" text-anchor="middle" fill="#888" font-size="10">OUT−</text>
+        <!-- SET pin -->
+        <circle cx="560" cy="167" r="6" fill="#ff5c5c" stroke="#ff9999" stroke-width="1.5"/>
+        <text x="560" y="152" text-anchor="middle" fill="#ff5c5c" font-size="10" font-weight="700">SET</text>
+        <!-- SET wire to GND label -->
+        <line x1="560" y1="173" x2="560" y2="205" stroke="#ff5c5c" stroke-width="2" stroke-dasharray="4,3"/>
+        <rect x="530" y="205" width="60" height="18" rx="4" fill="rgba(255,92,92,0.15)" stroke="#ff5c5c" stroke-width="1"/>
+        <text x="560" y="218" text-anchor="middle" fill="#ff5c5c" font-size="10" font-weight="700">→ GND</text>
+        <text x="560" y="233" text-anchor="middle" fill="#ff9999" font-size="9">= 1 kenno</text>
+
+        <!-- wires solar→charger -->
+        <line x1="390" y1="90" x2="375" y2="130" stroke="#ff4444" stroke-width="2.5"/>
+        <line x1="510" y1="90" x2="420" y2="130" stroke="#555" stroke-width="2.5"/>
+
+        <!-- ── LiPo battery ── -->
+        <rect x="300" y="238" width="180" height="60" rx="10" fill="#1a1a24" stroke="#ff8c00" stroke-width="2"/>
+        <text x="390" y="263" text-anchor="middle" fill="#ff8c00" font-size="13" font-weight="700">🔋 LiPo</text>
+        <text x="390" y="282" text-anchor="middle" fill="#86868b" font-size="11">3.7 V · 8000–10000 mAh</text>
+        <!-- battery pins -->
+        <circle cx="335" cy="238" r="5" fill="#ff8c00"/>
+        <text x="335" y="230" text-anchor="middle" fill="#ff8c00" font-size="10">B+</text>
+        <circle cx="445" cy="238" r="5" fill="#444"/>
+        <text x="445" y="230" text-anchor="middle" fill="#888" font-size="10">B−</text>
+
+        <!-- wires charger→battery -->
+        <line x1="375" y1="205" x2="335" y2="238" stroke="#ff8c00" stroke-width="2.5"/>
+        <line x1="420" y1="205" x2="445" y2="238" stroke="#555" stroke-width="2.5"/>
+
+        <!-- ── OUT bus from TP5100 going to two boosts ── -->
+        <!-- OUT+ goes right then splits -->
+        <line x1="480" y1="205" x2="480" y2="280" stroke="#ff8c00" stroke-width="2.5"/>
+        <line x1="480" y1="280" x2="200" y2="280" stroke="#ff8c00" stroke-width="2.5"/>
+        <line x1="480" y1="280" x2="700" y2="280" stroke="#ff8c00" stroke-width="2.5"/>
+        <!-- OUT− bus -->
+        <line x1="525" y1="205" x2="525" y2="290" stroke="#555" stroke-width="2.5"/>
+        <line x1="525" y1="290" x2="215" y2="290" stroke="#555" stroke-width="2.5"/>
+        <line x1="525" y1="290" x2="715" y2="290" stroke="#555" stroke-width="2.5"/>
+
+        <!-- ── MT3608 LEFT (keula) ── -->
+        <rect x="100" y="308" width="200" height="70" rx="10" fill="#1a1a24" stroke="#a855f7" stroke-width="2"/>
+        <text x="200" y="332" text-anchor="middle" fill="#a855f7" font-size="13" font-weight="700">MT3608</text>
+        <text x="200" y="350" text-anchor="middle" fill="#86868b" font-size="11">Boost → 5.00 V</text>
+        <text x="200" y="366" text-anchor="middle" fill="#a855f7" font-size="10">KEULA-kamera</text>
+        <!-- pins -->
+        <circle cx="150" cy="308" r="5" fill="#ff8c00"/>
+        <text x="150" y="300" text-anchor="middle" fill="#ff8c00" font-size="10">IN+</text>
+        <circle cx="200" cy="308" r="5" fill="#444"/>
+        <text x="200" y="300" text-anchor="middle" fill="#888" font-size="10">GND</text>
+        <circle cx="150" cy="378" r="5" fill="#f5c842"/>
+        <text x="150" y="394" text-anchor="middle" fill="#f5c842" font-size="10">5V</text>
+        <circle cx="250" cy="378" r="5" fill="#444"/>
+        <text x="250" y="394" text-anchor="middle" fill="#888" font-size="10">GND</text>
+        <!-- wires bus→MT3608 left -->
+        <line x1="200" y1="280" x2="150" y2="308" stroke="#ff8c00" stroke-width="2.5"/>
+        <line x1="215" y1="290" x2="200" y2="308" stroke="#555" stroke-width="2.5"/>
+
+        <!-- ── MT3608 RIGHT (perä) ── -->
+        <rect x="600" y="308" width="200" height="70" rx="10" fill="#1a1a24" stroke="#4adb8f" stroke-width="2"/>
+        <text x="700" y="332" text-anchor="middle" fill="#4adb8f" font-size="13" font-weight="700">MT3608</text>
+        <text x="700" y="350" text-anchor="middle" fill="#86868b" font-size="11">Boost → 5.00 V</text>
+        <text x="700" y="366" text-anchor="middle" fill="#4adb8f" font-size="10">PERÄ-kamera</text>
+        <!-- pins -->
+        <circle cx="650" cy="308" r="5" fill="#ff8c00"/>
+        <text x="650" y="300" text-anchor="middle" fill="#ff8c00" font-size="10">IN+</text>
+        <circle cx="700" cy="308" r="5" fill="#444"/>
+        <text x="700" y="300" text-anchor="middle" fill="#888" font-size="10">GND</text>
+        <circle cx="650" cy="378" r="5" fill="#f5c842"/>
+        <text x="650" y="394" text-anchor="middle" fill="#f5c842" font-size="10">5V</text>
+        <circle cx="750" cy="378" r="5" fill="#444"/>
+        <text x="750" y="394" text-anchor="middle" fill="#888" font-size="10">GND</text>
+        <!-- wires bus→MT3608 right -->
+        <line x1="700" y1="280" x2="650" y2="308" stroke="#ff8c00" stroke-width="2.5"/>
+        <line x1="715" y1="290" x2="700" y2="308" stroke="#555" stroke-width="2.5"/>
+
+        <!-- ── ESP32-CAM LEFT ── -->
+        <rect x="80" y="420" width="240" height="110" rx="10" fill="#1a1a24" stroke="#a855f7" stroke-width="2"/>
+        <text x="200" y="445" text-anchor="middle" fill="#a855f7" font-size="13" font-weight="700">ESP32-CAM</text>
+        <text x="200" y="461" text-anchor="middle" fill="#86868b" font-size="11">AI-Thinker · KEULA</text>
+        <!-- pin labels -->
+        <text x="105" y="490" fill="#f5c842" font-size="11" font-family="monospace">5V</text>
+        <text x="105" y="508" fill="#888" font-size="11" font-family="monospace">GND</text>
+        <text x="105" y="526" fill="#4adb8f" font-size="11" font-family="monospace">GPIO0  = FLASH</text>
+        <text x="105" y="542" fill="#4adb8f" font-size="11" font-family="monospace">GPIO33 = LED</text>
+        <!-- OV2640 label -->
+        <rect x="220" y="472" width="85" height="30" rx="6" fill="#2a1a3a" stroke="#a855f7" stroke-width="1"/>
+        <text x="262" y="492" text-anchor="middle" fill="#a855f7" font-size="11" font-weight="700">OV2640</text>
+        <!-- 220uF cap -->
+        <rect x="220" y="512" width="80" height="16" rx="4" fill="#1a2a1a" stroke="#4adb8f" stroke-width="1"/>
+        <text x="260" y="524" text-anchor="middle" fill="#4adb8f" font-size="10">220µF cap</text>
+        <!-- pins -->
+        <circle cx="140" cy="420" r="5" fill="#f5c842"/>
+        <circle cx="165" cy="420" r="5" fill="#444"/>
+
+        <!-- wires boost left → ESP32 left -->
+        <line x1="150" y1="378" x2="140" y2="420" stroke="#f5c842" stroke-width="2.5"/>
+        <line x1="250" y1="378" x2="165" y2="420" stroke="#555" stroke-width="2.5"/>
+
+        <!-- ── ESP32-CAM RIGHT ── -->
+        <rect x="580" y="420" width="240" height="110" rx="10" fill="#1a1a24" stroke="#4adb8f" stroke-width="2"/>
+        <text x="700" y="445" text-anchor="middle" fill="#4adb8f" font-size="13" font-weight="700">ESP32-CAM</text>
+        <text x="700" y="461" text-anchor="middle" fill="#86868b" font-size="11">AI-Thinker · PERÄ</text>
+        <!-- pin labels -->
+        <text x="605" y="490" fill="#f5c842" font-size="11" font-family="monospace">5V</text>
+        <text x="605" y="508" fill="#888" font-size="11" font-family="monospace">GND</text>
+        <text x="605" y="526" fill="#4adb8f" font-size="11" font-family="monospace">GPIO0  = FLASH</text>
+        <text x="605" y="542" fill="#4adb8f" font-size="11" font-family="monospace">GPIO33 = LED</text>
+        <!-- OV2640 -->
+        <rect x="720" y="472" width="85" height="30" rx="6" fill="#1a2a1a" stroke="#4adb8f" stroke-width="1"/>
+        <text x="762" y="492" text-anchor="middle" fill="#4adb8f" font-size="11" font-weight="700">OV2640</text>
+        <!-- cap -->
+        <rect x="720" y="512" width="80" height="16" rx="4" fill="#1a2a1a" stroke="#4adb8f" stroke-width="1"/>
+        <text x="760" y="524" text-anchor="middle" fill="#4adb8f" font-size="10">220µF cap</text>
+        <!-- pins -->
+        <circle cx="640" cy="420" r="5" fill="#f5c842"/>
+        <circle cx="665" cy="420" r="5" fill="#444"/>
+
+        <!-- wires boost right → ESP32 right -->
+        <line x1="650" y1="378" x2="640" y2="420" stroke="#f5c842" stroke-width="2.5"/>
+        <line x1="750" y1="378" x2="665" y2="420" stroke="#555" stroke-width="2.5"/>
+
+        <!-- Labels for networks -->
+        <rect x="30" y="430" width="45" height="40" rx="6" fill="rgba(168,85,247,0.12)" stroke="rgba(168,85,247,0.4)" stroke-width="1"/>
+        <text x="52" y="447" text-anchor="middle" fill="#a855f7" font-size="9" font-weight="700">WiFi</text>
+        <text x="52" y="461" text-anchor="middle" fill="#a855f7" font-size="8">.6.1</text>
+
+        <rect x="825" y="430" width="45" height="40" rx="6" fill="rgba(74,219,143,0.12)" stroke="rgba(74,219,143,0.4)" stroke-width="1"/>
+        <text x="848" y="447" text-anchor="middle" fill="#4adb8f" font-size="9" font-weight="700">WiFi</text>
+        <text x="848" y="461" text-anchor="middle" fill="#4adb8f" font-size="8">.7.1</text>
+
+      </svg>
+    </div>
+  </div>
+
+  <!-- Component cards -->
+  <div class="section-title">Komponentit</div>
+  <div class="components-grid">
+    <div class="comp-card">
+      <div class="comp-icon">☀️</div>
+      <div class="comp-name">Aurinkopaneeli</div>
+      <div class="comp-spec"><strong>10 W</strong> · epoxy/laminoitu<br>AliExpress: <em>10W epoxy solar panel</em></div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">🔋</div>
+      <div class="comp-name">LiPo-akku</div>
+      <div class="comp-spec"><strong>3.7 V · 8000–10000 mAh</strong><br>tai 2× 4000 mAh rinnan<br>3 pilvistä päivää = 30 Wh</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">⚡</div>
+      <div class="comp-name">Lataaja: TP5100</div>
+      <div class="comp-spec"><strong>2 A max</strong>, sopii 10 W paneelille<br><span style="color:#ff5c5c;">❌ EI TP4056</span> — vain 1 A<br>AliExpress: <em>TP5100 solar charger</em></div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">🔼</div>
+      <div class="comp-name">Boost: MT3608 × 2</div>
+      <div class="comp-spec"><strong>Säädetty 5.00 V</strong> per yksikkö<br>Eristää WiFi-virtapiikit<br>AliExpress: <em>MT3608 boost 5V</em></div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">📷</div>
+      <div class="comp-name">ESP32-CAM × 2</div>
+      <div class="comp-spec"><strong>AI-Thinker</strong><br>OV2640 kamera<br>Omat WiFi AP:t</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">🧲</div>
+      <div class="comp-name">Kondensaattorit × 2</div>
+      <div class="comp-spec"><strong>220 µF elektrolyyttinen</strong><br>5 V/GND väliin kummallekin<br>Vakauttaa WiFi-virtapiikit</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">📦</div>
+      <div class="comp-name">Kotelo IP67</div>
+      <div class="comp-spec"><strong>150 × 80 × 50 mm</strong><br>Pitkänomainen<br>AliExpress: <em>IP67 waterproof enclosure 150x80</em></div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">🔩</div>
+      <div class="comp-name">Kaapeliläpivienti</div>
+      <div class="comp-spec"><strong>PG7</strong> holkki<br>Silikonitiiviste<br>Aurinkopaneelin kaapelille</div>
+    </div>
+  </div>
+
+  <!-- Pin tables -->
+  <div class="section-title">Pinout — ESP32-CAM AI-Thinker</div>
+  <div class="pin-tables">
+    <div class="pin-table-wrap">
+      <div class="pin-table-header" style="color:#a855f7;">Keula-kamera (SusieQ-MastoKeula)</div>
+      <table>
+        <tr><th>PIN</th><th>Yhteys</th><th>Huomio</th></tr>
+        <tr><td>5V</td><td>MT3608 OUT+ (keula)</td><td>Tarkista 5.00 V ensin</td></tr>
+        <tr><td>GND</td><td>MT3608 GND (keula)</td><td>Yhteinen maa</td></tr>
+        <tr><td>GPIO0</td><td>Flash-nappi / GND flash-tilassa</td><td>Irti käynnistyksessä</td></tr>
+        <tr><td>GPIO33</td><td>Status LED (sisäinen)</td><td>Heartbeat vilkku</td></tr>
+        <tr><td>CAM</td><td>OV2640 (sisäinen liitäntä)</td><td>Ei muutoksia</td></tr>
+        <tr><td>U0TXD</td><td>Debug UART TX</td><td>Ohjelmointi</td></tr>
+        <tr><td>U0RXD</td><td>Debug UART RX</td><td>Ohjelmointi</td></tr>
+      </table>
+    </div>
+    <div class="pin-table-wrap">
+      <div class="pin-table-header" style="color:#4adb8f;">Perä-kamera (SusieQ-MastoPerä)</div>
+      <table>
+        <tr><th>PIN</th><th>Yhteys</th><th>Huomio</th></tr>
+        <tr><td>5V</td><td>MT3608 OUT+ (perä)</td><td>Tarkista 5.00 V ensin</td></tr>
+        <tr><td>GND</td><td>MT3608 GND (perä)</td><td>Yhteinen maa</td></tr>
+        <tr><td>GPIO0</td><td>Flash-nappi / GND flash-tilassa</td><td>Irti käynnistyksessä</td></tr>
+        <tr><td>GPIO33</td><td>Status LED (sisäinen)</td><td>Heartbeat vilkku</td></tr>
+        <tr><td>CAM</td><td>OV2640 (sisäinen liitäntä)</td><td>Ei muutoksia</td></tr>
+        <tr><td>U0TXD</td><td>Debug UART TX</td><td>Ohjelmointi</td></tr>
+        <tr><td>U0RXD</td><td>Debug UART RX</td><td>Ohjelmointi</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- TP5100 pin table -->
+  <div class="section-title">TP5100 Lataajan pinout</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:32px;">
+    <div style="background:var(--bg3);padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--blue);border-bottom:1px solid var(--border);">TP5100 — Solar Charger 2A</div>
+    <table>
+      <tr><th>PIN</th><th>Yhteys</th><th>Jännite</th><th>Huomio</th></tr>
+      <tr><td>IN+</td><td>Aurinkopaneeli +</td><td>5–15 V</td><td>Paneeliin suoraan</td></tr>
+      <tr><td>IN−</td><td>Aurinkopaneeli −</td><td>0 V</td><td>Yhteinen GND</td></tr>
+      <tr><td>BAT+</td><td>LiPo + johto</td><td>3.7–4.2 V</td><td>Latausvirta max 2 A</td></tr>
+      <tr><td>BAT−</td><td>LiPo − johto</td><td>0 V</td><td>Yhteinen GND</td></tr>
+      <tr><td>OUT+</td><td>MT3608 (molemmat) IN+</td><td>3.7–4.2 V</td><td>Suoraan akusta</td></tr>
+      <tr><td>OUT−</td><td>MT3608 (molemmat) GND</td><td>0 V</td><td>Yhteinen GND</td></tr>
+      <tr style="background:rgba(74,219,143,0.05);">
+        <td style="color:#4adb8f;">SET</td>
+        <td style="color:#7a7a8a;">Ei kytketä mihinkään</td>
+        <td>—</td>
+        <td style="color:#4adb8f;">✅ Tämä moduuli oletuksena 1 kenno (4.2 V). SET auki = ok. Älä juota.</td>
+      </tr>
+    </table>
+    <div style="background:rgba(74,219,143,0.05);border-top:1px solid rgba(74,219,143,0.15);padding:12px 16px;font-size:13px;color:#7a7a8a;">
+      <strong style="color:#4adb8f;">SET-padin toiminta tarkistettu mittaamalla:</strong> BAT-lähdöstä mitattu ~4.2 V ilman SET-juotosta → moduuli on valmiiksi yksikennotilaissa. SET-padi on tarkoitettu vain kahden kennon tilaan siirtymiseen.
+    </div>
+  </div>
+
+  <!-- Enclosure layout -->
+  <div class="section-title">IP67 Kotelon sisäinen layout</div>
+  <div class="enclosure-wrap">
+    <div class="enclosure-box">
+      <div class="enc-section cam-left">
+        <div class="enc-label">Vasen pää</div>
+        <div class="enc-icon">📷</div>
+        <div class="enc-chip">ESP32-CAM PERÄ</div>
+        <div class="enc-detail">Linssi ulos<br>vasemmalta<br><span style="color:#a855f7;">SusieQ-MastoPerä</span></div>
+      </div>
+      <div class="enc-section electronics">
+        <div class="enc-label">Keskusta</div>
+        <div class="enc-icon">⚡</div>
+        <div class="enc-chip">TP5100 lataaja</div>
+        <div class="enc-chip">LiPo 8000mAh</div>
+        <div class="enc-chip">MT3608 × 2</div>
+        <div class="enc-detail" style="margin-top:8px;font-size:11px;">Kaapeliläpivienti PG7<br>aurinkopaneelille</div>
+      </div>
+      <div class="enc-section cam-right">
+        <div class="enc-label">Oikea pää</div>
+        <div class="enc-icon">📷</div>
+        <div class="enc-chip">ESP32-CAM KEULA</div>
+        <div class="enc-detail">Linssi ulos<br>oikealta<br><span style="color:#4adb8f;">SusieQ-MastoKeula</span></div>
+      </div>
+    </div>
+    <div class="enc-dims">Kotelo: <strong>150 × 80 × 50 mm</strong> · Materiaali: PC / ABS · IP67 tiivistetty</div>
+  </div>
+
+  <!-- WiFi summary -->
+  <div class="section-title">WiFi-verkot</div>
+  <div class="wifi-grid">
+    <div class="wifi-card" style="border-color:rgba(168,85,247,0.3);">
+      <div class="wifi-ssid" style="color:#a855f7;">📡 SusieQ-MastoKeula</div>
+      <div class="wifi-row">IP-osoite <span style="color:#a855f7;">192.168.6.1</span></div>
+      <div class="wifi-row">Salasana <span>susieq123</span></div>
+      <div class="wifi-row">Kanava <span>1</span></div>
+      <div class="wifi-row">Firmware <span>susieq_bow -kopio</span></div>
+      <div class="wifi-row">Kamera <span>Eteenpäin (keula)</span></div>
+    </div>
+    <div class="wifi-card" style="border-color:rgba(74,219,143,0.3);">
+      <div class="wifi-ssid" style="color:#4adb8f;">📡 SusieQ-MastoPerä</div>
+      <div class="wifi-row">IP-osoite <span style="color:#4adb8f;">192.168.7.1</span></div>
+      <div class="wifi-row">Salasana <span>susieq123</span></div>
+      <div class="wifi-row">Kanava <span>6</span></div>
+      <div class="wifi-row">Firmware <span>susieq_bow -kopio</span></div>
+      <div class="wifi-row">Kamera <span>Taaksepäin (perä)</span></div>
+    </div>
+  </div>
+
+  <!-- Tips -->
+  <div class="section-title">Rakennusohjeet — tärkeysjärjestyksessä</div>
+  <div class="tips-grid">
+    <div class="tip-card">
+      <div class="tip-num" style="background:rgba(255,92,92,0.15);color:#ff5c5c;">1</div>
+      <div class="tip-text"><strong>Säädä MT3608 ensin ilman ESP32:a.</strong> Kytke yleismittari OUT+-GND väliin, kierrä trimmeripotentiometriä kunnes näyttää tarkasti 5.00 V. Tee molemmille erikseen.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num" style="background:rgba(245,200,66,0.15);color:#f5c842;">2</div>
+      <div class="tip-text"><strong>Kytke 220 µF kondensaattori</strong> jokaisen ESP32:n 5 V/GND-napoihin. Tämä vakauttaa WiFi-lähetyksen aiheuttamat virtapiikit (~300 mA pulssit).</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num" style="background:rgba(74,158,255,0.15);color:#4a9eff;">3</div>
+      <div class="tip-text"><strong>Testaa koko kytkentä pöydällä</strong> ennen kotelointia ja mastoon asentamista. Varmista molemmat WiFi-verkot ja kamerastreami puhelimella.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num" style="background:rgba(168,85,247,0.15);color:#a855f7;">4</div>
+      <div class="tip-text"><strong>PG7 kaapeliläpivienti</strong> aurinkopaneelin kaapelille. Täytä silikonitiivisteellä. Jätä kotelon sisälle muutama cm ylimääräistä kaapelia.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num" style="background:rgba(74,219,143,0.15);color:#4adb8f;">5</div>
+      <div class="tip-text"><strong>Ohjelmointi:</strong> Käytä FTDI-adapteria (3.3 V). GPIO0 → GND ohjelmointi-tilaan, irti normaalikäynnistyksessä. Kytke U0TXD/U0RXD adapteriin.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num" style="background:rgba(255,140,0,0.15);color:#ff8c00;">6</div>
+      <div class="tip-text"><strong>Kaksi erillistä boost-muunninta</strong> eristää keula- ja peräkameran toisistaan — jos toinen kaatuu, toinen jatkaa toimintaa itsenäisesti.</div>
+    </div>
+    <div class="tip-card" style="border-color:rgba(74,219,143,0.3);">
+      <div class="tip-num" style="background:rgba(74,219,143,0.15);color:#4adb8f;">✓</div>
+      <div class="tip-text"><strong style="color:#4adb8f;">TP5100 SET-padi — ei toimia tarvita.</strong> Tämä moduulivariantti on oletuksena yksikennotilaissa. Tarkistettu mittaamalla: BAT-lähtö ~4.2 V ilman juotosta. SET-padia ei tarvitse käsitellä.</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:var(--muted);font-size:12px;padding-top:24px;border-top:1px solid var(--border);">
+    SusieQ C&amp;C 28 · Mastokamera · Päivitetty 2026-05-03
+  </div>
+
+</div>
+</body>
+</html>

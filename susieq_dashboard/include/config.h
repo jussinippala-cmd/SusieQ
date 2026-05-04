@@ -10,11 +10,12 @@
 #define LOG_I(tag, fmt, ...) do { if (SUSIEQ_LOG_LEVEL >= 3) Serial.printf("[" tag "] "        fmt "\n", ##__VA_ARGS__); } while(0)
 #define LOG_D(tag, fmt, ...) do { if (SUSIEQ_LOG_LEVEL >= 4) Serial.printf("[" tag "] DBG: "   fmt "\n", ##__VA_ARGS__); } while(0)
 
-// ─── WiFi Access Point ────────────────────────────────────────────────
-#define WIFI_SSID        "SusieQ-Data"
-#define WIFI_PASSWORD    "susieq123"   // min 8 chars; change as needed
-#define WIFI_CHANNEL     6
-#define WIFI_IP          "192.168.4.1"
+// ─── WiFi STA — yhdistetään GL-XE300:n SusieQ-Net-verkkoon ──────────
+#define STA_SSID      "SusieQ-Net"
+#define STA_PASSWORD  "susieq123"
+#define STATIC_IP     "192.168.8.100"
+#define GATEWAY_IP    "192.168.8.1"
+#define SUBNET_MASK   "255.255.255.0"
 
 // ─── Update interval ──────────────────────────────────────────────────
 #define SENSOR_INTERVAL_MS  2000       // 2 s between sensor polls

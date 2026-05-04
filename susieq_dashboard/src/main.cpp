@@ -250,6 +250,32 @@ static void setup_routes() {
     });
 }
 
+// ─── WiFi STA ─────────────────────────────────────────────────────────
+static void start_wifi_sta() {
+    IPAddress ip, gw, sn;
+    ip.fromString(STATIC_IP);
+    gw.fromString(GATEWAY_IP);
+    sn.fromString(SUBNET_MASK);
+
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.config(ip, gw, sn);
+    WiFi.begin(STA_SSID, STA_PASSWORD);
+
+    unsigned long t = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - t < 15000) {
+        delay(200);
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+        Serial.printf("[wifi] yhdistetty: %s  RSSI: %d dBm\n",
+                      WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    } else {
+        Serial.println("[wifi] yhdistyminen epäonnistui — jatketaan silti");
+    }
+}
+
 // ─── Setup ────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
@@ -275,14 +301,7 @@ void setup() {
     weather_init();    // AHT20 + BMP280 (I2C) + DS18B20 (1-Wire)
     rum_init();
 
-    // WiFi AP
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL);
-    esp_wifi_set_ps(WIFI_PS_NONE);
-    esp_wifi_set_max_tx_power(82);  // 20.5 dBm max
-    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
-    Serial.printf("[wifi] AP started: %s  IP: %s\n",
-                  WIFI_SSID, WiFi.softAPIP().toString().c_str());
+    start_wifi_sta();
 
     // OTA
     ArduinoOTA.setHostname(OTA_HOSTNAME);
@@ -306,7 +325,7 @@ void setup() {
     server.begin();
     Serial.println("[http] server started on port 80");
 
-    Serial.println("[SusieQ] ready — open http://192.168.4.1 on iPad");
+    Serial.printf("[SusieQ] ready — open http://%s on device\n", STATIC_IP);
 }
 
 // ─── Serial command handler ───────────────────────────────────────────
@@ -357,8 +376,21 @@ static void handle_serial() {
 }
 
 // ─── Loop ─────────────────────────────────────────────────────────────
+static unsigned long _lastWifiCheck = 0;
+
 void loop() {
     ArduinoOTA.handle();
+
+    if (millis() - _lastWifiCheck > 30000) {
+        _lastWifiCheck = millis();
+        if (WiFi.status() != WL_CONNECTED) {
+            Serial.println("[wifi] yhteys poikki — yritetaan uudelleen");
+            WiFi.reconnect();
+        } else {
+            esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+        }
+    }
+
     handle_serial();
 
     unsigned long now = millis();

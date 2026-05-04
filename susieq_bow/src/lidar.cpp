@@ -14,6 +14,7 @@ static unsigned long _lastValidMs = 0;
 void lidar_init() {
     LidarSerial.setRxBufferSize(1024);  // prevent overflow during sleep
     LidarSerial.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
+    LidarSerial.setTimeout(5);  // readBytes() max 5ms — prevents blocking stream task
     Serial.println("[lidar] TF-Luna UART init on RX=" +
                    String(LIDAR_RX_PIN) + " TX=" + String(LIDAR_TX_PIN));
 }

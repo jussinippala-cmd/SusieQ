@@ -253,7 +253,8 @@ static void handle_distance(AsyncWebServerRequest* request) {
 static void handle_status(AsyncWebServerRequest* request) {
     JsonDocument doc;
     doc["uptime_s"]   = (millis() - _bootTime) / 1000;
-    doc["wifi_clients"] = WiFi.softAPgetStationNum();
+    doc["rssi"]         = WiFi.RSSI();
+    doc["ip"]           = WiFi.localIP().toString();
     doc["free_heap"]  = ESP.getFreeHeap();
     doc["sleeping"]   = (_powerState != POWER_AWAKE);
     doc["camera_ok"]  = (bool)_cameraOk;
@@ -264,18 +265,30 @@ static void handle_status(AsyncWebServerRequest* request) {
     request->send(200, "application/json", out);
 }
 
-// ─── WiFi AP (bow hosts its own network) ─────────────────────────────
-static void start_wifi_ap() {
-    WiFi.mode(WIFI_AP);
-    IPAddress ip; ip.fromString(BOW_AP_IP);
-    IPAddress subnet(255, 255, 255, 0);
-    WiFi.softAPConfig(ip, ip, subnet);
-    WiFi.softAP(BOW_AP_SSID, BOW_AP_PASSWORD, BOW_AP_CHANNEL);
-    esp_wifi_set_ps(WIFI_PS_NONE);
-    esp_wifi_set_max_tx_power(82);  // 20.5 dBm max
-    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
-    Serial.printf("[wifi] AP started: %s  IP: %s  ch: %d\n",
-                  BOW_AP_SSID, WiFi.softAPIP().toString().c_str(), BOW_AP_CHANNEL);
+// ─── WiFi STA — yhdistetään GL-XE300:n SusieQ-Net-verkkoon ──────────
+static void start_wifi_sta() {
+    IPAddress ip, gw, sn;
+    ip.fromString(STATIC_IP);
+    gw.fromString(GATEWAY_IP);
+    sn.fromString(SUBNET_MASK);
+
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.config(ip, gw, sn);
+    WiFi.begin(STA_SSID, STA_PASSWORD);
+
+    unsigned long t = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - t < 15000) {
+        delay(200);
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+        Serial.printf("[wifi] yhdistetty: %s  RSSI: %d dBm\n",
+                      WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    } else {
+        Serial.println("[wifi] yhdistyminen epäonnistui — jatketaan silti");
+    }
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────
@@ -305,8 +318,7 @@ void setup() {
     }
 
     lidar_init();
-    start_wifi_ap();
-    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);  // modem sleep until first request
+    start_wifi_sta();
 
     // F8: CORS via DefaultHeaders — no need for per-handler addHeader
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
@@ -368,15 +380,26 @@ void setup() {
     ArduinoOTA.begin();
     Serial.printf("[ota] ready — hostname: %s\n", OTA_HOSTNAME);
 
-    Serial.printf("[SusieQ-Bow] ready — open http://%s on phone\n", BOW_AP_IP);
+    Serial.printf("[SusieQ-Bow] ready — open http://%s on phone\n", STATIC_IP);
 }
 
 // ─── Loop ────────────────────────────────────────────────────────────
 static unsigned long _lastLidarPoll = 0;
+static unsigned long _lastWifiCheck = 0;
 static const unsigned long LIDAR_POLL_MS = 1000 / LIDAR_READ_HZ;  // 50ms at 20Hz
 
 void loop() {
     ArduinoOTA.handle();
+
+    if (millis() - _lastWifiCheck > 30000) {
+        _lastWifiCheck = millis();
+        if (WiFi.status() != WL_CONNECTED) {
+            Serial.println("[wifi] yhteys poikki — yritetaan uudelleen");
+            WiFi.reconnect();
+        } else if (_powerState != POWER_AWAKE) {
+            esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+        }
+    }
 
     // Auto-sleep after idle timeout
     if (_powerState == POWER_AWAKE && (millis() - _lastActivity > SLEEP_TIMEOUT_MS)) {

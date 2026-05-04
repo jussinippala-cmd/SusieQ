@@ -1219,14 +1219,14 @@
     </details>
 
     <details class="help-section">
-      <summary>Dashboard — SusieQ-Data</summary>
+      <summary>Dashboard — SusieQ-Net</summary>
       <div class="help-section-body">
         <h4>Yhdistäminen</h4>
         <table>
           <tr><th>Tieto</th><th>Arvo</th></tr>
-          <tr><td>WiFi</td><td><code>SusieQ-Data</code></td></tr>
+          <tr><td>WiFi</td><td><code>SusieQ-Net</code></td></tr>
           <tr><td>Salasana</td><td><code>susieq123</code></td></tr>
-          <tr><td>Osoite</td><td><code>http://192.168.4.1</code></td></tr>
+          <tr><td>Osoite</td><td><code>http://192.168.8.100</code></td></tr>
           <tr><td>Päivitysväli</td><td>2 s (WebSocket)</td></tr>
         </table>
         <div class="help-tip"><strong>iPad-vinkki:</strong> Safari → Jaa → Lisää kotivalikkoon → avautuu koko näytön sovelluksena.</div>
@@ -1247,7 +1247,7 @@
         <p><strong>Rum o'clock:</strong> Näkyy 3 h ennen auringonlaskua. Laskuri näyttää täydet minuutit ja tunnit.</p>
 
         <h4>Keulakamera satamassa</h4>
-        <p>Satamaan saavuttaessa keulayksikön kamera ja etäisyysmittari ovat käytössä bow-yksikön omasta WiFi-verkosta. Vaihda puhelin/iPad verkkoon <strong>SusieQ-Bow</strong> (salasana <code>susieq123</code>) ja avaa selaimessa <a href="http://192.168.5.1">http://192.168.5.1</a>. Siellä näet kameran live-kuvan ja etäisyyden laituriin. Palaa tähän dashboardiin vaihtamalla takaisin <strong>SusieQ-Data</strong>-verkkoon.</p>
+        <p>Satamaan saavuttaessa keulayksikön kamera ja etäisyysmittari ovat käytössä samasta <strong>SusieQ-Net</strong>-verkosta. Avaa selaimessa <a href="http://192.168.8.103">http://192.168.8.103</a>. Siellä näet kameran live-kuvan ja etäisyyden laituriin.</p>
 
         <h4>Tilailmaisimet</h4>
         <ul>
@@ -1260,7 +1260,7 @@
         <p>Tankit-välilehdellä: aseta <strong>tyhjä</strong> säiliö vaa'alle ja paina Tara-nappia. Tara tallennetaan flash-muistiin (säilyy virrankatkojen yli).</p>
 
         <h4>JSON API</h4>
-        <p><code>GET http://192.168.4.1/data</code> — kaikki sensoridatan JSON-muodossa.</p>
+        <p><code>GET http://192.168.8.100/data</code> — kaikki sensoridatan JSON-muodossa.</p>
       </div>
     </details>
 
@@ -1466,7 +1466,7 @@
           <tr><td>Akku ei näy</td><td>Victron BLE: encryption key config.h:ssa, BLE kantama</td></tr>
           <tr><td>Tuulianturi ei vastaa</td><td>Modbus slave ID (1), baud (4800), DE-nasta GPIO 4</td></tr>
           <tr><td>Vaaka lukee väärin</td><td>Kalibrointikerroin, tee tara uudelleen</td></tr>
-          <tr><td>Kamera ei toimi</td><td>Liity SusieQ-Bow-verkkoon ja avaa http://192.168.5.1</td></tr>
+          <tr><td>Kamera ei toimi</td><td>Liity SusieQ-Net-verkkoon ja avaa http://192.168.8.103</td></tr>
         </table>
       </div>
     </details>
@@ -1794,7 +1794,7 @@ var _wsReconnecting = false;  // L: prevent onclose+onerror double-fire
 function connect() {
   _wsReconnecting = false;
   try {
-    var host = location.hostname || "192.168.4.1";
+    var host = location.hostname || "192.168.8.100";
     ws = new WebSocket("ws://" + host + "/ws");
   } catch (e) {
     console.error("WebSocket connect error", e);

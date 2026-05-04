@@ -175,7 +175,7 @@
   var off = document.getElementById("cam-offline");
 
   function startStream() {
-    img.src = "http://" + location.hostname + ":81/stream?t=" + Date.now();
+    img.src = "http://192.168.5.1:81/stream?t=" + Date.now();
   }
   img.onload = function () { off.style.display = "none"; };
   img.onerror = function () {
