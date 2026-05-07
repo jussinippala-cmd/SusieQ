@@ -8,12 +8,41 @@
 . /etc/susieq.env
 
 COCKPIT_URL="http://192.168.8.100/data"
+LAST_OK_FILE="/tmp/susieq_last_ok"
+OFFLINE_FLAG="/tmp/susieq_offline_notified"
+NOW=$(date +%s)
+
+# Yölepo-suojaus: jos modeemi käynnistynyt alle 10 min sitten, nollataan
+# aikaleima hiljaa — ei lähetetä väärää offline-hälytystä herätyksen jälkeen
+UPTIME_S=$(awk '{print int($1)}' /proc/uptime)
+if [ "$UPTIME_S" -lt 600 ]; then
+    echo "$NOW" > "$LAST_OK_FILE"
+    rm -f "$OFFLINE_FLAG"
+    exit 0
+fi
 
 # ── 1. Hae sensordata cockpitilta ────────────────────────────────────
 DATA=$(curl -sf --connect-timeout 5 --max-time 10 "$COCKPIT_URL")
 if [ $? -ne 0 ] || [ -z "$DATA" ]; then
     logger -t susieq-sensors "ERROR: ei yhteyttä cockpittiin (192.168.8.100)"
+    LAST_OK=$(cat "$LAST_OK_FILE" 2>/dev/null || echo "$NOW")
+    ELAPSED=$((NOW - LAST_OK))
+    if [ "$ELAPSED" -gt 300 ] && [ ! -f "$OFFLINE_FLAG" ]; then
+        curl -sf -H "Priority: high" \
+             -d "SusieQ cockpit offline — ei vastausta ${ELAPSED}s" \
+             "https://ntfy.sh/${NTFY_CHANNEL}"
+        touch "$OFFLINE_FLAG"
+    fi
     exit 1
+fi
+
+# Onnistui — päivitä aikaleima ja ilmoita paluusta jos oltiin offline
+echo "$NOW" > "$LAST_OK_FILE"
+if [ -f "$OFFLINE_FLAG" ]; then
+    curl -sf -H "Priority: default" \
+         -d "SusieQ cockpit takaisin online ✓" \
+         "https://ntfy.sh/${NTFY_CHANNEL}"
+    rm -f "$OFFLINE_FLAG"
 fi
 
 # ── 2. Postaa Supabaseen ─────────────────────────────────────────────
