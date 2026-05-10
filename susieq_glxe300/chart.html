@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>SusieQ — Karttaplotteri</title>
+<link rel="stylesheet" href="/static/leaflet.min.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body, #map {
+  width: 100%; height: 100%;
+  background: #0d1117;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#info {
+  position: fixed;
+  bottom: 24px;
+  left: 16px;
+  z-index: 1000;
+  background: rgba(22, 27, 34, 0.92);
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #e6edf3;
+  min-width: 110px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  transition: opacity 0.3s;
+}
+
+#info.no-fix { opacity: 0.45; }
+
+#info .lbl {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6e7681;
+  margin-bottom: 1px;
+}
+
+#info .sog-val {
+  font-size: 26px;
+  font-weight: 700;
+  color: #f0c04c;
+  line-height: 1.1;
+}
+
+#info .cog-val {
+  font-size: 13px;
+  color: #8b949e;
+  margin-top: 6px;
+}
+
+#btn-clear {
+  position: fixed;
+  bottom: 24px;
+  right: 16px;
+  z-index: 1000;
+  background: rgba(22, 27, 34, 0.88);
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  color: #6e7681;
+  font-size: 13px;
+  padding: 9px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  touch-action: manipulation;
+}
+
+#btn-clear:active { background: #21262d; color: #e6edf3; }
+
+/* Tummennetaan pohjakartta navigoinnin selkeyteen */
+.leaflet-tile-pane { filter: brightness(0.82) contrast(1.08) saturate(0.9); }
+
+/* Leaflet-zoom-kontrollit tummaan teemaan */
+.leaflet-control-zoom a {
+  background: rgba(22, 27, 34, 0.92) !important;
+  color: #e6edf3 !important;
+  border-color: #30363d !important;
+}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="info" class="no-fix">
+  <div class="lbl">Nopeus</div>
+  <div class="sog-val" id="sog">—</div>
+  <div class="cog-val" id="cog">Ei GPS-lukemaa</div>
+</div>
+
+<button id="btn-clear" onclick="clearTrack()">✕ Reitti</button>
+
+<script src="/static/leaflet.min.js"></script>
+<script>
+const HOME = [61.515544, 23.790427];
+
+const map = L.map('map', {
+  zoomControl: true,
+  attributionControl: true,
+  tap: true
+}).setView(HOME, 13);
+
+L.tileLayer('/tiles/osm/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>'
+}).addTo(map);
+
+L.tileLayer('/tiles/seamark/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  opacity: 0.75,
+  attribution: '© <a href="https://openseamap.org">OpenSeaMap</a>'
+}).addTo(map);
+
+const track = L.polyline([], {
+  color: '#4fc3f7',
+  weight: 2.5,
+  opacity: 0.8
+}).addTo(map);
+
+let boatMarker = null;
+let firstFix = true;
+let lastLatLng = null;
+
+function boatIcon(cog) {
+  const rot = Math.round(cog || 0);
+  return L.divIcon({
+    className: '',
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30"
+               viewBox="0 0 22 30"
+               style="transform:rotate(${rot}deg);transform-origin:50% 50%;
+                      filter:drop-shadow(0 0 5px rgba(240,192,76,0.55))">
+             <polygon points="11,2 20,28 11,21 2,28"
+                      fill="#f0c04c" stroke="#161b22" stroke-width="1.5"/>
+           </svg>`,
+    iconSize: [22, 30],
+    iconAnchor: [11, 15]
+  });
+}
+
+function clearTrack() {
+  track.setLatLngs([]);
+  lastLatLng = null;
+}
+
+function updateInfo(gps) {
+  const info = document.getElementById('info');
+  if (!gps || !gps.fix) {
+    info.classList.add('no-fix');
+    document.getElementById('sog').textContent = '—';
+    document.getElementById('cog').textContent = 'Ei GPS-lukemaa';
+    return;
+  }
+  info.classList.remove('no-fix');
+  document.getElementById('sog').textContent =
+    (gps.sog_knots != null ? gps.sog_knots.toFixed(1) : '—') + ' kn';
+  document.getElementById('cog').textContent =
+    'Suunta: ' + (gps.cog_deg != null ? Math.round(gps.cog_deg) + '°' : '—');
+}
+
+function updateBoat(lat, lon, cog) {
+  const pos = [lat, lon];
+  if (!boatMarker) {
+    boatMarker = L.marker(pos, { icon: boatIcon(cog), zIndexOffset: 1000 }).addTo(map);
+  } else {
+    boatMarker.setLatLng(pos);
+    boatMarker.setIcon(boatIcon(cog));
+  }
+
+  if (firstFix) {
+    map.setView(pos, 14);
+    firstFix = false;
+  }
+
+  // Lisää reittiin vain jos liikuttu yli ~5m (0.00005°)
+  const moved = !lastLatLng ||
+    Math.hypot(lastLatLng[0] - lat, lastLatLng[1] - lon) > 0.00005;
+  if (moved) {
+    track.addLatLng(pos);
+    lastLatLng = pos;
+  }
+}
+
+async function pollGPS() {
+  try {
+    const r = await fetch('/gps');
+    if (!r.ok) return;
+    const gps = await r.json();
+    updateInfo(gps);
+    if (gps.fix && gps.lat != null && gps.lon != null) {
+      updateBoat(gps.lat, gps.lon, gps.cog_deg || 0);
+    }
+  } catch (_) { /* palvelin ei vastaa */ }
+}
+
+setInterval(pollGPS, 2000);
+pollGPS();
+</script>
+</body>
+</html>
