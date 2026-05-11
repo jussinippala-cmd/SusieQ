@@ -138,6 +138,12 @@ def _mime(filename: str) -> str:
 class _ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = host or "localhost"
+        self.server_port = port
+
 
 if __name__ == "__main__":
     print(f"SusieQ chart server: http://0.0.0.0:{PORT}/")

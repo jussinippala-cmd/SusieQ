@@ -11,7 +11,7 @@ STOP=10
 
 start_service() {
     procd_open_instance
-    procd_set_param command python3 /usr/bin/susieq-chart-server.py
+    procd_set_param command /usr/bin/python3 /usr/bin/susieq-chart-server.py
     # Käynnistä automaattisesti uudelleen kaatumisen jälkeen
     procd_set_param respawn 3600 5 0
     procd_set_param stdout 1

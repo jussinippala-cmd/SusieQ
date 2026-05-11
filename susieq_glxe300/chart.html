@@ -24,7 +24,7 @@ html, body, #map {
   border-radius: 10px;
   padding: 12px 16px;
   color: #e6edf3;
-  min-width: 110px;
+  min-width: 130px;
   backdrop-filter: blur(8px);
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   transition: opacity 0.3s;
@@ -53,11 +53,69 @@ html, body, #map {
   margin-top: 6px;
 }
 
-#btn-clear {
+#wp-info {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #30363d;
+  display: none;
+}
+
+#wp-info.visible { display: block; }
+
+#wp-info .wp-lbl {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ff6b6b;
+  margin-bottom: 4px;
+}
+
+#wp-info .wp-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #e6edf3;
+  margin-bottom: 2px;
+}
+
+#wp-info .wp-row span:first-child { color: #6e7681; }
+
+/* Minuuttiviiva — ylä-oikea */
+#minline-ctrl {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  background: rgba(22, 27, 34, 0.92);
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #e6edf3;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+#minline-ctrl label { color: #8b949e; cursor: pointer; user-select: none; }
+#minline-ctrl input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #f0c04c; }
+#minline-ctrl input[type=range] { width: 80px; accent-color: #f0c04c; cursor: pointer; }
+#ml-val { color: #f0c04c; font-weight: 600; min-width: 36px; }
+
+/* Napit — ala-oikea */
+#btn-group {
   position: fixed;
   bottom: 24px;
   right: 16px;
   z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ctrl-btn {
   background: rgba(22, 27, 34, 0.88);
   border: 1px solid #30363d;
   border-radius: 8px;
@@ -67,14 +125,16 @@ html, body, #map {
   cursor: pointer;
   backdrop-filter: blur(8px);
   touch-action: manipulation;
+  white-space: nowrap;
+  text-align: center;
 }
 
-#btn-clear:active { background: #21262d; color: #e6edf3; }
+.ctrl-btn:active { background: #21262d; color: #e6edf3; }
+.ctrl-btn.active { border-color: #ff6b6b; color: #ff6b6b; }
+.ctrl-btn.hidden { display: none; }
 
-/* Tummennetaan pohjakartta navigoinnin selkeyteen */
 .leaflet-tile-pane { filter: brightness(0.82) contrast(1.08) saturate(0.9); }
 
-/* Leaflet-zoom-kontrollit tummaan teemaan */
 .leaflet-control-zoom a {
   background: rgba(22, 27, 34, 0.92) !important;
   color: #e6edf3 !important;
@@ -90,62 +150,262 @@ html, body, #map {
   <div class="lbl">Nopeus</div>
   <div class="sog-val" id="sog">—</div>
   <div class="cog-val" id="cog">Ei GPS-lukemaa</div>
+  <div id="wp-info">
+    <div class="wp-lbl">Kohde</div>
+    <div class="wp-row"><span>Suunta</span><span id="wp-brg">—</span></div>
+    <div class="wp-row"><span>Etäisyys</span><span id="wp-dist">—</span></div>
+    <div class="wp-row"><span>ETA</span><span id="wp-eta">—</span></div>
+  </div>
 </div>
 
-<button id="btn-clear" onclick="clearTrack()">✕ Reitti</button>
+<div id="minline-ctrl">
+  <input type="checkbox" id="ml-toggle" checked onchange="onMlToggle()">
+  <label for="ml-toggle">Minuuttiviiva</label>
+  <input type="range" id="ml-slider" min="1" max="60" value="5" oninput="onMlSlider()">
+  <span id="ml-val">5 min</span>
+</div>
+
+<div id="btn-group">
+  <button class="ctrl-btn" id="btn-wp" onclick="toggleWpMode()">📍 WP</button>
+  <button class="ctrl-btn hidden" id="btn-clear-wp" onclick="clearWaypoint()">✕ WP</button>
+  <button class="ctrl-btn" id="btn-center" onclick="centerNow()">🎯 Keskitä</button>
+  <button class="ctrl-btn" id="btn-follow" onclick="toggleFollow()">⊙ Seuraa</button>
+  <button class="ctrl-btn" onclick="clearTrack()">✕ Reitti</button>
+</div>
 
 <script src="/static/leaflet.min.js"></script>
 <script>
 const HOME = [61.515544, 23.790427];
+const TRACK_KEY = 'susieq_track';
+const MAX_PTS = 5000;
 
+// ── Kartta ──────────────────────────────────────────────────────────────────
 const map = L.map('map', {
-  zoomControl: true,
-  attributionControl: true,
-  tap: true
+  zoomControl: true, attributionControl: true, tap: true
 }).setView(HOME, 13);
 
 L.tileLayer('/tiles/osm/{z}/{x}/{y}.png', {
-  maxZoom: 18,
-  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>'
+  maxZoom: 18, attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>'
 }).addTo(map);
 
 L.tileLayer('/tiles/seamark/{z}/{x}/{y}.png', {
-  maxZoom: 18,
-  opacity: 0.75,
+  maxZoom: 18, opacity: 0.75,
   attribution: '© <a href="https://openseamap.org">OpenSeaMap</a>'
 }).addTo(map);
 
-const track = L.polyline([], {
-  color: '#4fc3f7',
-  weight: 2.5,
-  opacity: 0.8
-}).addTo(map);
-
-let boatMarker = null;
-let firstFix = true;
+// ── Track + localStorage ─────────────────────────────────────────────────────
+const track = L.polyline([], { color: '#4fc3f7', weight: 2.5, opacity: 0.8 }).addTo(map);
 let lastLatLng = null;
+let firstFix = true;
 
-function boatIcon(cog) {
-  const rot = Math.round(cog || 0);
-  return L.divIcon({
-    className: '',
-    html: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30"
-               viewBox="0 0 22 30"
-               style="transform:rotate(${rot}deg);transform-origin:50% 50%;
-                      filter:drop-shadow(0 0 5px rgba(240,192,76,0.55))">
-             <polygon points="11,2 20,28 11,21 2,28"
-                      fill="#f0c04c" stroke="#161b22" stroke-width="1.5"/>
-           </svg>`,
-    iconSize: [22, 30],
-    iconAnchor: [11, 15]
-  });
+(function loadTrack() {
+  try {
+    const saved = localStorage.getItem(TRACK_KEY);
+    if (!saved) return;
+    const pts = JSON.parse(saved);
+    if (pts.length) { track.setLatLngs(pts); lastLatLng = pts[pts.length - 1]; }
+  } catch(e) { localStorage.removeItem(TRACK_KEY); }
+})();
+
+function saveTrack() {
+  const pts = track.getLatLngs();
+  if (!pts.length) { localStorage.removeItem(TRACK_KEY); return; }
+  try {
+    localStorage.setItem(TRACK_KEY,
+      JSON.stringify(pts.slice(-MAX_PTS).map(p => [p.lat, p.lng])));
+  } catch(e) {}
 }
+
+setInterval(saveTrack, 30000);
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden') saveTrack();
+});
 
 function clearTrack() {
   track.setLatLngs([]);
   lastLatLng = null;
+  localStorage.removeItem(TRACK_KEY);
 }
 
+// ── Veneen markeri ───────────────────────────────────────────────────────────
+let boatMarker = null;
+
+function boatIcon(cog) {
+  const r = Math.round(cog || 0);
+  return L.divIcon({
+    className: '',
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30" viewBox="0 0 22 30"
+               style="transform:rotate(${r}deg);transform-origin:50% 50%;
+                      filter:drop-shadow(0 0 5px rgba(240,192,76,0.55))">
+             <polygon points="11,2 20,28 11,21 2,28" fill="#f0c04c" stroke="#161b22" stroke-width="1.5"/>
+           </svg>`,
+    iconSize: [22, 30], iconAnchor: [11, 15]
+  });
+}
+
+function updateBoat(lat, lon, cog) {
+  const pos = [lat, lon];
+  if (!boatMarker) {
+    boatMarker = L.marker(pos, { icon: boatIcon(cog), zIndexOffset: 1000 }).addTo(map);
+  } else {
+    boatMarker.setLatLng(pos);
+    boatMarker.setIcon(boatIcon(cog));
+  }
+  currentPos = pos;
+  if (firstFix) { map.setView(pos, 14); firstFix = false; }
+  else if (autoFollow && Date.now() - lastInteraction > FOLLOW_DELAY) {
+    map.setView(pos, map.getZoom());
+  }
+  const moved = !lastLatLng ||
+    Math.hypot(lastLatLng[0] - lat, lastLatLng[1] - lon) > 0.00005;
+  if (moved) { track.addLatLng(pos); lastLatLng = pos; }
+}
+
+// ── Minuuttiviiva ────────────────────────────────────────────────────────────
+let minuteLine = null;
+let mlEnabled = true;
+let mlMinutes = 5;
+
+function onMlToggle() {
+  mlEnabled = document.getElementById('ml-toggle').checked;
+  if (!mlEnabled && minuteLine) { minuteLine.remove(); minuteLine = null; }
+}
+
+function onMlSlider() {
+  mlMinutes = +document.getElementById('ml-slider').value;
+  document.getElementById('ml-val').textContent = mlMinutes + ' min';
+}
+
+function projectPos(lat, lon, cogDeg, sogKn, mins) {
+  const d = sogKn * mins / 60 * 1852;
+  const cr = cogDeg * Math.PI / 180;
+  const lr = lat * Math.PI / 180;
+  return [lat + d * Math.cos(cr) / 111320,
+          lon + d * Math.sin(cr) / (111320 * Math.cos(lr))];
+}
+
+function updateMinuteLine(lat, lon, cog, sog) {
+  if (!mlEnabled || sog < 0.2) {
+    if (minuteLine) { minuteLine.remove(); minuteLine = null; }
+    return;
+  }
+  const end = projectPos(lat, lon, cog, sog, mlMinutes);
+  if (!minuteLine) {
+    minuteLine = L.polyline([[lat, lon], end], {
+      color: '#f0c04c', weight: 2, opacity: 0.85, dashArray: '8 5'
+    }).addTo(map);
+  } else {
+    minuteLine.setLatLngs([[lat, lon], end]);
+  }
+}
+
+// ── Keskitä / Seuraa ─────────────────────────────────────────────────────────
+let autoFollow = false;
+let lastInteraction = 0;
+let currentPos = null;
+const FOLLOW_DELAY = 20000;
+
+map.on('dragstart zoomstart', function() {
+  lastInteraction = Date.now();
+});
+
+function centerNow() {
+  if (!currentPos) return;
+  map.setView(currentPos, map.getZoom());
+  lastInteraction = 0;
+}
+
+function toggleFollow() {
+  autoFollow = !autoFollow;
+  document.getElementById('btn-follow').classList.toggle('active', autoFollow);
+  document.getElementById('btn-follow').textContent = autoFollow ? '⊙ Seuraa ✓' : '⊙ Seuraa';
+  if (autoFollow && currentPos) centerNow();
+}
+
+// ── Waypoint ─────────────────────────────────────────────────────────────────
+let wpMarker = null, wpLine = null, wpLatLng = null, wpMode = false;
+
+function toggleWpMode() {
+  wpMode = !wpMode;
+  const btn = document.getElementById('btn-wp');
+  btn.classList.toggle('active', wpMode);
+  btn.textContent = wpMode ? '📍 Napauta karttaa' : '📍 WP';
+}
+
+map.on('click', function(e) {
+  if (!wpMode) return;
+  setWaypoint(e.latlng.lat, e.latlng.lng);
+  wpMode = false;
+  document.getElementById('btn-wp').classList.remove('active');
+  document.getElementById('btn-wp').textContent = '📍 WP';
+  document.getElementById('btn-clear-wp').classList.remove('hidden');
+});
+
+function setWaypoint(lat, lon) {
+  wpLatLng = [lat, lon];
+  if (wpMarker) wpMarker.remove();
+  wpMarker = L.marker([lat, lon], {
+    icon: L.divIcon({
+      className: '',
+      html: `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+               <circle cx="14" cy="14" r="10" fill="none" stroke="#ff6b6b" stroke-width="2.5"/>
+               <line x1="14" y1="4" x2="14" y2="24" stroke="#ff6b6b" stroke-width="1.5"/>
+               <line x1="4" y1="14" x2="24" y2="14" stroke="#ff6b6b" stroke-width="1.5"/>
+             </svg>`,
+      iconSize: [28, 28], iconAnchor: [14, 14]
+    }), zIndexOffset: 900
+  }).addTo(map);
+}
+
+function clearWaypoint() {
+  if (wpMarker) { wpMarker.remove(); wpMarker = null; }
+  if (wpLine) { wpLine.remove(); wpLine = null; }
+  wpLatLng = null;
+  document.getElementById('btn-clear-wp').classList.add('hidden');
+  document.getElementById('wp-info').classList.remove('visible');
+}
+
+function updateWpLine(lat, lon) {
+  if (!wpLatLng) { if (wpLine) { wpLine.remove(); wpLine = null; } return; }
+  if (!wpLine) {
+    wpLine = L.polyline([[lat, lon], wpLatLng], {
+      color: '#ff6b6b', weight: 1.5, opacity: 0.7, dashArray: '5 5'
+    }).addTo(map);
+  } else {
+    wpLine.setLatLngs([[lat, lon], wpLatLng]);
+  }
+}
+
+function bearing(lat1, lon1, lat2, lon2) {
+  const dL = (lon2 - lon1) * Math.PI / 180;
+  const l1 = lat1 * Math.PI / 180, l2 = lat2 * Math.PI / 180;
+  return (Math.atan2(Math.sin(dL) * Math.cos(l2),
+    Math.cos(l1) * Math.sin(l2) - Math.sin(l1) * Math.cos(l2) * Math.cos(dL))
+    * 180 / Math.PI + 360) % 360;
+}
+
+function distNm(lat1, lon1, lat2, lon2) {
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return 3440.065 * 2 * Math.asin(Math.sqrt(a));
+}
+
+function updateWpInfo(lat, lon, sog) {
+  if (!wpLatLng) { document.getElementById('wp-info').classList.remove('visible'); return; }
+  const brg = bearing(lat, lon, wpLatLng[0], wpLatLng[1]);
+  const dist = distNm(lat, lon, wpLatLng[0], wpLatLng[1]);
+  const etaMin = sog > 0.2 ? dist / sog * 60 : null;
+  document.getElementById('wp-brg').textContent = Math.round(brg) + '°';
+  document.getElementById('wp-dist').textContent = dist.toFixed(2) + ' nm';
+  document.getElementById('wp-eta').textContent = etaMin
+    ? (etaMin < 60 ? Math.round(etaMin) + ' min' : (etaMin / 60).toFixed(1) + ' h')
+    : '—';
+  document.getElementById('wp-info').classList.add('visible');
+}
+
+// ── Info ─────────────────────────────────────────────────────────────────────
 function updateInfo(gps) {
   const info = document.getElementById('info');
   if (!gps || !gps.fix) {
@@ -161,29 +421,7 @@ function updateInfo(gps) {
     'Suunta: ' + (gps.cog_deg != null ? Math.round(gps.cog_deg) + '°' : '—');
 }
 
-function updateBoat(lat, lon, cog) {
-  const pos = [lat, lon];
-  if (!boatMarker) {
-    boatMarker = L.marker(pos, { icon: boatIcon(cog), zIndexOffset: 1000 }).addTo(map);
-  } else {
-    boatMarker.setLatLng(pos);
-    boatMarker.setIcon(boatIcon(cog));
-  }
-
-  if (firstFix) {
-    map.setView(pos, 14);
-    firstFix = false;
-  }
-
-  // Lisää reittiin vain jos liikuttu yli ~5m (0.00005°)
-  const moved = !lastLatLng ||
-    Math.hypot(lastLatLng[0] - lat, lastLatLng[1] - lon) > 0.00005;
-  if (moved) {
-    track.addLatLng(pos);
-    lastLatLng = pos;
-  }
-}
-
+// ── GPS poll ─────────────────────────────────────────────────────────────────
 async function pollGPS() {
   try {
     const r = await fetch('/gps');
@@ -191,9 +429,14 @@ async function pollGPS() {
     const gps = await r.json();
     updateInfo(gps);
     if (gps.fix && gps.lat != null && gps.lon != null) {
-      updateBoat(gps.lat, gps.lon, gps.cog_deg || 0);
+      const { lat, lon } = gps;
+      const cog = gps.cog_deg || 0, sog = gps.sog_knots || 0;
+      updateBoat(lat, lon, cog);
+      updateMinuteLine(lat, lon, cog, sog);
+      updateWpLine(lat, lon);
+      updateWpInfo(lat, lon, sog);
     }
-  } catch (_) { /* palvelin ei vastaa */ }
+  } catch (_) {}
 }
 
 setInterval(pollGPS, 2000);
