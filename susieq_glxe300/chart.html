@@ -19,7 +19,7 @@ html, body, #map {
   bottom: 24px;
   left: 16px;
   z-index: 1000;
-  background: rgba(22, 27, 34, 0.92);
+  background: rgba(22, 27, 34, 0.82);
   border: 1px solid #30363d;
   border-radius: 10px;
   padding: 12px 16px;
@@ -82,7 +82,7 @@ html, body, #map {
 
 /* Zoom — ylä-vasen (sijainti #top-left:n kautta) */
 #zoom-display {
-  background: rgba(22, 27, 34, 0.5);
+  background: rgba(22, 27, 34, 0.82);
   border: 1px solid #30363d;
   border-radius: 8px;
   padding: 7px 12px;
@@ -142,7 +142,7 @@ html, body, #map {
 /* Pysyvät napit ala-oikea */
 #persistent-btns {
   position: fixed; bottom: 24px; right: 16px;
-  z-index: 1001; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  z-index: 1001; display: flex; flex-direction: row; align-items: center; gap: 8px;
 }
 
 /* Asetuspaneeli */
@@ -153,7 +153,7 @@ html, body, #map {
 #settings-panel.open { display: block; }
 
 .settings-card {
-  background: rgba(22, 27, 34, 0.92); border: 1px solid #30363d;
+  background: rgba(22, 27, 34, 0.82); border: 1px solid #30363d;
   border-radius: 12px; padding: 12px 14px;
   backdrop-filter: blur(8px); box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   display: flex; flex-direction: column; gap: 10px; min-width: 210px;
@@ -261,10 +261,6 @@ html, body, #map {
         <span class="btn-lbl">Poista</span>
       </div>
       <div class="btn-labeled">
-        <button class="ctrl-btn" id="btn-depth" onclick="toggleDepth()">⚓</button>
-        <span class="btn-lbl">Syvyys</span>
-      </div>
-      <div class="btn-labeled">
         <button class="ctrl-btn" onclick="clearTrack()">🗑</button>
         <span class="btn-lbl">Reitti</span>
       </div>
@@ -304,6 +300,7 @@ html, body, #map {
 
 <div id="persistent-btns">
   <button class="ctrl-btn" id="btn-center" onclick="centerNow()">🎯</button>
+  <button class="ctrl-btn" id="btn-depth" onclick="toggleDepth()">⚓</button>
   <button class="ctrl-btn" id="btn-settings" onclick="toggleSettings()">⚙</button>
 </div>
 
@@ -496,6 +493,15 @@ function toggleSettings() {
 function closeSettings() {
   document.getElementById('settings-panel').classList.remove('open');
 }
+
+document.addEventListener('pointerdown', function(e) {
+  const panel = document.getElementById('settings-panel');
+  const btn = document.getElementById('btn-settings');
+  if (panel.classList.contains('open') &&
+      !panel.contains(e.target) && !btn.contains(e.target)) {
+    closeSettings();
+  }
+});
 
 function toggleWpMode() {
   wpMode = !wpMode;
