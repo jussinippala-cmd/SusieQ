@@ -80,12 +80,8 @@ html, body, #map {
 
 #wp-info .wp-row span:first-child { color: #6e7681; }
 
-/* Zoom — ylä-vasen */
+/* Zoom — ylä-vasen (sijainti #top-left:n kautta) */
 #zoom-display {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 1000;
   background: rgba(22, 27, 34, 0.5);
   border: 1px solid #30363d;
   border-radius: 8px;
@@ -97,50 +93,89 @@ html, body, #map {
 }
 #zoom-display span { color: #e6edf3; font-weight: 600; }
 
-/* Minuuttiviiva — ylä-oikea */
-#minline-ctrl {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 1000;
-  background: rgba(22, 27, 34, 0.5);
-  border: 1px solid #30363d;
-  border-radius: 10px;
-  padding: 8px 12px;
-  color: #e6edf3;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-#ml-val {
-  color: #f0c04c; font-weight: 600; min-width: 34px; text-align: center;
-  cursor: pointer; user-select: none;
-}
-#ml-val.off { color: #6e7681; }
 .ml-btn {
-  background: none; border: 1px solid #30363d; border-radius: 5px;
-  color: #e6edf3; font-size: 15px; width: 26px; height: 26px;
+  background: rgba(22, 27, 34, 0.82); border: 1px solid #30363d; border-radius: 5px;
+  color: #e6edf3; font-size: 15px; width: 28px; height: 28px;
   cursor: pointer; padding: 0; line-height: 1; touch-action: manipulation;
+  display: flex; align-items: center; justify-content: center;
 }
 .ml-btn:active { background: #21262d; }
 
-/* Napit — ala-oikea */
-#btn-group {
-  position: fixed;
-  bottom: 24px;
-  right: 16px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* Nappi + alusteksti */
+.btn-labeled {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.btn-lbl {
+  font-size: 9px; color: #6e7681;
+  text-transform: uppercase; letter-spacing: 0.06em; user-select: none;
+}
+
+/* Toggle-kytkin */
+.toggle-switch {
+  width: 46px; height: 26px; background: #30363d;
+  border-radius: 13px; position: relative; cursor: pointer;
+  transition: background 0.2s; flex-shrink: 0; border: 1px solid #484f58;
+}
+.toggle-switch.on { background: #1f6feb; border-color: #388bfd; }
+.toggle-knob {
+  width: 20px; height: 20px; background: #6e7681;
+  border-radius: 50%; position: absolute; top: 2px; left: 2px;
+  transition: left 0.2s, background 0.2s; pointer-events: none;
+}
+.toggle-switch.on .toggle-knob { left: 22px; background: #fff; }
+
+/* Asetus-rivi (label + toggle) */
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.setting-lbl { font-size: 13px; color: #e6edf3; user-select: none; }
+
+/* Arvorivi (− val +) */
+.val-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; margin-top: 4px;
+}
+#ml-val, #alert-val {
+  color: #f0c04c; font-weight: 600; min-width: 40px; text-align: center; font-size: 13px;
+}
+
+/* Pysyvät napit ala-oikea */
+#persistent-btns {
+  position: fixed; bottom: 24px; right: 16px;
+  z-index: 1001; display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+
+/* Asetuspaneeli */
+#settings-panel {
+  position: fixed; bottom: 100px; right: 16px;
+  z-index: 1000; display: none;
+}
+#settings-panel.open { display: block; }
+
+.settings-card {
+  background: rgba(22, 27, 34, 0.92); border: 1px solid #30363d;
+  border-radius: 12px; padding: 12px 14px;
+  backdrop-filter: blur(8px); box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  display: flex; flex-direction: column; gap: 10px; min-width: 210px;
+}
+
+.action-row { display: flex; flex-direction: row; gap: 12px; justify-content: center; }
+
+.settings-sep { height: 1px; background: #30363d; }
+
+/* WP-tila vihje */
+#wp-hint {
+  display: none;
+  position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+  z-index: 2000;
+  background: rgba(255,107,107,0.92); color: #fff;
+  padding: 7px 16px; border-radius: 8px; font-size: 13px;
+  white-space: nowrap; pointer-events: none;
+  backdrop-filter: blur(4px);
 }
 
 .ctrl-btn {
-  background: rgba(22, 27, 34, 0.5);
+  background: rgba(22, 27, 34, 0.82);
   border: 1px solid #30363d;
   border-radius: 8px;
   color: #6e7681;
@@ -157,10 +192,37 @@ html, body, #map {
 .ctrl-btn:active { background: #21262d; color: #e6edf3; }
 .ctrl-btn.active { border-color: #ff6b6b; color: #ff6b6b; }
 .ctrl-btn.out-of-range { border-color: #ff6b6b; color: #ff6b6b; opacity: 0.5; }
+.ctrl-btn.disabled { opacity: 0.35; }
 .ctrl-btn.hidden { display: none; }
 
 .leaflet-tile-pane { filter: brightness(0.82) contrast(1.08) saturate(0.9); }
 
+/* Karilleajovaroitus */
+#grounding-alert {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 3000;
+  background: #ff6b6b;
+  color: #fff;
+  text-align: center;
+  padding: 14px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  animation: gpulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes gpulse { from { opacity: 0.75; } to { opacity: 1; } }
+
+/* Ylä-vasen ryhmä */
+#top-left {
+  position: fixed;
+  top: 16px; left: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 </style>
 </head>
 <body>
@@ -179,21 +241,70 @@ html, body, #map {
   </div>
 </div>
 
-<div id="zoom-display">Z:<span id="zoom-val">13</span></div>
+<div id="grounding-alert">⚠ Karilleajovaara</div>
 
-<div id="minline-ctrl">
-  <button class="ml-btn" onclick="changeMl(-1)">−</button>
-  <span id="ml-val" onclick="onMlToggle()">5 min</span>
-  <button class="ml-btn" onclick="changeMl(1)">+</button>
+<div id="top-left">
+  <div id="zoom-display">Z:<span id="zoom-val">13</span></div>
 </div>
 
-<div id="btn-group">
-  <button class="ctrl-btn" id="btn-wp" onclick="toggleWpMode()">📍</button>
-  <button class="ctrl-btn hidden" id="btn-clear-wp" onclick="clearWaypoint()">✕</button>
+<div id="wp-hint">📍 Napauta karttaa</div>
+
+<div id="settings-panel">
+  <div class="settings-card">
+    <div class="action-row">
+      <div class="btn-labeled">
+        <button class="ctrl-btn" id="btn-wp" onclick="toggleWpMode()">📍</button>
+        <span class="btn-lbl">Kohde</span>
+      </div>
+      <div class="btn-labeled" id="btn-clear-wp-wrap" style="visibility:hidden">
+        <button class="ctrl-btn" id="btn-clear-wp" onclick="clearWaypoint()">✕</button>
+        <span class="btn-lbl">Poista</span>
+      </div>
+      <div class="btn-labeled">
+        <button class="ctrl-btn" id="btn-depth" onclick="toggleDepth()">⚓</button>
+        <span class="btn-lbl">Syvyys</span>
+      </div>
+      <div class="btn-labeled">
+        <button class="ctrl-btn" onclick="clearTrack()">🗑</button>
+        <span class="btn-lbl">Reitti</span>
+      </div>
+    </div>
+    <div class="settings-sep"></div>
+    <div class="setting-row">
+      <span class="setting-lbl">Seuraa</span>
+      <div class="toggle-switch" id="toggle-follow" onclick="toggleFollow()"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="settings-sep"></div>
+    <div class="setting-row">
+      <span class="setting-lbl">Minuuttiviiva</span>
+      <div class="toggle-switch on" id="toggle-ml" onclick="onMlToggle()"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="val-row">
+      <button class="ml-btn" onclick="changeMl(-1)">−</button>
+      <span id="ml-val">5 min</span>
+      <button class="ml-btn" onclick="changeMl(1)">+</button>
+    </div>
+    <div class="settings-sep"></div>
+    <div class="setting-row">
+      <span class="setting-lbl">Ääni</span>
+      <div class="toggle-switch" id="toggle-sound" onclick="toggleSound()"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="settings-sep"></div>
+    <div class="setting-row">
+      <span class="setting-lbl">Hälytys</span>
+      <div class="toggle-switch on" id="toggle-alert" onclick="toggleAlertEnabled()"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="val-row">
+      <button class="ml-btn" onclick="changeAlertMin(-1)">−</button>
+      <span id="alert-val">5 min</span>
+      <button class="ml-btn" onclick="changeAlertMin(1)">+</button>
+    </div>
+  </div>
+</div>
+
+<div id="persistent-btns">
   <button class="ctrl-btn" id="btn-center" onclick="centerNow()">🎯</button>
-  <button class="ctrl-btn" id="btn-follow" onclick="toggleFollow()">⊙</button>
-  <button class="ctrl-btn" id="btn-depth" onclick="toggleDepth()">⚓</button>
-  <button class="ctrl-btn" onclick="clearTrack()">🗑</button>
+  <button class="ctrl-btn" id="btn-settings" onclick="toggleSettings()">⚙</button>
 </div>
 
 <script src="/static/leaflet.min.js"></script>
@@ -256,6 +367,7 @@ function clearTrack() {
   track.setLatLngs([]);
   lastLatLng = null;
   localStorage.removeItem(TRACK_KEY);
+  closeSettings();
 }
 
 // ── Veneen markeri ───────────────────────────────────────────────────────────
@@ -300,7 +412,7 @@ let mlMinutes = 5;
 function onMlToggle() {
   mlEnabled = !mlEnabled;
   if (!mlEnabled && minuteLine) { minuteLine.remove(); minuteLine = null; }
-  document.getElementById('ml-val').classList.toggle('off', !mlEnabled);
+  document.getElementById('toggle-ml').classList.toggle('on', mlEnabled);
 }
 
 function changeMl(delta) {
@@ -349,7 +461,7 @@ function centerNow() {
 
 function toggleFollow() {
   autoFollow = !autoFollow;
-  document.getElementById('btn-follow').classList.toggle('active', autoFollow);
+  document.getElementById('toggle-follow').classList.toggle('on', autoFollow);
   if (autoFollow && currentPos) centerNow();
 }
 
@@ -378,9 +490,18 @@ function updateDepthBtnState() {
 // ── Waypoint ─────────────────────────────────────────────────────────────────
 let wpMarker = null, wpLine = null, wpLatLng = null, wpMode = false;
 
+function toggleSettings() {
+  document.getElementById('settings-panel').classList.toggle('open');
+}
+function closeSettings() {
+  document.getElementById('settings-panel').classList.remove('open');
+}
+
 function toggleWpMode() {
   wpMode = !wpMode;
   document.getElementById('btn-wp').classList.toggle('active', wpMode);
+  document.getElementById('wp-hint').style.display = wpMode ? 'block' : 'none';
+  if (wpMode) closeSettings();
 }
 
 let _tapCount = 0, _tapTimer = null;
@@ -389,7 +510,8 @@ map.on('click', function(e) {
     setWaypoint(e.latlng.lat, e.latlng.lng);
     wpMode = false;
     document.getElementById('btn-wp').classList.remove('active');
-    document.getElementById('btn-clear-wp').classList.remove('hidden');
+    document.getElementById('wp-hint').style.display = 'none';
+    document.getElementById('btn-clear-wp-wrap').style.visibility = 'visible';
     return;
   }
   _tapCount++;
@@ -421,7 +543,7 @@ function clearWaypoint() {
   if (wpMarker) { wpMarker.remove(); wpMarker = null; }
   if (wpLine) { wpLine.remove(); wpLine = null; }
   wpLatLng = null;
-  document.getElementById('btn-clear-wp').classList.add('hidden');
+  document.getElementById('btn-clear-wp-wrap').style.visibility = 'hidden';
   document.getElementById('wp-info').classList.remove('visible');
 }
 
@@ -495,6 +617,12 @@ async function pollGPS() {
       updateMinuteLine(lat, lon, cog, sog);
       updateWpLine(lat, lon);
       updateWpInfo(lat, lon, sog);
+      if (sog > 0.5 && alertEnabled) {
+        const [pLat, pLon] = projectPos(lat, lon, cog, sog, alertMinutes);
+        showGroundingAlert(!inLake(pLat, pLon));
+      } else {
+        showGroundingAlert(false);
+      }
     }
   } catch (_) {}
 }
@@ -507,6 +635,88 @@ map.on('zoomend', function() {
   updateDepthBtnState();
 });
 updateDepthBtnState();
+
+// ── Karilleajovaroitus ───────────────────────────────────────────────────────
+let lakeRings = [];
+let groundingActive = false;
+let alertEnabled = true;
+let alertMinutes = 5;
+
+function toggleAlertEnabled() {
+  alertEnabled = !alertEnabled;
+  document.getElementById('toggle-alert').classList.toggle('on', alertEnabled);
+  if (!alertEnabled) showGroundingAlert(false);
+}
+
+function changeAlertMin(delta) {
+  alertMinutes = Math.min(10, Math.max(1, alertMinutes + delta));
+  document.getElementById('alert-val').textContent = alertMinutes + ' min';
+}
+
+fetch('/static/nasijärvi.geojson')
+  .then(r => r.json())
+  .then(gj => {
+    for (const feat of gj.features) {
+      const geom = feat.geometry;
+      const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
+      for (const poly of polys) {
+        const outer = poly[0].map(c => [c[1], c[0]]);
+        const holes = poly.slice(1).map(h => h.map(c => [c[1], c[0]]));
+        lakeRings.push({ outer, holes });
+      }
+    }
+  })
+  .catch(() => {});
+
+function pointInRing(lat, lon, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [lati, loni] = ring[i], [latj, lonj] = ring[j];
+    if ((loni > lon) !== (lonj > lon) &&
+        lat < (latj - lati) * (lon - loni) / (lonj - loni) + lati)
+      inside = !inside;
+  }
+  return inside;
+}
+
+function inLake(lat, lon) {
+  if (!lakeRings.length) return true;
+  for (const { outer, holes } of lakeRings) {
+    if (!pointInRing(lat, lon, outer)) continue;
+    if (holes.some(h => pointInRing(lat, lon, h))) continue;
+    return true;
+  }
+  return false;
+}
+
+function showGroundingAlert(danger) {
+  if (danger === groundingActive) return;
+  groundingActive = danger;
+  document.getElementById('grounding-alert').style.display = danger ? 'block' : 'none';
+  if (danger) playBeep();
+}
+
+// ── Hälytysääni ──────────────────────────────────────────────────────────────
+let audioCtx = null;
+let soundEnabled = false;
+
+function toggleSound() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  soundEnabled = !soundEnabled;
+  document.getElementById('toggle-sound').classList.toggle('on', soundEnabled);
+}
+
+function playBeep() {
+  if (!audioCtx || !soundEnabled) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.frequency.value = 880;
+  gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+}
 </script>
 </body>
 </html>

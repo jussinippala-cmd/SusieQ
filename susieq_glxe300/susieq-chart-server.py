@@ -154,8 +154,9 @@ def _mime(filename: str) -> str:
         "html": "text/html; charset=utf-8",
         "js":   "application/javascript",
         "css":  "text/css",
-        "png":  "image/png",
-        "ico":  "image/x-icon",
+        "png":     "image/png",
+        "ico":     "image/x-icon",
+        "geojson": "application/json",
     }.get(ext, "application/octet-stream")
 
 
