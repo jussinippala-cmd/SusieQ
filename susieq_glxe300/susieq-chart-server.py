@@ -3,6 +3,7 @@
 # Asennus: /usr/bin/susieq-chart-server.py
 # Käynnistys: /etc/init.d/susieq-chart start
 
+import collections
 import json
 import socketserver
 import threading
@@ -27,6 +28,24 @@ UA = {"User-Agent": "SusieQ-ChartProxy/1.0 (+github.com/jussinippala-cmd/susieq-
 
 _gps: dict = {}
 _gps_lock = threading.Lock()
+
+_tile_mem: collections.OrderedDict = collections.OrderedDict()
+_tile_mem_lock = threading.Lock()
+TILE_MEM_MAX = 1000
+
+def _tile_mem_get(key: str) -> "bytes | None":
+    with _tile_mem_lock:
+        if key in _tile_mem:
+            _tile_mem.move_to_end(key)
+            return _tile_mem[key]
+    return None
+
+def _tile_mem_put(key: str, data: bytes) -> None:
+    with _tile_mem_lock:
+        _tile_mem[key] = data
+        _tile_mem.move_to_end(key)
+        if len(_tile_mem) > TILE_MEM_MAX:
+            _tile_mem.popitem(last=False)
 
 
 def _poll_gps() -> None:
@@ -93,25 +112,29 @@ class ChartHandler(BaseHTTPRequestHandler):
             return
 
         cache_file = TILE_CACHE / source / z / x / f"{y}.png"
+        mem_key = f"{source}/{z}/{x}/{y}"
 
-        if cache_file.exists():
-            data = cache_file.read_bytes()
-        else:
-            url = TILE_SOURCES[source].format(z=z, x=x, y=y)
-            try:
-                req = urllib.request.Request(url, headers=UA)
-                with urllib.request.urlopen(req, timeout=8) as resp:
-                    data = resp.read()
-                cache_file.parent.mkdir(parents=True, exist_ok=True)
-                cache_file.write_bytes(data)
-            except Exception:
-                self.send_error(503)
-                return
+        data = _tile_mem_get(mem_key)
+        if data is None:
+            if cache_file.exists():
+                data = cache_file.read_bytes()
+            else:
+                url = TILE_SOURCES[source].format(z=z, x=x, y=y)
+                try:
+                    req = urllib.request.Request(url, headers=UA)
+                    with urllib.request.urlopen(req, timeout=8) as resp:
+                        data = resp.read()
+                    cache_file.parent.mkdir(parents=True, exist_ok=True)
+                    cache_file.write_bytes(data)
+                except Exception:
+                    self.send_error(503)
+                    return
+            _tile_mem_put(mem_key, data)
 
         self.send_response(200)
         self.send_header("Content-Type", "image/png")
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "public, max-age=86400")
+        self.send_header("Cache-Control", "public, max-age=604800")
         self.end_headers()
         self.wfile.write(data)
 
