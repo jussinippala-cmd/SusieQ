@@ -131,6 +131,7 @@ html, body, #map {
 
 .ctrl-btn:active { background: #21262d; color: #e6edf3; }
 .ctrl-btn.active { border-color: #ff6b6b; color: #ff6b6b; }
+.ctrl-btn.out-of-range { border-color: #ff6b6b; color: #ff6b6b; opacity: 0.5; }
 .ctrl-btn.hidden { display: none; }
 
 .leaflet-tile-pane { filter: brightness(0.82) contrast(1.08) saturate(0.9); }
@@ -163,6 +164,7 @@ html, body, #map {
   <label for="ml-toggle">Minuuttiviiva</label>
   <input type="range" id="ml-slider" min="1" max="60" value="5" oninput="onMlSlider()">
   <span id="ml-val">5 min</span>
+  <span style="color:#6e7681;margin-left:4px;">Z:<span id="zoom-val">13</span></span>
 </div>
 
 <div id="btn-group">
@@ -170,6 +172,7 @@ html, body, #map {
   <button class="ctrl-btn hidden" id="btn-clear-wp" onclick="clearWaypoint()">✕ WP</button>
   <button class="ctrl-btn" id="btn-center" onclick="centerNow()">🎯 Keskitä</button>
   <button class="ctrl-btn" id="btn-follow" onclick="toggleFollow()">⊙ Seuraa</button>
+  <button class="ctrl-btn" id="btn-depth" onclick="toggleDepth()">⚓ Syvyys</button>
   <button class="ctrl-btn" onclick="clearTrack()">✕ Reitti</button>
 </div>
 
@@ -192,6 +195,13 @@ L.tileLayer('/tiles/seamark/{z}/{x}/{y}.png', {
   maxZoom: 18, opacity: 0.75,
   attribution: '© <a href="https://openseamap.org">OpenSeaMap</a>'
 }).addTo(map);
+
+// Merikarttasarja N — syvyysdata (Traficom WMTS, zoom 10-15)
+const depthLayer = L.tileLayer('/tiles/merik/{z}/{x}/{y}.png', {
+  minZoom: 10, maxZoom: 15, opacity: 0.9,
+  attribution: '© <a href="https://traficom.fi">Traficom</a>'
+});
+let depthVisible = false;
 
 // ── Track + localStorage ─────────────────────────────────────────────────────
 const track = L.polyline([], { color: '#4fc3f7', weight: 2.5, opacity: 0.8 }).addTo(map);
@@ -322,6 +332,24 @@ function toggleFollow() {
   if (autoFollow && currentPos) centerNow();
 }
 
+function toggleDepth() {
+  depthVisible = !depthVisible;
+  if (depthVisible) depthLayer.addTo(map);
+  else depthLayer.remove();
+  document.getElementById('btn-depth').classList.toggle('active', depthVisible);
+  updateDepthBtnState();
+}
+
+function updateDepthBtnState() {
+  const z = map.getZoom();
+  const btn = document.getElementById('btn-depth');
+  const inRange = z >= 10 && z <= 15;
+  btn.classList.toggle('out-of-range', !inRange);
+  btn.textContent = inRange
+    ? (depthVisible ? '⚓ Syvyys ✓' : '⚓ Syvyys')
+    : '⚓ Syvyys ✕';
+}
+
 // ── Waypoint ─────────────────────────────────────────────────────────────────
 let wpMarker = null, wpLine = null, wpLatLng = null, wpMode = false;
 
@@ -441,6 +469,12 @@ async function pollGPS() {
 
 setInterval(pollGPS, 2000);
 pollGPS();
+
+map.on('zoomend', function() {
+  document.getElementById('zoom-val').textContent = map.getZoom();
+  updateDepthBtnState();
+});
+updateDepthBtnState();
 </script>
 </body>
 </html>

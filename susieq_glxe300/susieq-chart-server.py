@@ -21,6 +21,7 @@ ESP32_URL = "http://192.168.8.100/data"
 TILE_SOURCES = {
     "osm":     "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     "seamark": "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png",
+    "merik":   "https://julkinen.traficom.fi/rasteripalvelu/wmts?request=GetTile&version=1.0.0&service=wmts&layer=Traficom:Merikarttasarja%20N&TILEMATRIXSET=WGS84_Pseudo-Mercator&TileMatrix=WGS84_Pseudo-Mercator:{z}&tilerow={y}&tilecol={x}&format=image/png&style=default",
 }
 UA = {"User-Agent": "SusieQ-ChartProxy/1.0 (+github.com/jussinippala-cmd/susieq-remote)"}
 
