@@ -245,6 +245,22 @@ static void setup_routes() {
     );
 
     server.serveStatic("/", LittleFS, "/");
+    server.on("/victron-debug", HTTP_GET, [](AsyncWebServerRequest* req) {
+        VictronDebug d = victron_debug_get();
+        String hex = "";
+        for (int i = 0; i < d.last_pkt_len; i++) {
+            char h[3]; snprintf(h, sizeof(h), "%02X", d.last_pkt[i]);
+            hex += h;
+        }
+        char buf[256];
+        snprintf(buf, sizeof(buf),
+            "{\"ble_seen\":%lu,\"victron_seen\":%lu,\"decrypt_fail\":%lu,\"decrypt_ok\":%lu,\"last_mac\":\"%s\",\"pkt_len\":%u,\"pkt\":\"%s\"}",
+            (unsigned long)d.ble_seen, (unsigned long)d.victron_seen,
+            (unsigned long)d.decrypt_fail, (unsigned long)d.decrypt_ok,
+            d.last_mac, d.last_pkt_len, hex.c_str());
+        req->send(200, "application/json", buf);
+    });
+
     server.onNotFound([](AsyncWebServerRequest* req) {
         req->send(404, "text/plain", "Not found");
     });

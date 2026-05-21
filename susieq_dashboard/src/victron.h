@@ -11,9 +11,20 @@ struct VictronData {
     unsigned long last_seen_ms = 0;
 };
 
+struct VictronDebug {
+    uint32_t ble_seen;
+    uint32_t victron_seen;
+    uint32_t decrypt_fail;
+    uint32_t decrypt_ok;
+    uint8_t  last_pkt[32];
+    uint8_t  last_pkt_len;
+    char     last_mac[18];   // "aa:bb:cc:dd:ee:ff"
+};
+
 // enabled only when VICTRON_KEY is non-empty in config.h
 void victron_init();
-VictronData victron_get();   // returns latest cached data (updated by BLE callback)
+VictronData victron_get();
+VictronDebug victron_debug_get();
 
 // 12V lead-acid/AGM voltage → SOC estimation (used with Victron battery voltage)
 float battery_voltage_to_soc(float v);

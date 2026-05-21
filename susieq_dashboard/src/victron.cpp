@@ -2,22 +2,27 @@
 #include "../include/config.h"
 
 // ─── Victron SmartSolar MPPT BLE Advertisement Parser ─────────────────
-// Victron devices broadcast encrypted "Extra Manufacturer Data" BLE adverts.
-// We use NimBLE-Arduino to scan passively and decode the packets.
+// SmartSolar 75|15 uses AES-128-CTR encryption (NOT CCM).
 //
-// Protocol reference:
-//   https://github.com/keshavdv/victron-ble  (Python reference)
-//   https://github.com/Fabian-Schmidt/esphome-victron_ble (ESPHome port)
+// Packet layout (manufacturer data, company ID 0x02E1):
+//   d[0-1]  company ID
+//   d[2-3]  model ID
+//   d[4]    record type (0x75 = SmartSolar via VE.Direct Bluetooth Dongle)
+//   d[5-6]  constant (0xA0 0x01)
+//   d[7-8]  IV counter (uint16 LE, changes every advertisement)
+//   d[9]    key check byte — must equal key[0]
+//   d[10:]  12-byte AES-CTR-encrypted payload
 //
-// IMPORTANT: You must set VICTRON_KEY in config.h with the 32-char hex
-// encryption key from VictronConnect → Device → Product Info.
+// CTR keystream: AES-ECB(key, {iv_lo, iv_hi, 0x00 × 14})
 //
-// Record IDs we care about (MPPT):
-//   0x01 = Device state (charge state)
-//   0x0B = Solar power (W × 1)
-//   0x0D = Battery voltage (mV)
-//   0x0E = Battery current (mA, signed)
-//   0x15 = Panel voltage (mV)
+// Decrypted 12-byte binary struct:
+//   [0]     device_state   (3=bulk 4=absorb 5=float 0=off 2=fault)
+//   [1]     charger_error
+//   [2:4]   battery_voltage  int16 LE, ÷100 → V
+//   [4:6]   battery_current  int16 LE, ÷10  → A
+//   [6:8]   yield_today      uint16 LE, ÷100 → Wh
+//   [8:10]  pv_power         uint16 LE, W
+//   [10:12] load_current     uint16 LE, ÷10  → A
 
 // ─── 12V lead-acid/AGM voltage → SOC lookup table (21 points, 5% steps) ──
 static const float soc_v_table[21] = {
@@ -40,7 +45,6 @@ float battery_voltage_to_soc(float v) {
     return 0.0f;
 }
 
-// VICTRON_ENABLED is set in config.h (default 1)
 #ifndef VICTRON_ENABLED
   #define VICTRON_ENABLED 1
 #endif
@@ -48,43 +52,46 @@ float battery_voltage_to_soc(float v) {
 #if VICTRON_ENABLED
 
 #include <NimBLEDevice.h>
-#include <mbedtls/ccm.h>
+#include <mbedtls/aes.h>
 
-#define VICTRON_MANUFACTURER_ID  0x02E1   // Victron Energy BLE company ID
-#define STALE_TIMEOUT_MS         30000    // data older than 30 s = stale
+#define VICTRON_MANUFACTURER_ID  0x02E1
+#define STALE_TIMEOUT_MS         30000
 
-static VictronData latest;
+static VictronData  latest;
+static VictronDebug dbg;
 static portMUX_TYPE victron_mux = portMUX_INITIALIZER_UNLOCKED;
-static String target_name = VICTRON_NAME;
 
-// ── AES-128-CCM decrypt helper ──────────────────────────────────────────
-static bool decrypt_payload(const uint8_t* key_hex_str,
-                             const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* cipher, size_t cipher_len,
-                             uint8_t* plain) {
-    // Validate key length before accessing bytes
-    if (strlen((const char*)key_hex_str) < 32) return false;
-
-    // Convert 32-char hex key string to 16-byte binary
-    uint8_t key[16];
+// ── Parse 32-char hex string → 16-byte key ─────────────────────────────
+static bool parse_key(const char* hex, uint8_t key[16]) {
+    if (strlen(hex) < 32) return false;
     for (int i = 0; i < 16; i++) {
-        char byte_str[3] = { (char)key_hex_str[i*2], (char)key_hex_str[i*2+1], 0 };
-        key[i] = (uint8_t)strtol(byte_str, nullptr, 16);
+        char b[3] = { hex[i*2], hex[i*2+1], 0 };
+        key[i] = (uint8_t)strtol(b, nullptr, 16);
     }
+    return true;
+}
 
-    mbedtls_ccm_context ctx;
-    mbedtls_ccm_init(&ctx);
-    int ret = mbedtls_ccm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, key, 128);
-    if (ret == 0) {
-        ret = mbedtls_ccm_auth_decrypt(&ctx,
-            cipher_len - 4,          // ciphertext length (last 4 bytes = tag)
-            nonce, nonce_len,
-            nullptr, 0,              // no AAD
-            cipher, plain,
-            cipher + cipher_len - 4, 4); // tag
-    }
-    mbedtls_ccm_free(&ctx);
-    return (ret == 0);
+// ── AES-128-CTR decrypt (single 16-byte block keystream) ───────────────
+// counter_block = { iv_lo, iv_hi, 0x00 × 14 }
+static bool decrypt_ctr(const uint8_t key[16], uint16_t iv,
+                         const uint8_t* cipher, size_t len,
+                         uint8_t* plain) {
+    uint8_t counter[16] = {};
+    counter[0] = iv & 0xFF;
+    counter[1] = (iv >> 8) & 0xFF;
+
+    uint8_t keystream[16];
+    mbedtls_aes_context ctx;
+    mbedtls_aes_init(&ctx);
+    int ret = mbedtls_aes_setkey_enc(&ctx, key, 128);
+    if (ret == 0)
+        ret = mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_ENCRYPT, counter, keystream);
+    mbedtls_aes_free(&ctx);
+    if (ret != 0) return false;
+
+    for (size_t i = 0; i < len && i < 16; i++)
+        plain[i] = cipher[i] ^ keystream[i];
+    return true;
 }
 
 // ── BLE scan callback ────────────────────────────────────────────────────
@@ -92,58 +99,70 @@ class VictronAdvCB : public NimBLEAdvertisedDeviceCallbacks {
     void onResult(NimBLEAdvertisedDevice* dev) override {
         if (!dev->haveManufacturerData()) return;
         std::string mfr = dev->getManufacturerData();
-        if (mfr.size() < 8) return;  // minimum: 2 mfr_id + 2 product + 1 rec_type + 2 nonce_ctr + 1+ data
+        if (mfr.size() < 8) return;
 
         const uint8_t* d = (const uint8_t*)mfr.data();
-        // Bytes 0-1: manufacturer ID (little-endian)
         uint16_t mfr_id = d[0] | (d[1] << 8);
+
+        portENTER_CRITICAL(&victron_mux); dbg.ble_seen++; portEXIT_CRITICAL(&victron_mux);
         if (mfr_id != VICTRON_MANUFACTURER_ID) return;
 
-        // Victron Extra Manufacturer Data layout:
-        //   [0-1] manufacturer ID  [2] record type  [3-4] nonce/counter (LE)
-        //   [5..N-4] ciphertext    [N-4..N] 4-byte AES-CCM tag
-        //
-        // Nonce (13 bytes for AES-128-CCM): counter_lo, counter_hi + 11 zero padding
-        uint8_t rec_type = d[2];
-        uint8_t nonce[13] = {};
-        nonce[0] = d[3];   // counter low byte
-        nonce[1] = d[4];   // counter high byte
-        // bytes 2-12 remain zero (protocol spec)
+        // MAC filter
+        std::string mac = dev->getAddress().toString();
+        std::string mac_flat;
+        for (char c : mac) if (c != ':') mac_flat += tolower(c);
 
-        size_t   payload_len = mfr.size() - 5;   // ciphertext + tag start at offset 5
-        if (payload_len < 5 || payload_len > 36) return;  // need at least 1 byte data + 4 byte tag; plain[32] holds at most 32 bytes
-        uint8_t  plain[32] = {};
-
-        if (!decrypt_payload((const uint8_t*)VICTRON_KEY,
-                             nonce, sizeof(nonce),
-                             d + 5, payload_len,
-                             plain)) return;
-        (void)rec_type;  // used implicitly — payload format depends on device type
-
-        // Parse plain-text records (TLV-style, 1-byte id, 1-byte len, N-byte val)
-        size_t plain_len = payload_len - 4;  // subtract 4-byte tag
-        size_t pos = 0;
-        while (pos + 2 <= plain_len) {
-            uint8_t id  = plain[pos++];
-            uint8_t len = plain[pos++];
-            if (id == 0xFF || pos + len > plain_len) break;
-            uint32_t val = 0;
-            for (int i = 0; i < len && i < 4; i++) val |= plain[pos+i] << (8*i);
-            pos += len;
-
-            portENTER_CRITICAL(&victron_mux);
-            switch (id) {
-                case 0x01: latest.charge_state    = val & 0xFF; break;
-                case 0x0B: latest.pv_power_w      = (float)val; break;
-                case 0x0D: latest.battery_voltage = val / 1000.0f; break;
-                case 0x0E: latest.battery_current = (int16_t)val / 1000.0f; break;
-                case 0x15: latest.pv_voltage      = val / 1000.0f; break;
-            }
-            portEXIT_CRITICAL(&victron_mux);
-        }
         portENTER_CRITICAL(&victron_mux);
-        latest.valid       = true;
-        latest.last_seen_ms = millis();
+        dbg.victron_seen++;
+        uint8_t copy_len = mfr.size() < 32 ? mfr.size() : 32;
+        memcpy(dbg.last_pkt, d, copy_len);
+        dbg.last_pkt_len = copy_len;
+        strncpy(dbg.last_mac, mac.c_str(), sizeof(dbg.last_mac) - 1);
+        portEXIT_CRITICAL(&victron_mux);
+
+        std::string target_mac = VICTRON_MAC;
+        if (target_mac.length() == 12 && mac_flat != target_mac) return;
+
+        // Need at least: 7 header + 1 key_check + 12 ciphertext = 20 bytes
+        if (mfr.size() < 20) return;
+
+        // Parse key
+        uint8_t key[16];
+        if (!parse_key(VICTRON_KEY, key)) return;
+
+        // Key check: d[9] must match key[0]
+        if (d[9] != key[0]) {
+            portENTER_CRITICAL(&victron_mux); dbg.decrypt_fail++; portEXIT_CRITICAL(&victron_mux);
+            return;
+        }
+
+        // IV from d[7:9]
+        uint16_t iv = d[7] | (d[8] << 8);
+
+        // Ciphertext starts at d[10], length = (mfr.size() - 10), max 12
+        size_t cipher_len = mfr.size() - 10;
+        if (cipher_len > 12) cipher_len = 12;
+
+        uint8_t plain[12] = {};
+        if (!decrypt_ctr(key, iv, d + 10, cipher_len, plain)) {
+            portENTER_CRITICAL(&victron_mux); dbg.decrypt_fail++; portEXIT_CRITICAL(&victron_mux);
+            return;
+        }
+        portENTER_CRITICAL(&victron_mux); dbg.decrypt_ok++; portEXIT_CRITICAL(&victron_mux);
+
+        // Parse fixed binary struct
+        int16_t raw_batt_v = (int16_t)(plain[2] | (plain[3] << 8));
+        int16_t raw_batt_i = (int16_t)(plain[4] | (plain[5] << 8));
+        uint16_t raw_pv_p  = plain[8] | (plain[9] << 8);
+
+        portENTER_CRITICAL(&victron_mux);
+        latest.charge_state    = plain[0];
+        latest.battery_voltage = raw_batt_v / 100.0f;
+        latest.battery_current = raw_batt_i / 10.0f;
+        latest.pv_power_w      = (float)raw_pv_p;
+        latest.pv_voltage      = 0.0f;  // not in this packet format
+        latest.valid           = true;
+        latest.last_seen_ms    = millis();
         portEXIT_CRITICAL(&victron_mux);
     }
 };
@@ -152,7 +171,7 @@ static VictronAdvCB advCB;
 
 void victron_init() {
     if (strlen(VICTRON_KEY) < 32) {
-        Serial.println("[victron] WARNING: VICTRON_KEY not set or too short — BLE scan disabled");
+        Serial.println("[victron] WARNING: VICTRON_KEY not set — BLE scan disabled");
         return;
     }
     NimBLEDevice::init("");
@@ -161,8 +180,8 @@ void victron_init() {
     scan->setActiveScan(false);
     scan->setInterval(100);
     scan->setWindow(99);
-    scan->start(0, nullptr, false);   // scan indefinitely (non-blocking)
-    Serial.println("[victron] BLE scan started");
+    scan->start(0, nullptr, false);
+    Serial.println("[victron] BLE scan started (AES-CTR)");
 }
 
 VictronData victron_get() {
@@ -170,7 +189,6 @@ VictronData victron_get() {
     VictronData copy = latest;
     portEXIT_CRITICAL(&victron_mux);
 
-    // Mark stale if we haven't seen an advert recently
     if (copy.valid && (millis() - copy.last_seen_ms > STALE_TIMEOUT_MS)) {
         copy.valid = false;
         portENTER_CRITICAL(&victron_mux);
@@ -180,14 +198,19 @@ VictronData victron_get() {
     return copy;
 }
 
-#else  // VICTRON_KEY not set — stub implementation
+VictronDebug victron_debug_get() {
+    portENTER_CRITICAL(&victron_mux);
+    VictronDebug copy = dbg;
+    portEXIT_CRITICAL(&victron_mux);
+    return copy;
+}
+
+#else
 
 void victron_init() {
     Serial.println("[victron] disabled (no VICTRON_KEY set)");
 }
-
-VictronData victron_get() {
-    return VictronData{};
-}
+VictronData victron_get() { return VictronData{}; }
+VictronDebug victron_debug_get() { return VictronDebug{}; }
 
 #endif

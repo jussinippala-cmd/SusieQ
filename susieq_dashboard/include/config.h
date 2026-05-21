@@ -75,7 +75,10 @@
 // Find these in VictronConnect: Device → Product Info
 // Leave VICTRON_KEY empty ("") to disable Victron BLE
 #define VICTRON_NAME     "SmartSolar MPPT 75|15"
-// 32-char hex key, no spaces, uppercase.  Example: "0102AABB..."
-#define VICTRON_KEY      ""            // <-- FILL IN YOUR KEY HERE
+// 32-char hex key, no spaces.  Example: "0102aabb..."
+#define VICTRON_KEY      "b3ca0ac532be90bfe1012d5c8cf68935"
+// MAC address from VictronConnect → Product Info (lowercase, no colons)
+// Leave empty "" to accept any Victron device
+#define VICTRON_MAC      "cd2b11b198d6"
 // Set to 0 to disable BLE scanning (e.g. for bench testing without Victron)
 #define VICTRON_ENABLED  1
