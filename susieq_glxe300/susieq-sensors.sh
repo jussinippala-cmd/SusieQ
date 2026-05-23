@@ -149,25 +149,6 @@ if bat.get('valid') and bat.get('voltage') is not None:
     elif v >= 12.4:
         remove_f('/tmp/susieq_volt_notified')
 
-# ── Vesitankki (15 L max) ─────────────────────────────────────────────
-water = data.get('water', {})
-if water.get('valid') and water.get('liters') is not None:
-    pct = (water['liters'] / 15.0) * 100
-    if pct < 20:
-        low_since = read_f('/tmp/susieq_water_low_since', '')
-        if not low_since:
-            write_f('/tmp/susieq_water_low_since', int(time.time()))
-        else:
-            try:
-                if int(time.time()) - int(low_since) >= 300 and not os.path.exists('/tmp/susieq_water_notified'):
-                    ntfy(f'Vesitankki {pct:.0f}% ({water["liters"]:.1f} L)', 'default')
-                    write_f('/tmp/susieq_water_notified', pct)
-            except ValueError:
-                write_f('/tmp/susieq_water_low_since', int(time.time()))
-    elif pct >= 20:
-        remove_f('/tmp/susieq_water_low_since')
-        if pct >= 30:
-            remove_f('/tmp/susieq_water_notified')
 
 # ── Polttoaine (25 L max) ─────────────────────────────────────────────
 fuel = data.get('fuel', {})
