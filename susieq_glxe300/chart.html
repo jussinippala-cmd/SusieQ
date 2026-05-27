@@ -108,7 +108,7 @@ html, body, #map {
   display: flex; align-items: center; justify-content: center;
   gap: 8px; margin-top: 4px;
 }
-#ml-val, #alert-val {
+#ml-val, #alert-val, #advance-val {
   color: #f0c04c; font-weight: 600; min-width: 40px; text-align: center; font-size: 13px;
 }
 
@@ -200,7 +200,7 @@ html, body, #map {
 /* Reittipaneeli */
 #route-panel {
   position: fixed;
-  top: 56px; right: 16px; bottom: 80px;
+  top: 56px; left: 16px; bottom: 80px;
   width: 160px;
   z-index: 1000;
   background: rgba(22, 27, 34, 0.92);
@@ -713,9 +713,10 @@ function updateRoutePanel() {
     let distTxt = '';
     if (isActive && currentPos) {
       const d = distNm(currentPos[0], currentPos[1], wp.lat, wp.lon);
-      const eta = _lastSog > 0.2 ? Math.round(d / _lastSog * 60) + ' min' : null;
-      distTxt = d.toFixed(2) + ' nm' + (eta ? ' · ' + eta : '');
-    } else if (!routeActive && i > 0) {
+      const brg = Math.round(bearing(currentPos[0], currentPos[1], wp.lat, wp.lon)) % 360;
+      distTxt = d.toFixed(2) + ' nm · ' + String(brg).padStart(3, '0') + '°';
+      if (_lastSog > 0.2) distTxt += '<br>' + Math.round(d / _lastSog * 60) + ' min';
+    } else if (i > 0 && (!routeActive || i > currentWpIdx)) {
       distTxt = distNm(route[i-1].lat, route[i-1].lon, wp.lat, wp.lon).toFixed(2) + ' nm';
     }
 
@@ -787,8 +788,23 @@ function renderRouteOnMap() {
                </svg>`,
         iconSize: [26, 26], iconAnchor: [13, 13]
       }),
-      zIndexOffset: 800
+      zIndexOffset: 800,
+      draggable: true
     }).addTo(map);
+
+    m.on('drag', function() {
+      const p = m.getLatLng();
+      routeLine.setLatLngs(route.map((wp, j) => j === i ? [p.lat, p.lng] : [wp.lat, wp.lon]));
+    });
+
+    m.on('dragend', function() {
+      const p = m.getLatLng();
+      route[i] = { lat: p.lat, lon: p.lng };
+      renderRouteOnMap();
+      updateRoutePanel();
+      postRouteToServer();
+    });
+
     routeMarkers.push(m);
   });
 }
