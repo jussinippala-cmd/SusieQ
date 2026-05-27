@@ -29,6 +29,9 @@ UA = {"User-Agent": "SusieQ-ChartProxy/1.0 (+github.com/jussinippala-cmd/susieq-
 _gps: dict = {}
 _gps_lock = threading.Lock()
 
+_route: dict = {"waypoints": [], "active_idx": -1}
+_route_lock = threading.Lock()
+
 _tile_mem: collections.OrderedDict = collections.OrderedDict()
 _tile_mem_lock = threading.Lock()
 TILE_MEM_MAX = 1000
@@ -79,8 +82,30 @@ class ChartHandler(BaseHTTPRequestHandler):
                 gps = dict(_gps)
             gps["ts"] = int(time.time())
             self._json(gps)
+        elif path == "/route":
+            with _route_lock:
+                r = dict(_route)
+                r["waypoints"] = _route["waypoints"][:]
+            r["ts"] = int(time.time())
+            self._json(r)
         elif path.startswith("/tiles/"):
             self._tile(path[7:])
+        else:
+            self.send_error(404)
+
+    def do_POST(self):
+        path = urlparse(self.path).path
+        if path == "/route":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            try:
+                data = json.loads(body)
+                with _route_lock:
+                    _route["waypoints"] = data.get("waypoints", [])
+                    _route["active_idx"] = data.get("active_idx", -1)
+                self._json({"ok": True})
+            except Exception:
+                self.send_error(400)
         else:
             self.send_error(404)
 
