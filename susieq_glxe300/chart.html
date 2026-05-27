@@ -53,33 +53,6 @@ html, body, #map {
   margin-top: 6px;
 }
 
-#wp-info {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #30363d;
-  display: none;
-}
-
-#wp-info.visible { display: block; }
-
-#wp-info .wp-lbl {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #ff6b6b;
-  margin-bottom: 4px;
-}
-
-#wp-info .wp-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: #e6edf3;
-  margin-bottom: 2px;
-}
-
-#wp-info .wp-row span:first-child { color: #6e7681; }
-
 /* Zoom — ylä-vasen (sijainti #top-left:n kautta) */
 #zoom-display {
   background: rgba(22, 27, 34, 0.82);
@@ -233,12 +206,6 @@ html, body, #map {
   <div class="lbl">Nopeus</div>
   <div class="sog-val" id="sog">—</div>
   <div class="cog-val" id="cog">Ei GPS-lukemaa</div>
-  <div id="wp-info">
-    <div class="wp-lbl">Kohde</div>
-    <div class="wp-row"><span>Suunta</span><span id="wp-brg">—</span></div>
-    <div class="wp-row"><span>Etäisyys</span><span id="wp-dist">—</span></div>
-    <div class="wp-row"><span>ETA</span><span id="wp-eta">—</span></div>
-  </div>
 </div>
 
 <div id="grounding-alert">⚠ Karilleajovaara</div>
@@ -253,17 +220,34 @@ html, body, #map {
   <div class="settings-card">
     <div class="action-row">
       <div class="btn-labeled">
-        <button class="ctrl-btn" id="btn-wp" onclick="toggleWpMode()">📍</button>
-        <span class="btn-lbl">Kohde</span>
-      </div>
-      <div class="btn-labeled" id="btn-clear-wp-wrap" style="visibility:hidden">
-        <button class="ctrl-btn" id="btn-clear-wp" onclick="clearWaypoint()">✕</button>
-        <span class="btn-lbl">Poista</span>
+        <button class="ctrl-btn" id="btn-add-wp" onclick="toggleWpAddMode()">📍</button>
+        <span class="btn-lbl">Lisää WP</span>
       </div>
       <div class="btn-labeled">
-        <button class="ctrl-btn" onclick="clearTrack()">🗑</button>
+        <button class="ctrl-btn" id="btn-start-route" onclick="startRoute()">▶</button>
+        <span class="btn-lbl">Aloita</span>
+      </div>
+      <div class="btn-labeled">
+        <button class="ctrl-btn" onclick="clearRoute()">🗑</button>
         <span class="btn-lbl">Reitti</span>
       </div>
+    </div>
+    <div class="settings-sep"></div>
+    <div class="action-row" style="justify-content:flex-start">
+      <div class="btn-labeled">
+        <button class="ctrl-btn" onclick="clearTrack()" style="width:36px;height:36px;font-size:14px">🗑</button>
+        <span class="btn-lbl">GPS-jälki</span>
+      </div>
+    </div>
+    <div class="settings-sep"></div>
+    <div class="setting-row">
+      <span class="setting-lbl">Automaattiohitus</span>
+      <div class="toggle-switch on" id="toggle-autoadvance" onclick="toggleAutoAdvance()"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="val-row">
+      <button class="ml-btn" onclick="changeAdvanceRadius(-1)">−</button>
+      <span id="advance-val">0.10 nm</span>
+      <button class="ml-btn" onclick="changeAdvanceRadius(1)">+</button>
     </div>
     <div class="settings-sep"></div>
     <div class="setting-row">
@@ -360,7 +344,7 @@ document.addEventListener('visibilitychange', function() {
 });
 
 function clearTrack() {
-  if (!confirm('Tyhjennetäänkö reitti?')) return;
+  if (!confirm('Tyhjennetäänkö GPS-jälki?')) return;
   track.setLatLngs([]);
   lastLatLng = null;
   localStorage.removeItem(TRACK_KEY);
@@ -484,9 +468,7 @@ function updateDepthBtnState() {
   btn.classList.toggle('out-of-range', !inRange);
 }
 
-// ── Waypoint ─────────────────────────────────────────────────────────────────
-let wpMarker = null, wpLine = null, wpLatLng = null, wpMode = false;
-
+// ── Settings ─────────────────────────────────────────────────────────────────
 function toggleSettings() {
   document.getElementById('settings-panel').classList.toggle('open');
 }
@@ -503,23 +485,8 @@ document.addEventListener('pointerdown', function(e) {
   }
 });
 
-function toggleWpMode() {
-  wpMode = !wpMode;
-  document.getElementById('btn-wp').classList.toggle('active', wpMode);
-  document.getElementById('wp-hint').style.display = wpMode ? 'block' : 'none';
-  if (wpMode) closeSettings();
-}
-
 let _tapCount = 0, _tapTimer = null;
 map.on('click', function(e) {
-  if (wpMode) {
-    setWaypoint(e.latlng.lat, e.latlng.lng);
-    wpMode = false;
-    document.getElementById('btn-wp').classList.remove('active');
-    document.getElementById('wp-hint').style.display = 'none';
-    document.getElementById('btn-clear-wp-wrap').style.visibility = 'visible';
-    return;
-  }
   _tapCount++;
   clearTimeout(_tapTimer);
   _tapTimer = setTimeout(function() {
@@ -528,41 +495,6 @@ map.on('click', function(e) {
     _tapCount = 0;
   }, 200);
 });
-
-function setWaypoint(lat, lon) {
-  wpLatLng = [lat, lon];
-  if (wpMarker) wpMarker.remove();
-  wpMarker = L.marker([lat, lon], {
-    icon: L.divIcon({
-      className: '',
-      html: `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-               <circle cx="14" cy="14" r="10" fill="none" stroke="#ff6b6b" stroke-width="2.5"/>
-               <line x1="14" y1="4" x2="14" y2="24" stroke="#ff6b6b" stroke-width="1.5"/>
-               <line x1="4" y1="14" x2="24" y2="14" stroke="#ff6b6b" stroke-width="1.5"/>
-             </svg>`,
-      iconSize: [28, 28], iconAnchor: [14, 14]
-    }), zIndexOffset: 900
-  }).addTo(map);
-}
-
-function clearWaypoint() {
-  if (wpMarker) { wpMarker.remove(); wpMarker = null; }
-  if (wpLine) { wpLine.remove(); wpLine = null; }
-  wpLatLng = null;
-  document.getElementById('btn-clear-wp-wrap').style.visibility = 'hidden';
-  document.getElementById('wp-info').classList.remove('visible');
-}
-
-function updateWpLine(lat, lon) {
-  if (!wpLatLng) { if (wpLine) { wpLine.remove(); wpLine = null; } return; }
-  if (!wpLine) {
-    wpLine = L.polyline([[lat, lon], wpLatLng], {
-      color: '#ff6b6b', weight: 1.5, opacity: 0.7, dashArray: '5 5'
-    }).addTo(map);
-  } else {
-    wpLine.setLatLngs([[lat, lon], wpLatLng]);
-  }
-}
 
 function bearing(lat1, lon1, lat2, lon2) {
   const dL = (lon2 - lon1) * Math.PI / 180;
@@ -578,19 +510,6 @@ function distNm(lat1, lon1, lat2, lon2) {
   const a = Math.sin(dLat/2)**2 +
     Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return 3440.065 * 2 * Math.asin(Math.sqrt(a));
-}
-
-function updateWpInfo(lat, lon, sog) {
-  if (!wpLatLng) { document.getElementById('wp-info').classList.remove('visible'); return; }
-  const brg = bearing(lat, lon, wpLatLng[0], wpLatLng[1]);
-  const dist = distNm(lat, lon, wpLatLng[0], wpLatLng[1]);
-  const etaMin = sog > 0.2 ? dist / sog * 60 : null;
-  document.getElementById('wp-brg').textContent = Math.round(brg) + '°';
-  document.getElementById('wp-dist').textContent = dist.toFixed(2) + ' nm';
-  document.getElementById('wp-eta').textContent = etaMin
-    ? (etaMin < 60 ? Math.round(etaMin) + ' min' : (etaMin / 60).toFixed(1) + ' h')
-    : '—';
-  document.getElementById('wp-info').classList.add('visible');
 }
 
 // ── Info ─────────────────────────────────────────────────────────────────────
@@ -609,6 +528,13 @@ function updateInfo(gps) {
     'Suunta: ' + (gps.cog_deg != null ? Math.round(gps.cog_deg) + '°' : '—');
 }
 
+// ── Route stubs (implementoitu Task 3–6:ssa) ───────────────────────────────
+function toggleWpAddMode() {}
+function startRoute() {}
+function clearRoute() {}
+function toggleAutoAdvance() {}
+function changeAdvanceRadius(delta) {}
+
 // ── GPS poll ─────────────────────────────────────────────────────────────────
 async function pollGPS() {
   try {
@@ -621,8 +547,6 @@ async function pollGPS() {
       const cog = gps.cog_deg || 0, sog = gps.sog_knots || 0;
       updateBoat(lat, lon, cog);
       updateMinuteLine(lat, lon, cog, sog);
-      updateWpLine(lat, lon);
-      updateWpInfo(lat, lon, sog);
       if (sog > 0.5 && alertEnabled) {
         const [pLat, pLon] = projectPos(lat, lon, cog, sog, alertMinutes);
         showGroundingAlert(!inLake(pLat, pLon));
