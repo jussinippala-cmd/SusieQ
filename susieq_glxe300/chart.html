@@ -840,9 +840,60 @@ function toggleWpAddMode() {
   closeSettings();
 }
 
-function startRoute() {}
-function toggleAutoAdvance() {}
-function changeAdvanceRadius(delta) {}
+function startRoute() {
+  if (!route.length) return;
+  routeActive = true;
+  currentWpIdx = 0;
+  renderRouteOnMap();
+  updateRoutePanel();
+  closeSettings();
+  postRouteToServer();
+}
+
+function advanceToNextWp() {
+  if (!routeActive) return;
+  currentWpIdx++;
+  if (currentWpIdx >= route.length) {
+    routeActive = false;
+    currentWpIdx = route.length - 1;
+  }
+  renderRouteOnMap();
+  updateRoutePanel();
+  postRouteToServer();
+}
+
+function checkAutoAdvance(lat, lon) {
+  if (!routeActive || !autoAdvance || currentWpIdx >= route.length) return;
+  const wp = route[currentWpIdx];
+  if (distNm(lat, lon, wp.lat, wp.lon) < advanceRadiusNm) {
+    advanceToNextWp();
+  }
+}
+
+function toggleAutoAdvance() {
+  autoAdvance = !autoAdvance;
+  document.getElementById('toggle-autoadvance').classList.toggle('on', autoAdvance);
+}
+
+function changeAdvanceRadius(delta) {
+  advanceRadiusNm = Math.round(
+    Math.min(1.00, Math.max(0.05, advanceRadiusNm + delta * 0.05)) * 100
+  ) / 100;
+  document.getElementById('advance-val').textContent = advanceRadiusNm.toFixed(2) + ' nm';
+}
+
+async function postRouteToServer() {
+  try {
+    await fetch('/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        waypoints: route,
+        active_idx: routeActive ? currentWpIdx : -1
+      })
+    });
+  } catch (_) {}
+}
 
 // ── GPS poll ─────────────────────────────────────────────────────────────────
 async function pollGPS() {
