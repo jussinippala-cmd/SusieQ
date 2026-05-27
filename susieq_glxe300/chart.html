@@ -487,6 +487,11 @@ document.addEventListener('pointerdown', function(e) {
 
 let _tapCount = 0, _tapTimer = null;
 map.on('click', function(e) {
+  if (wpAddMode) {
+    addRouteWp(e.latlng.lat, e.latlng.lng);
+    cancelWpAddMode();
+    return;
+  }
   _tapCount++;
   clearTimeout(_tapTimer);
   _tapTimer = setTimeout(function() {
@@ -528,10 +533,103 @@ function updateInfo(gps) {
     'Suunta: ' + (gps.cog_deg != null ? Math.round(gps.cog_deg) + '°' : '—');
 }
 
-// ── Route stubs (implementoitu Task 3–6:ssa) ───────────────────────────────
-function toggleWpAddMode() {}
+// ── Route ────────────────────────────────────────────────────────────────────
+let route = [];           // [{lat, lon}, ...]
+let routeActive = false;  // navigointi käynnissä
+let currentWpIdx = 0;     // aktiivisen WP:n indeksi
+let wpAddMode = false;    // napautustila uuden pisteen lisäämiseen
+let advanceRadiusNm = 0.10;
+let autoAdvance = true;
+let routeMarkers = [];    // L.marker-instanssit kartalla
+let routeLine = null;     // L.polyline reittilinjalle
+let _lastSog = 0;         // viimeisin SOG (knots) routePanel-laskentaa varten
+
+function renderRouteOnMap() {
+  routeMarkers.forEach(m => m.remove());
+  routeMarkers = [];
+  if (routeLine) { routeLine.remove(); routeLine = null; }
+
+  document.getElementById('route-panel').style.display =
+    route.length ? 'flex' : 'none';
+
+  if (!route.length) return;
+
+  routeLine = L.polyline(
+    route.map(wp => [wp.lat, wp.lon]),
+    { color: '#4fc3f7', weight: 2, opacity: 0.65, dashArray: '6 4' }
+  ).addTo(map);
+
+  route.forEach((wp, i) => {
+    const isActive = routeActive && i === currentWpIdx;
+    const isDone   = routeActive && i < currentWpIdx;
+    const color    = isActive ? '#ff6b6b' : isDone ? '#484f58' : '#6e7681';
+    const bgFill   = isActive ? 'rgba(255,107,107,0.15)' : 'none';
+    const sw       = isActive ? 2.5 : 1.8;
+    const fw       = isActive ? 'bold' : 'normal';
+    const m = L.marker([wp.lat, wp.lon], {
+      icon: L.divIcon({
+        className: '',
+        html: `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26">
+                 <circle cx="13" cy="13" r="10" fill="${bgFill}" stroke="${color}" stroke-width="${sw}"/>
+                 <text x="13" y="17" text-anchor="middle" fill="${color}"
+                   font-size="9" font-weight="${fw}" font-family="sans-serif">${i + 1}</text>
+               </svg>`,
+        iconSize: [26, 26], iconAnchor: [13, 13]
+      }),
+      zIndexOffset: 800
+    }).addTo(map);
+    routeMarkers.push(m);
+  });
+}
+
+function addRouteWp(lat, lon) {
+  route.push({ lat, lon });
+  renderRouteOnMap();
+  updateRoutePanel();
+  postRouteToServer();
+}
+
+function removeRouteWp(idx) {
+  route.splice(idx, 1);
+  if (routeActive) {
+    if (idx < currentWpIdx) {
+      currentWpIdx--;
+    } else if (idx === currentWpIdx) {
+      if (currentWpIdx >= route.length) currentWpIdx = Math.max(0, route.length - 1);
+      if (!route.length) routeActive = false;
+    }
+  }
+  renderRouteOnMap();
+  updateRoutePanel();
+  postRouteToServer();
+}
+
+function clearRoute() {
+  if (!confirm('Tyhjennetäänkö reitti?')) return;
+  route = [];
+  routeActive = false;
+  currentWpIdx = 0;
+  renderRouteOnMap();
+  updateRoutePanel();
+  closeSettings();
+  postRouteToServer();
+}
+
+function cancelWpAddMode() {
+  wpAddMode = false;
+  document.getElementById('btn-add-wp').classList.remove('active');
+  document.getElementById('wp-hint').style.display = 'none';
+}
+
+function toggleWpAddMode() {
+  if (wpAddMode) { cancelWpAddMode(); return; }
+  wpAddMode = true;
+  document.getElementById('btn-add-wp').classList.add('active');
+  document.getElementById('wp-hint').style.display = 'block';
+  closeSettings();
+}
+
 function startRoute() {}
-function clearRoute() {}
 function toggleAutoAdvance() {}
 function changeAdvanceRadius(delta) {}
 
