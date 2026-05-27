@@ -905,8 +905,11 @@ async function pollGPS() {
     if (gps.fix && gps.lat != null && gps.lon != null) {
       const { lat, lon } = gps;
       const cog = gps.cog_deg || 0, sog = gps.sog_knots || 0;
+      _lastSog = sog;
       updateBoat(lat, lon, cog);
       updateMinuteLine(lat, lon, cog, sog);
+      checkAutoAdvance(lat, lon);
+      updateRoutePanel();
       if (sog > 0.5 && alertEnabled) {
         const [pLat, pLon] = projectPos(lat, lon, cog, sog, alertMinutes);
         showGroundingAlert(!inLake(pLat, pLon));
