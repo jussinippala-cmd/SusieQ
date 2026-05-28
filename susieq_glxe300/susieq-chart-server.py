@@ -32,6 +32,9 @@ _gps_lock = threading.Lock()
 _route: dict = {"waypoints": [], "active_idx": -1}
 _route_lock = threading.Lock()
 
+_anchor: dict = {"active": False, "lat": None, "lon": None, "radius_m": 50}
+_anchor_lock = threading.Lock()
+
 _tile_mem: collections.OrderedDict = collections.OrderedDict()
 _tile_mem_lock = threading.Lock()
 TILE_MEM_MAX = 1000
@@ -88,6 +91,11 @@ class ChartHandler(BaseHTTPRequestHandler):
                 r["waypoints"] = _route["waypoints"][:]
             r["ts"] = int(time.time())
             self._json(r)
+        elif path == "/anchor":
+            with _anchor_lock:
+                anchor = dict(_anchor)
+            anchor["ts"] = int(time.time())
+            self._json(anchor)
         elif path.startswith("/tiles/"):
             self._tile(path[7:])
         else:
@@ -103,6 +111,19 @@ class ChartHandler(BaseHTTPRequestHandler):
                 with _route_lock:
                     _route["waypoints"] = data.get("waypoints", [])
                     _route["active_idx"] = data.get("active_idx", -1)
+                self._json({"ok": True})
+            except Exception:
+                self.send_error(400)
+        elif path == "/anchor":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            try:
+                data = json.loads(body)
+                with _anchor_lock:
+                    _anchor["active"] = bool(data.get("active", False))
+                    _anchor["lat"]    = data.get("lat")
+                    _anchor["lon"]    = data.get("lon")
+                    _anchor["radius_m"] = int(data.get("radius_m", 50))
                 self._json({"ok": True})
             except Exception:
                 self.send_error(400)
