@@ -108,7 +108,7 @@ html, body, #map {
   display: flex; align-items: center; justify-content: center;
   gap: 8px; margin-top: 4px;
 }
-#ml-val, #alert-val, #advance-val {
+#ml-val, #alert-val, #advance-val, #anchor-radius-val {
   color: #f0c04c; font-weight: 600; min-width: 40px; text-align: center; font-size: 13px;
 }
 
@@ -380,6 +380,16 @@ html, body, #map {
       <button class="ml-btn" onclick="changeAdvanceRadius(-1)">−</button>
       <span id="advance-val">0.10 nm</span>
       <button class="ml-btn" onclick="changeAdvanceRadius(1)">+</button>
+    </div>
+    <div class="settings-sep"></div>
+    <div class="setting-row">
+      <span class="setting-lbl">Ankkurivahti</span>
+      <div class="toggle-switch" id="toggle-anchor" onclick="toggleAnchorWatch()"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="val-row">
+      <button class="ml-btn" onclick="changeAnchorRadius(-1)">−</button>
+      <span id="anchor-radius-val">50 m</span>
+      <button class="ml-btn" onclick="changeAnchorRadius(1)">+</button>
     </div>
     <div class="settings-sep"></div>
     <div class="setting-row">
