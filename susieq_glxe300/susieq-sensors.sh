@@ -170,4 +170,15 @@ if fuel.get('valid') and fuel.get('liters') is not None:
         if pct >= 30:
             remove_f('/tmp/susieq_fuel_notified')
 
+# ── Ankkurivahti ──────────────────────────────────────────────────────
+try:
+    import urllib.request as _ur
+    _a = json.loads(_ur.urlopen('http://localhost:8080/anchor', timeout=3).read())
+    if _a.get('active') and _a.get('lat') is not None and gps.get('fix'):
+        _d = haversine_m(gps['lat'], gps['lon'], _a['lat'], _a['lon'])
+        if _d > _a.get('radius_m', 50):
+            ntfy(f'SusieQ ankkuri ajanut! {int(_d)} m (raja {_a["radius_m"]} m) ⚓', 'high')
+except Exception:
+    pass
+
 PYEOF
