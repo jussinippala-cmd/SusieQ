@@ -687,6 +687,14 @@ let routeMarkers = [];    // L.marker-instanssit kartalla
 let routeLine = null;     // L.polyline reittilinjalle
 let _lastSog = 0;         // viimeisin SOG (knots) routePanel-laskentaa varten
 
+// ── Anchor Watch ─────────────────────────────────────────────────────────────
+let anchorActive = false;
+let anchorLat = null;
+let anchorLon = null;
+let anchorRadiusM = 50;
+let anchorMarker = null;
+let anchorCircle = null;
+
 function calcRemainingRoute(lat, lon) {
   if (!routeActive || !route.length || currentWpIdx >= route.length) return null;
   let nm = distNm(lat, lon, route[currentWpIdx].lat, route[currentWpIdx].lon);
@@ -906,6 +914,71 @@ async function postRouteToServer() {
       body: JSON.stringify({
         waypoints: route,
         active_idx: routeActive ? currentWpIdx : -1
+      })
+    });
+  } catch (_) {}
+}
+
+function renderAnchorOnMap() {
+  if (anchorMarker) { anchorMarker.remove(); anchorMarker = null; }
+  if (anchorCircle) { anchorCircle.remove(); anchorCircle = null; }
+  if (!anchorActive || anchorLat === null) return;
+  anchorCircle = L.circle([anchorLat, anchorLon], {
+    radius: anchorRadiusM,
+    color: '#4fc3f7', weight: 1.5, opacity: 0.7,
+    fillColor: '#4fc3f7', fillOpacity: 0.06,
+    dashArray: '5 4'
+  }).addTo(map);
+  anchorMarker = L.marker([anchorLat, anchorLon], {
+    icon: L.divIcon({
+      className: '',
+      html: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+               <circle cx="11" cy="11" r="9" fill="rgba(79,195,247,0.15)" stroke="#4fc3f7" stroke-width="1.5"/>
+               <text x="11" y="15" text-anchor="middle" fill="#4fc3f7" font-size="11">⚓</text>
+             </svg>`,
+      iconSize: [22, 22], iconAnchor: [11, 11]
+    }),
+    zIndexOffset: 700,
+    interactive: false
+  }).addTo(map);
+}
+
+function toggleAnchorWatch() {
+  if (anchorActive) {
+    anchorActive = false;
+    document.getElementById('toggle-anchor').classList.remove('on');
+    renderAnchorOnMap();
+    postAnchorToServer();
+    return;
+  }
+  if (!currentPos) { alert('GPS-sijainti puuttuu — odota fixiä.'); return; }
+  anchorActive = true;
+  anchorLat = currentPos[0];
+  anchorLon = currentPos[1];
+  document.getElementById('toggle-anchor').classList.add('on');
+  renderAnchorOnMap();
+  postAnchorToServer();
+}
+
+function changeAnchorRadius(delta) {
+  anchorRadiusM = Math.min(150, Math.max(20, anchorRadiusM + delta * 10));
+  document.getElementById('anchor-radius-val').textContent = anchorRadiusM + ' m';
+  if (anchorActive) {
+    renderAnchorOnMap();
+    postAnchorToServer();
+  }
+}
+
+async function postAnchorToServer() {
+  try {
+    await fetch('/anchor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        active: anchorActive,
+        lat: anchorLat,
+        lon: anchorLon,
+        radius_m: anchorRadiusM
       })
     });
   } catch (_) {}
