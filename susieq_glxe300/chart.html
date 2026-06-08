@@ -32,6 +32,25 @@ html, body, #map {
 
 #info.no-fix { opacity: 0.45; }
 
+#wind-widget {
+  position: fixed;
+  bottom: 120px; left: 16px;
+  z-index: 1000;
+  background: rgba(22, 27, 34, 0.82);
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 8px 10px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+#wind-widget .lbl { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#6e7681; margin-bottom:2px; }
+#wind-speed-val   { font-size:18px; font-weight:700; color:#58a6ff; line-height:1.1; }
+#wind-bft-val     { font-size:11px; color:#8b949e; }
+
 #info .lbl {
   font-size: 10px;
   text-transform: uppercase;
@@ -342,6 +361,21 @@ html, body, #map {
   <div class="lbl">Nopeus</div>
   <div class="sog-val" id="sog">—</div>
   <div class="cog-val" id="cog">Ei GPS-lukemaa</div>
+</div>
+
+<div id="wind-widget">
+  <div class="lbl">Tuuli</div>
+  <svg viewBox="0 0 280 280" width="96" height="96">
+    <circle cx="140" cy="140" r="130" fill="#1a1f27" stroke="#30363d" stroke-width="1.5"/>
+    <circle cx="140" cy="140" r="108" fill="#161b22"/>
+    <g id="wind-ticks-small"></g>
+    <g id="wind-arrow-small">
+      <polygon points="140,28 151,182 140,162 129,182" fill="#58a6ff" opacity="0.9"/>
+    </g>
+    <circle cx="140" cy="140" r="4" fill="#30363d"/>
+  </svg>
+  <div id="wind-speed-val">— m/s</div>
+  <div id="wind-bft-val">—</div>
 </div>
 
 <div id="grounding-alert">⚠ Karilleajovaara</div>
@@ -1051,6 +1085,77 @@ async function postAnchorToServer() {
     });
   } catch (_) {}
 }
+
+// ── Tuuliwidget ───────────────────────────────────────────────────────────────
+function toBeaufort(mps) {
+  const scale = [
+    [0.3,  0, 'Tyyntä',      '#3fb950'],
+    [1.6,  1, 'Heikko',      '#3fb950'],
+    [3.4,  2, 'Heikko',      '#3fb950'],
+    [5.5,  3, 'Kohtalainen', '#3fb950'],
+    [8.0,  4, 'Kohtalainen', '#3fb950'],
+    [10.8, 5, 'Navakka',     '#d29922'],
+    [13.9, 6, 'Navakka',     '#d29922'],
+    [17.2, 7, 'Kova',        '#d29922'],
+    [20.8, 8, 'Kova tuuli',  '#f85149'],
+    [24.5, 9, 'Myrsky',      '#f85149'],
+    [28.5,10, 'Kova myrsky', '#f85149'],
+    [32.7,11, 'Myrsky',      '#f85149'],
+  ];
+  for (const [lim, n, label, color] of scale) {
+    if (mps < lim) return { n, label, color };
+  }
+  return { n: 12, label: 'Hurrikaani', color: '#f85149' };
+}
+
+(function drawWindTicksSmall() {
+  const g = document.getElementById('wind-ticks-small');
+  if (!g) return;
+  for (let i = 0; i < 72; i++) {
+    const deg = i * 5;
+    const rad = deg * Math.PI / 180;
+    const isMajor = deg % 30 === 0;
+    const isMed   = deg % 10 === 0;
+    const r1 = isMajor ? 110 : isMed ? 117 : 121;
+    const x1 = 140 + r1  * Math.sin(rad), y1 = 140 - r1  * Math.cos(rad);
+    const x2 = 140 + 127 * Math.sin(rad), y2 = 140 - 127 * Math.cos(rad);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    line.setAttribute('stroke', isMajor ? '#8b949e' : isMed ? '#4a5568' : '#30363d');
+    line.setAttribute('stroke-width', isMajor ? '2' : '1');
+    g.appendChild(line);
+  }
+})();
+
+let _windArrowDeg = 0;
+
+function updateWindWidget(speed, dir, valid) {
+  const widget = document.getElementById('wind-widget');
+  if (!valid) { widget.style.display = 'none'; return; }
+  widget.style.display = 'flex';
+  // Lyhin reitti rotaatiota varten
+  let delta = ((dir - _windArrowDeg % 360) + 540) % 360 - 180;
+  _windArrowDeg += delta;
+  document.getElementById('wind-arrow-small')
+    .setAttribute('transform', `rotate(${_windArrowDeg}, 140, 140)`);
+  document.getElementById('wind-speed-val').textContent = speed.toFixed(1) + ' m/s';
+  const bft = toBeaufort(speed);
+  const bftEl = document.getElementById('wind-bft-val');
+  bftEl.textContent = 'B' + bft.n + ' — ' + bft.label;
+  bftEl.style.color = bft.color;
+}
+
+async function pollWind() {
+  try {
+    const r = await fetch('/wind');
+    if (!r.ok) return;
+    const w = await r.json();
+    updateWindWidget(w.speed ?? 0, w.direction ?? 0, !!w.valid);
+  } catch (_) {}
+}
+setInterval(pollWind, 2000);
+pollWind();
 
 // ── GPS poll ─────────────────────────────────────────────────────────────────
 async function pollGPS() {

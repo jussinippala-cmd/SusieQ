@@ -29,6 +29,9 @@ UA = {"User-Agent": "SusieQ-ChartProxy/1.0 (+github.com/jussinippala-cmd/susieq-
 _gps: dict = {}
 _gps_lock = threading.Lock()
 
+_wind: dict = {}
+_wind_lock = threading.Lock()
+
 _route: dict = {"waypoints": [], "active_idx": -1}
 _route_lock = threading.Lock()
 
@@ -55,7 +58,7 @@ def _tile_mem_put(key: str, data: bytes) -> None:
 
 
 def _poll_gps() -> None:
-    global _gps
+    global _gps, _wind
     while True:
         try:
             req = urllib.request.Request(ESP32_URL, headers=UA)
@@ -63,6 +66,8 @@ def _poll_gps() -> None:
                 data = json.loads(resp.read())
                 with _gps_lock:
                     _gps = data.get("gps", {})
+                with _wind_lock:
+                    _wind = data.get("wind", {})
         except Exception:
             pass
         time.sleep(2)
@@ -85,6 +90,11 @@ class ChartHandler(BaseHTTPRequestHandler):
                 gps = dict(_gps)
             gps["ts"] = int(time.time())
             self._json(gps)
+        elif path == "/wind":
+            with _wind_lock:
+                w = dict(_wind)
+            w["ts"] = int(time.time())
+            self._json(w)
         elif path == "/route":
             with _route_lock:
                 r = dict(_route)
