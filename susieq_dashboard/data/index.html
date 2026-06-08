@@ -1052,51 +1052,9 @@
       </div>
       <div class="nav-row" style="border:none;padding-top:0;">
         <span class="nav-label" style="font-size:0.72rem;" id="speed-season-date"></span>
-        <span id="season-nm" style="font-size:0.8rem;color:var(--muted);">— nm kaudella</span>
       </div>
     </div>
 
-    <!-- Ankkurialarmi -->
-    <div class="nav-section" id="anchor-section">
-      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;
-                  letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;">Ankkuri</div>
-      <div class="nav-btn-row">
-        <button id="anchor-set-btn" class="nav-btn" onclick="setAnchor()">⚓ Laske ankkuri</button>
-        <button id="anchor-clear-btn" class="nav-btn nav-btn-danger" onclick="clearAnchor()"
-                style="display:none">✕ Nosta ankkuri</button>
-      </div>
-      <div id="anchor-live" style="display:none">
-        <div class="nav-row">
-          <span class="nav-label">Etäisyys ankkurista</span>
-          <span id="anchor-dist">— m</span>
-        </div>
-        <div class="nav-row" style="gap:8px;flex-wrap:wrap;">
-          <span class="nav-label">Hälytysraja</span>
-          <input type="range" id="anchor-radius" min="20" max="150" value="50"
-                 oninput="updateAnchorRadius(this.value)"
-                 style="width:80px;accent-color:var(--blue);">
-          <span id="anchor-radius-val" style="min-width:36px;text-align:right;">50 m</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Matkatilastot -->
-    <div class="nav-section" id="trip-section">
-      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;
-                  letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;">Matka</div>
-      <div class="nav-btn-row">
-        <button id="trip-start-btn" class="nav-btn" onclick="startTrip()">▶ Aloita matka</button>
-        <button id="trip-stop-btn" class="nav-btn nav-btn-danger" onclick="stopTrip()"
-                style="display:none">⏹ Lopeta matka</button>
-      </div>
-      <div id="trip-live" style="display:none">
-        <div class="nav-row"><span class="nav-label">Kesto</span><span id="trip-duration">0h 0m</span></div>
-        <div class="nav-row"><span class="nav-label">Matka</span><span id="trip-nm">0.0 nm</span></div>
-        <div class="nav-row"><span class="nav-label">Keskinopeus</span><span id="trip-avg-kn">— kn</span></div>
-        <div class="nav-row"><span class="nav-label">Huippu</span><span id="trip-max-kn">— kn</span></div>
-      </div>
-      <div id="trip-history" style="margin-top:8px;font-size:0.8rem;color:var(--muted);"></div>
-    </div>
 
     <!-- MOB — mies yli laidan -->
     <div class="nav-section" id="mob-section">
@@ -1882,19 +1840,12 @@ function update(d) {
   refreshSolarBar();
   updateNavTab(d.gps);
   if (d.gps && d.gps.fix && d.gps.lat != null && d.gps.lon != null) {
-    var sg = smoothedGps(d.gps.lat, d.gps.lon);
-    checkAnchorAlarm(sg.lat, sg.lon);
+    _gpsLat = d.gps.lat; _gpsLon = d.gps.lon;
     updateMob(d.gps.lat, d.gps.lon);
-  } else {
-    _gpsLatBuf = []; _gpsLonBuf = [];  // fix kadotettu — nollaa puskuri
   }
   // Nopeusennätys
   if (d.gps && d.gps.fix && d.gps.sog_knots != null) {
     checkSpeedRecord(d.gps.sog_knots);
-  }
-  // Matkaetäisyys
-  if (d.gps && d.gps.fix && d.gps.sog_knots != null) {
-    updateTripDistance(d.gps.sog_knots);
   }
 
   // Battery
@@ -2335,25 +2286,8 @@ function getAudioCtx() {
 document.addEventListener("touchstart", function() { getAudioCtx(); }, { once: true, passive: true });
 document.addEventListener("click",      function() { getAudioCtx(); }, { once: true, passive: true });
 
-// ─── Ankkurialarmi ─────────────────────────────────────────────────────
-var _anchorLat = null, _anchorLon = null;
-var _anchorSetLat = null, _anchorSetLon = null;
-var _anchorRadiusM = 50;
-var _anchorAlarmFiring = false;
-var _anchorBeepCtx = null;
-var _anchorBeepInterval = null;
-
-// GPS-kohinan tasoitus — liukuva keskiarvo 8 lukemasta (~8 s)
-var _gpsLatBuf = [], _gpsLonBuf = [];
-var GPS_SMOOTH_N = 8;
-function smoothedGps(lat, lon) {
-  _gpsLatBuf.push(lat); _gpsLonBuf.push(lon);
-  if (_gpsLatBuf.length > GPS_SMOOTH_N) { _gpsLatBuf.shift(); _gpsLonBuf.shift(); }
-  var n = _gpsLatBuf.length;
-  var avgLat = _gpsLatBuf.reduce(function(a,b){return a+b;},0) / n;
-  var avgLon = _gpsLonBuf.reduce(function(a,b){return a+b;},0) / n;
-  return { lat: avgLat, lon: avgLon };
-}
+// ─── GPS-sijainti (MOBia varten) ───────────────────────────────────────
+var _gpsLat = null, _gpsLon = null;
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   var R = 6371000;
@@ -2365,70 +2299,6 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function setAnchor() {
-  if (_anchorLat == null) { alert("GPS-signaali puuttuu — odota fixiä."); return; }
-  // Herätetään AudioContext käyttäjäinteraktion yhteydessä (iOS-vaatimus)
-  if (!_anchorBeepCtx) _anchorBeepCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (_anchorBeepCtx.state === "suspended") _anchorBeepCtx.resume();
-  _anchorSetLat = _anchorLat;
-  _anchorSetLon = _anchorLon;
-  document.getElementById("anchor-set-btn").style.display   = "none";
-  document.getElementById("anchor-clear-btn").style.display = "";
-  document.getElementById("anchor-live").style.display      = "";
-  document.getElementById("anchor-radius-val").textContent  = _anchorRadiusM + " m";
-}
-
-function clearAnchor() {
-  _anchorSetLat = null; _anchorSetLon = null;
-  _anchorAlarmFiring = false;
-  if (_anchorBeepInterval) { clearInterval(_anchorBeepInterval); _anchorBeepInterval = null; }
-  document.getElementById("anchor-set-btn").style.display   = "";
-  document.getElementById("anchor-clear-btn").style.display = "none";
-  document.getElementById("anchor-live").style.display      = "none";
-  document.getElementById("card-nav").classList.remove("nav-alarm-active");
-}
-
-function updateAnchorRadius(val) {
-  _anchorRadiusM = parseInt(val);
-  document.getElementById("anchor-radius-val").textContent = _anchorRadiusM + " m";
-}
-
-function anchorBeep() {
-  try {
-    if (!_anchorBeepCtx) _anchorBeepCtx = new (window.AudioContext || window.webkitAudioContext)();
-    // Kaksi terävää piippausta 0.25 s välein
-    [0, 0.25].forEach(function(delay) {
-      var osc = _anchorBeepCtx.createOscillator();
-      var gain = _anchorBeepCtx.createGain();
-      osc.connect(gain); gain.connect(_anchorBeepCtx.destination);
-      osc.frequency.value = 1100;
-      var t = _anchorBeepCtx.currentTime + delay;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(1.0, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-      osc.start(t); osc.stop(t + 0.22);
-    });
-  } catch(e) {}
-}
-
-function checkAnchorAlarm(lat, lon) {
-  _anchorLat = lat; _anchorLon = lon;
-  if (_anchorSetLat == null) return;
-  if (lat == null || lon == null) return;
-  var dist = haversineMeters(_anchorSetLat, _anchorSetLon, lat, lon);
-  document.getElementById("anchor-dist").textContent = Math.round(dist) + " m";
-  var alarm = dist > _anchorRadiusM;
-  document.getElementById("card-nav").classList.toggle("nav-alarm-active", alarm);
-  if (alarm && !_anchorAlarmFiring) {
-    _anchorAlarmFiring = true;
-    anchorBeep();
-    _anchorBeepInterval = setInterval(anchorBeep, 3000);
-  }
-  if (!alarm && _anchorAlarmFiring) {
-    _anchorAlarmFiring = false;
-    if (_anchorBeepInterval) { clearInterval(_anchorBeepInterval); _anchorBeepInterval = null; }
-  }
-}
 
 // ─── MOB — mies yli laidan ─────────────────────────────────────────────
 var _mobLat = null, _mobLon = null;
@@ -2438,8 +2308,8 @@ var _mobBeepInterval = null;
 var _mobElapsedInterval = null;
 
 function mobActivate() {
-  if (_anchorLat == null) { alert("GPS-signaali puuttuu — sijaintia ei tiedetä."); return; }
-  _mobLat = _anchorLat; _mobLon = _anchorLon;
+  if (_gpsLat == null) { alert("GPS-signaali puuttuu — sijaintia ei tiedetä."); return; }
+  _mobLat = _gpsLat; _mobLon = _gpsLon;
   _mobTime = Date.now();
   // Herätä AudioContext käyttäjäinteraktion yhteydessä
   if (!_mobBeepCtx) _mobBeepCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2533,11 +2403,7 @@ function loadRecords() {
       if (j && (j.best_knots || j.trips)) {
         _records.best_knots = j.best_knots || 0;
         _records.best_date  = j.best_date  || "";
-        _records.season_nm  = j.season_nm  || 0;
-        _records.trips      = j.trips      || [];
         updateRecordsUI();
-        // updateTripHistoryUI määritellään Task 7:ssa — guard estää virheet jos toteutettu erikseen
-        if (typeof updateTripHistoryUI === "function") updateTripHistoryUI();
       }
     })
     .catch(function() {});  // offline — ei haittaa
@@ -2548,8 +2414,6 @@ function updateRecordsUI() {
     _records.best_knots > 0 ? _records.best_knots.toFixed(1) + " kn" : "— kn";
   document.getElementById("speed-season-date").textContent =
     _records.best_date ? _records.best_date : "";
-  document.getElementById("season-nm").textContent =
-    _records.season_nm > 0 ? _records.season_nm.toFixed(1) + " nm kaudella" : "— nm kaudella";
 }
 
 function checkSpeedRecord(kn) {
@@ -2568,85 +2432,6 @@ function checkSpeedRecord(kn) {
   }
 }
 
-// ─── Matkatilastot ──────────────────────────────────────────────────────
-var _trip = null;   // { startTime_ms, nm, maxKn, lastTime_ms }
-
-function startTrip() {
-  var now = Date.now();
-  _trip = { startTime_ms: now, nm: 0, maxKn: 0, lastTime_ms: now };
-  document.getElementById("trip-start-btn").style.display = "none";
-  document.getElementById("trip-stop-btn").style.display  = "";
-  document.getElementById("trip-live").style.display = "";
-  updateTripLiveUI();
-}
-
-function stopTrip() {
-  if (!_trip) return;
-  var now = Date.now();
-  var durationMin = Math.round((now - _trip.startTime_ms) / 60000);
-  var avgKn = durationMin > 0 ? _trip.nm / (durationMin / 60) : 0;
-  var summary = {
-    date:         new Date().toLocaleDateString("fi-FI"),
-    duration_min: durationMin,
-    nm:           Math.round(_trip.nm * 10) / 10,
-    avg_kn:       Math.round(avgKn * 10) / 10,
-    max_kn:       Math.round(_trip.maxKn * 10) / 10
-  };
-  // Lisää matkan nm kausiyhteensä
-  _records.season_nm = Math.round((_records.season_nm + summary.nm) * 10) / 10;
-  // Prepend ja rajoita 20:een
-  _records.trips = [summary].concat((_records.trips || []).slice(0, 19));
-  postRecords();
-  updateRecordsUI();
-  _trip = null;
-  document.getElementById("trip-start-btn").style.display = "";
-  document.getElementById("trip-stop-btn").style.display  = "none";
-  document.getElementById("trip-live").style.display = "none";
-  updateTripHistoryUI();
-}
-
-function updateTripDistance(sogKn) {
-  if (!_trip || sogKn == null) return;
-  var now = Date.now();
-  var dtHours = (now - _trip.lastTime_ms) / 3600000;
-  if (dtHours > 0.1) dtHours = 0.1;  // katkaise jos >6min tauko (esim. yhteys poikki)
-  _trip.nm += sogKn * dtHours;
-  if (sogKn > _trip.maxKn) _trip.maxKn = sogKn;
-  _trip.lastTime_ms = now;
-  updateTripLiveUI();
-}
-
-function updateTripLiveUI() {
-  if (!_trip) return;
-  var now  = Date.now();
-  var elapsed = Math.floor((now - _trip.startTime_ms) / 60000);
-  var h = Math.floor(elapsed / 60), m = elapsed % 60;
-  document.getElementById("trip-duration").textContent = h + "h " + m + "m";
-  document.getElementById("trip-nm").textContent       = _trip.nm.toFixed(1) + " nm";
-  var avgKn = elapsed > 0 ? _trip.nm / (elapsed / 60) : 0;
-  document.getElementById("trip-avg-kn").textContent   = avgKn.toFixed(1) + " kn";
-  document.getElementById("trip-max-kn").textContent   = _trip.maxKn.toFixed(1) + " kn";
-}
-
-function updateTripHistoryUI() {
-  var el = document.getElementById("trip-history");
-  if (!_records.trips || _records.trips.length === 0) { el.innerHTML = ""; return; }
-  var html = '<div style="font-size:0.72rem;color:var(--muted);font-weight:600;'
-    + 'letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px;">Viimeisimmät matkat</div>';
-  _records.trips.slice(0, 3).forEach(function(t) {
-    html += '<div style="display:flex;justify-content:space-between;padding:3px 0;'
-      + 'border-top:1px solid var(--border);font-size:0.8rem;">'
-      + '<span style="color:var(--muted);">' + t.date + '</span>'
-      + '<span>' + t.nm + ' nm</span>'
-      + '<span>' + Math.floor(t.duration_min/60) + 'h ' + (t.duration_min%60) + 'm</span>'
-      + '<span style="color:var(--muted);">↑' + t.max_kn + ' kn</span>'
-      + '</div>';
-  });
-  el.innerHTML = html;
-}
-
-// Päivitä live-UI kerran minuutissa vaikka GPS ei päivity
-setInterval(function() { if (_trip) updateTripLiveUI(); }, 30000);
 
 // ─── Rum o'clock ───────────────────────────────────────────────────────
 var _rumOClockFired = false;

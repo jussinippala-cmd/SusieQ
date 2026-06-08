@@ -202,7 +202,8 @@ html, body, #map {
 /* Reittipaneeli */
 #route-panel {
   position: fixed;
-  top: 56px; left: 16px; bottom: 80px;
+  top: 56px; left: 16px;
+  max-height: calc(100dvh - 170px);
   width: 160px;
   z-index: 1000;
   background: rgba(22, 27, 34, 0.92);
@@ -225,7 +226,8 @@ html, body, #map {
 }
 
 #route-wp-list {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 4px 0;
 }
@@ -471,7 +473,7 @@ const depthLayer = L.tileLayer('/tiles/merik/{z}/{x}/{y}.png', {
 let depthVisible = false;
 
 // ── Track + localStorage ─────────────────────────────────────────────────────
-const track = L.polyline([], { color: '#4fc3f7', weight: 2.5, opacity: 0.8 }).addTo(map);
+const track = L.polyline([], { color: '#4ade80', weight: 2.5, opacity: 0.85 }).addTo(map);
 let lastLatLng = null;
 let firstFix = true;
 
@@ -542,12 +544,19 @@ function updateBoat(lat, lon, cog) {
 
 // ── Minuuttiviiva ────────────────────────────────────────────────────────────
 let minuteLine = null;
+let minuteLabels = [];
 let mlEnabled = true;
 let mlMinutes = 5;
 
+function clearMinuteLine() {
+  if (minuteLine) { minuteLine.remove(); minuteLine = null; }
+  minuteLabels.forEach(m => m.remove());
+  minuteLabels = [];
+}
+
 function onMlToggle() {
   mlEnabled = !mlEnabled;
-  if (!mlEnabled && minuteLine) { minuteLine.remove(); minuteLine = null; }
+  if (!mlEnabled) clearMinuteLine();
   document.getElementById('toggle-ml').classList.toggle('on', mlEnabled);
 }
 
@@ -566,16 +575,44 @@ function projectPos(lat, lon, cogDeg, sogKn, mins) {
 
 function updateMinuteLine(lat, lon, cog, sog) {
   if (!mlEnabled || sog < 0.2) {
-    if (minuteLine) { minuteLine.remove(); minuteLine = null; }
+    clearMinuteLine();
     return;
   }
   const end = projectPos(lat, lon, cog, sog, mlMinutes);
   if (!minuteLine) {
     minuteLine = L.polyline([[lat, lon], end], {
-      color: '#f0c04c', weight: 2, opacity: 0.85, dashArray: '8 5'
+      color: '#ff9800', weight: 2.5, opacity: 0.9, dashArray: '8 5'
     }).addTo(map);
   } else {
     minuteLine.setLatLngs([[lat, lon], end]);
+  }
+
+  minuteLabels.forEach(m => m.remove());
+  minuteLabels = [];
+  for (let t = 5; t <= mlMinutes; t += 5) {
+    const pos = projectPos(lat, lon, cog, sog, t);
+    const lbl = L.marker(pos, {
+      icon: L.divIcon({
+        className: '',
+        html: `<span style="
+          display:inline-block;
+          background:rgba(22,27,34,0.8);
+          color:#ff9800;
+          font-size:9px;
+          font-weight:700;
+          padding:1px 4px;
+          border-radius:3px;
+          border:1px solid rgba(255,152,0,0.5);
+          white-space:nowrap;
+          pointer-events:none;
+          font-family:-apple-system,sans-serif;
+        ">${t} min</span>`,
+        iconSize: null,
+        iconAnchor: [0, 8]
+      }),
+      interactive: false
+    }).addTo(map);
+    minuteLabels.push(lbl);
   }
 }
 
@@ -697,6 +734,7 @@ let advanceRadiusNm = 0.10;
 let autoAdvance = true;
 let routeMarkers = [];    // L.marker-instanssit kartalla
 let routeLine = null;     // L.polyline reittilinjalle
+let currentLegLine = null; // viiva veneen sijainnista seuraavaan WP:hen
 let _lastSog = 0;         // viimeisin SOG (knots) routePanel-laskentaa varten
 
 // ── Anchor Watch ─────────────────────────────────────────────────────────────
@@ -774,12 +812,30 @@ function updateRoutePanel() {
 
   nextBtn.style.display = routeActive ? 'block' : 'none';
   nextBtn.disabled = !routeActive || currentWpIdx >= route.length - 1;
+  updateCurrentLegLine();
+}
+
+function updateCurrentLegLine() {
+  if (!routeActive || !currentPos || currentWpIdx >= route.length) {
+    if (currentLegLine) { currentLegLine.remove(); currentLegLine = null; }
+    return;
+  }
+  const wp = route[currentWpIdx];
+  const pts = [currentPos, [wp.lat, wp.lon]];
+  if (!currentLegLine) {
+    currentLegLine = L.polyline(pts, {
+      color: '#4fc3f7', weight: 2, opacity: 0.65, dashArray: '6 4'
+    }).addTo(map);
+  } else {
+    currentLegLine.setLatLngs(pts);
+  }
 }
 
 function renderRouteOnMap() {
   routeMarkers.forEach(m => m.remove());
   routeMarkers = [];
   if (routeLine) { routeLine.remove(); routeLine = null; }
+  if (currentLegLine) { currentLegLine.remove(); currentLegLine = null; }
 
   document.getElementById('route-panel').style.display =
     route.length ? 'flex' : 'none';
@@ -937,16 +993,16 @@ function renderAnchorOnMap() {
   if (!anchorActive || anchorLat === null) return;
   anchorCircle = L.circle([anchorLat, anchorLon], {
     radius: anchorRadiusM,
-    color: '#4fc3f7', weight: 1.5, opacity: 0.7,
-    fillColor: '#4fc3f7', fillOpacity: 0.06,
+    color: '#4ade80', weight: 1.5, opacity: 0.7,
+    fillColor: '#4ade80', fillOpacity: 0.06,
     dashArray: '5 4'
   }).addTo(map);
   anchorMarker = L.marker([anchorLat, anchorLon], {
     icon: L.divIcon({
       className: '',
       html: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
-               <circle cx="11" cy="11" r="9" fill="rgba(79,195,247,0.15)" stroke="#4fc3f7" stroke-width="1.5"/>
-               <text x="11" y="15" text-anchor="middle" fill="#4fc3f7" font-size="11">⚓</text>
+               <circle cx="11" cy="11" r="9" fill="rgba(74,222,128,0.15)" stroke="#4ade80" stroke-width="1.5"/>
+               <text x="11" y="15" text-anchor="middle" fill="#4ade80" font-size="11">⚓</text>
              </svg>`,
       iconSize: [22, 22], iconAnchor: [11, 11]
     }),
