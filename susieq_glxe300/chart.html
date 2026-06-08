@@ -371,7 +371,11 @@ html, body, #map {
     <circle cx="140" cy="140" r="108" fill="#161b22"/>
     <g id="wind-ticks-small"></g>
     <g id="wind-arrow-small">
-      <polygon points="140,28 131,6 149,6" fill="#58a6ff" opacity="0.95"/>
+      <!-- No-go-sektori ±45° tuulen tulosuunnasta (pyörii nuolen mukana) -->
+      <path d="M 140 140 L 69 69 A 100 100 0 0 1 211 69 Z"
+            fill="#f85149" fill-opacity="0.18"/>
+      <!-- Reunanuoli — isompi kolmio -->
+      <polygon points="140,42 120,2 160,2" fill="#58a6ff" opacity="0.95"/>
     </g>
     <circle cx="140" cy="140" r="4" fill="#30363d"/>
   </svg>
