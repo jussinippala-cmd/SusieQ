@@ -1,0 +1,14 @@
+#!/bin/sh
+NTFY_CHANNEL=SusieQpurjevene
+TEMP=$(gl_modem AT 'AT+QTEMP' 2>/dev/null | grep '+QTEMP:' | awk -F'[ ,]' '{print $2}')
+[ -z "$TEMP" ] && exit 0
+logger -t susieq-temp "Modeemi: ${TEMP}C"
+if [ "$TEMP" -ge 65 ] && [ ! -f /tmp/susieq_temp_notified ]; then
+    curl -s --connect-timeout 5 --max-time 10 \
+         -H 'Priority: high' \
+         -d "Modeemi ylikuumenee: ${TEMP}C" \
+         "https://ntfy.sh/${NTFY_CHANNEL}"
+    touch /tmp/susieq_temp_notified
+elif [ "$TEMP" -lt 60 ]; then
+    rm -f /tmp/susieq_temp_notified
+fi
