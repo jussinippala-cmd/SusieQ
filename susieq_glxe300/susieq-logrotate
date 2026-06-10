@@ -5,5 +5,7 @@ for i in 6 5 4 3 2 1; do
   [ -f ${LOG}.$i ] && mv ${LOG}.$i ${LOG}.$(($i+1))
 done
 [ -f $LOG ] && mv $LOG ${LOG}.1
-kill -HUP $(cat /var/run/logd.pid 2>/dev/null) 2>/dev/null
+touch $LOG
+kill $(cat /var/run/logread.1.pid 2>/dev/null) 2>/dev/null
+/etc/init.d/log start
 find /mnt/sda1/logs -name 'system.log.*' | sort -t. -k3 -n | head -n -7 | xargs rm -f 2>/dev/null
