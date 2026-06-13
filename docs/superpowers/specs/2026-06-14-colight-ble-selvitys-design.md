@@ -21,6 +21,22 @@ Cockpit ESP32 (192.168.8.100) tekee jo BLE-yhteyden Victron-laturiin, ja CoLight
 
 ---
 
+## Taustatutkimus
+
+Verkkohaku ennen toteutussuunnittelua tuotti seuraavat löydökset:
+
+- **CoLight on uudelleenbrändätty OEM-tuote** valmistajalta Guangzhou Weiming Electronic Technology Co., Ltd ("WM-" tuoteperhe). Samaa laitteistoa myydään myös nimillä Auxbeam AR-800/820, Mictuning P1S, Novsight, KickAss, GGLighting, San Hima, Podsl jne. — visuaalisesti identtisiä 8/12-gang RGB-kytkinpaneeleita.
+- Virallinen ohjaussovellus on **"Switch panel"** (App Store ID 1569109150, Guangzhou Weiming) — samaa sovellusta käytetään myös valmistajan "WM-LED" BLE-valaisimille.
+- **Julkista reverse-engineering-dokumentaatiota tämän tuoteperheen BLE-protokollasta ei löytynyt** (ei GitHub-repoja, ei foorumiketjuja UUID-tasolla).
+- Kaksi **candidate-UUID-perhettä** kannattaa tarkistaa ensimmäisenä `discover`-ajossa, koska ne ovat yleisiä halvoissa kiinalaisissa BLE-moduuleissa:
+  - **FFE0 (service) / FFE1 (write+notify)** — HM-10-tyylinen serial-over-BLE, raaka tavusarja
+  - **FFD5 (service) / FFD9 (write)** — "Triones"-tyylinen LED-protokolla, komennot muotoa `56 RR GG BB 00 F0 AA` (RGB) / `56 00 00 00 WW 0F AA` (valkoinen). Tämä on tunnettu RGB-taustavalon ohjausprotokolla — paneelin RGB-taustavalo saattaa käyttää samaa, mutta itse kytkinten on/off-komennot ovat todennäköisesti eri characteristicissa.
+- Ei löytynyt tietoa yhteysrajoituksesta (yksi vs. useampi samanaikainen BLE-keskusyksikkö) — testataan empiirisesti kohdassa 4.
+
+Näitä UUID:eja ei oleteta löytyvän — `discover`-komento listaa kaikki palvelut/characteristicsit joka tapauksessa — mutta jos FFE0/FFE1 tai FFD5/FFD9 löytyvät, ne kannattaa testata ensin.
+
+---
+
 ## Arkkitehtuuripäätös
 
 Selvitystyö tehdään **Macilla, Python-skriptillä (`bleak`-kirjasto)**, ajettuna veneellä BLE-kantamalla CoLight-paneelista. Skripti ei ole osa mitään firmwarea tai tuotantojärjestelmää — se on kertaluonteinen/toistettava tutkimustyökalu, jonka tulosteet (GATT-kartta JSON + notifikaatioloki CSV) ohjaavat Vaihe 2:n suunnittelua.
@@ -38,7 +54,7 @@ Yksi CLI-skripti kolmella alikomennolla:
 | Komento | Kuvaus |
 |---|---|
 | `scan` | Skannaa lähistön BLE-laitteet 10 s ajan, tulostaa nimi + osoite + RSSI -taulukon. Käytetään CoLight-paneelin osoitteen/nimen tunnistamiseen. |
-| `discover <address>` | Yhdistää annettuun osoitteeseen, käy läpi kaikki GATT-palvelut ja characteristicsit (UUID, properties: read/write/notify/indicate, deskriptorit), lukee read-kykyisten characteristicsien arvot. Tallentaa tuloksen JSON-tiedostoon. |
+| `discover <address>` | Yhdistää annettuun osoitteeseen, käy läpi kaikki GATT-palvelut ja characteristicsit (UUID, properties: read/write/notify/indicate, deskriptorit), lukee read-kykyisten characteristicsien arvot. Tallentaa tuloksen JSON-tiedostoon. Tulostaa lisäksi huomautuksen jos löytyy Taustatutkimus-osion candidate-UUID:eja (FFE0/FFE1, FFD5/FFD9). |
 | `monitor <address>` | Yhdistää, tilaa kaikki notify/indicate-kykyiset characteristicsit, ja kirjoittaa CSV-riviä (`timestamp, characteristic_uuid, value_hex`) joka kerta kun arvo muuttuu. Ajetaan kunnes Ctrl+C. |
 
 ### Riippuvuudet
