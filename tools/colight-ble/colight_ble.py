@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from bleak import BleakClient, BleakScanner
+from bleak.exc import BleakError
 
 OUTPUT_DIR = Path(__file__).parent / "output"
 SCAN_TIMEOUT = 10.0
@@ -92,6 +93,15 @@ def format_monitor_row(timestamp: str, uuid: str, data: bytes) -> list[str]:
     return [timestamp, format_uuid_short(uuid), data.hex()]
 
 
+def format_connection_error(address: str, exc: Exception) -> str:
+    """Muotoilee selkeän virheviestin BLE-yhteyden epäonnistuessa ja
+    ehdottaa 'scan'-komennon ajamista ensin."""
+    return (
+        f"Yhteys laitteeseen {address} epäonnistui ({exc}).\n"
+        "Kokeile ensin: python3 colight_ble.py scan"
+    )
+
+
 async def cmd_scan(args: argparse.Namespace) -> None:
     print(f"Skannataan {SCAN_TIMEOUT:.0f} sekuntia...")
     devices = await BleakScanner.discover(timeout=SCAN_TIMEOUT, return_adv=True)
@@ -109,23 +119,27 @@ async def cmd_discover(args: argparse.Namespace) -> None:
     OUTPUT_DIR.mkdir(exist_ok=True)
     print(f"Yhdistetään {args.address}...")
 
-    async with BleakClient(args.address) as client:
-        services_info = []
-        for service in client.services:
-            characteristics = []
-            for char in service.characteristics:
-                properties = list(char.properties)
-                value_hex = None
-                if "read" in properties:
-                    try:
-                        value = await client.read_gatt_char(char)
-                        value_hex = value.hex()
-                    except Exception as exc:
-                        value_hex = f"<virhe: {exc}>"
-                characteristics.append(
-                    {"uuid": char.uuid, "properties": properties, "value_hex": value_hex}
-                )
-            services_info.append({"uuid": service.uuid, "characteristics": characteristics})
+    try:
+        async with BleakClient(args.address) as client:
+            services_info = []
+            for service in client.services:
+                characteristics = []
+                for char in service.characteristics:
+                    properties = list(char.properties)
+                    value_hex = None
+                    if "read" in properties:
+                        try:
+                            value = await client.read_gatt_char(char)
+                            value_hex = value.hex()
+                        except Exception as exc:
+                            value_hex = f"<virhe: {exc}>"
+                    characteristics.append(
+                        {"uuid": char.uuid, "properties": properties, "value_hex": value_hex}
+                    )
+                services_info.append({"uuid": service.uuid, "characteristics": characteristics})
+    except BleakError as exc:
+        print(format_connection_error(args.address, exc))
+        return
 
     report = build_discover_report(services_info, args.address)
 
@@ -160,29 +174,37 @@ async def cmd_monitor(args: argparse.Namespace) -> None:
             csv_file.flush()
             print(" ".join(row))
 
+        connected_once = False
         while True:
             disconnected = asyncio.Event()
 
-            async with BleakClient(
-                args.address, disconnected_callback=lambda _c: disconnected.set()
-            ) as client:
-                subscribed = 0
-                for service in client.services:
-                    for char in service.characteristics:
-                        if "notify" in char.properties or "indicate" in char.properties:
-                            try:
-                                await client.start_notify(char, handler)
-                                subscribed += 1
-                            except Exception as exc:
-                                print(
-                                    f"  [varoitus] start_notify epäonnistui "
-                                    f"{format_uuid_short(char.uuid)}: {exc}"
-                                )
-                print(
-                    f"Tilattu {subscribed} characteristicsia. "
-                    "Kuunnellaan (Ctrl+C lopettaa)..."
-                )
-                await disconnected.wait()
+            try:
+                async with BleakClient(
+                    args.address, disconnected_callback=lambda _c: disconnected.set()
+                ) as client:
+                    connected_once = True
+                    subscribed = 0
+                    for service in client.services:
+                        for char in service.characteristics:
+                            if "notify" in char.properties or "indicate" in char.properties:
+                                try:
+                                    await client.start_notify(char, handler)
+                                    subscribed += 1
+                                except Exception as exc:
+                                    print(
+                                        f"  [varoitus] start_notify epäonnistui "
+                                        f"{format_uuid_short(char.uuid)}: {exc}"
+                                    )
+                    print(
+                        f"Tilattu {subscribed} characteristicsia. "
+                        "Kuunnellaan (Ctrl+C lopettaa)..."
+                    )
+                    await disconnected.wait()
+            except BleakError as exc:
+                if not connected_once:
+                    print(format_connection_error(args.address, exc))
+                    return
+                raise
 
             print("Yhteys katkesi, yhdistetään uudelleen 5 s kuluttua...")
             await asyncio.sleep(5)

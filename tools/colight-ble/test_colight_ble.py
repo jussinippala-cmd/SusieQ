@@ -1,7 +1,10 @@
+from bleak.exc import BleakError
+
 from colight_ble import (
     ScanResult,
     build_discover_report,
     describe_uuid,
+    format_connection_error,
     format_monitor_row,
     format_scan_table,
     format_uuid_short,
@@ -101,3 +104,16 @@ def test_build_discover_report_annotates_candidate_uuids():
 def test_format_monitor_row_returns_csv_row():
     row = format_monitor_row("2026-06-14T12:00:00+00:00", "0000ffe1-0000-1000-8000-00805f9b34fb", b"\x01\x02")
     assert row == ["2026-06-14T12:00:00+00:00", "ffe1", "0102"]
+
+
+def test_format_connection_error_includes_address_and_exception_message():
+    exc = BleakError("device not found")
+    message = format_connection_error("AA:BB:CC:DD:EE:FF", exc)
+    assert "AA:BB:CC:DD:EE:FF" in message
+    assert "device not found" in message
+
+
+def test_format_connection_error_suggests_running_scan():
+    exc = BleakError("device not found")
+    message = format_connection_error("AA:BB:CC:DD:EE:FF", exc)
+    assert "scan" in message
