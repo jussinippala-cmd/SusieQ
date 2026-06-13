@@ -19,6 +19,16 @@ OUTPUT_DIR = Path(__file__).parent / "output"
 SCAN_TIMEOUT = 10.0
 
 
+def format_uuid_short(uuid_str: str) -> str:
+    """Palauttaa 16-bittisen lyhytmuodon (esim. 'ffe0') Bluetooth SIG:n
+    base UUID -kaavalle 0000XXXX-0000-1000-8000-00805f9b34fb, muuten
+    palauttaa koko UUID:n pienillä kirjaimilla."""
+    normalized = uuid_str.lower()
+    if normalized.startswith("0000") and normalized.endswith("-0000-1000-8000-00805f9b34fb"):
+        return normalized[4:8]
+    return normalized
+
+
 async def cmd_scan(args: argparse.Namespace) -> None:
     raise NotImplementedError
 
