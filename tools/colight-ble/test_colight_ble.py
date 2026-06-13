@@ -71,7 +71,11 @@ def test_build_discover_report_annotates_candidate_uuids():
                     "value_hex": "010203",
                 },
             ],
-        }
+        },
+        {
+            "uuid": "0000abcd-0000-1000-8000-00805f9b34fb",
+            "characteristics": [],
+        },
     ]
     report = build_discover_report(services_info, "AA:BB:CC:DD:EE:FF")
 
@@ -88,3 +92,6 @@ def test_build_discover_report_annotates_candidate_uuids():
     assert char_abcd["short_uuid"] == "abcd"
     assert char_abcd["note"] is None
     assert char_abcd["value_hex"] == "010203"
+
+    assert report["services"][1]["short_uuid"] == "abcd"
+    assert report["services"][1]["note"] is None

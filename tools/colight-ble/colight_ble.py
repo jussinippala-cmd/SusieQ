@@ -113,7 +113,7 @@ async def cmd_discover(args: argparse.Namespace) -> None:
                 value_hex = None
                 if "read" in properties:
                     try:
-                        value = await client.read_gatt_char(char.uuid)
+                        value = await client.read_gatt_char(char)
                         value_hex = value.hex()
                     except Exception as exc:
                         value_hex = f"<virhe: {exc}>"
