@@ -44,8 +44,35 @@ def describe_uuid(uuid_str: str) -> str | None:
     return CANDIDATE_UUIDS.get(format_uuid_short(uuid_str))
 
 
+@dataclass
+class ScanResult:
+    name: str | None
+    address: str
+    rssi: int
+
+
+def format_scan_table(results: list[ScanResult]) -> str:
+    """Muotoilee skannaustulokset taulukoksi, vahvimmasta signaalista
+    heikoimpaan."""
+    header = f"{'Nimi':<30} {'Osoite':<20} RSSI"
+    rows = [header]
+    for r in sorted(results, key=lambda x: x.rssi, reverse=True):
+        name = r.name or "(nimetön)"
+        rows.append(f"{name:<30} {r.address:<20} {r.rssi}")
+    return "\n".join(rows)
+
+
 async def cmd_scan(args: argparse.Namespace) -> None:
-    raise NotImplementedError
+    print(f"Skannataan {SCAN_TIMEOUT:.0f} sekuntia...")
+    devices = await BleakScanner.discover(timeout=SCAN_TIMEOUT, return_adv=True)
+    results = [
+        ScanResult(name=device.name, address=address, rssi=adv.rssi)
+        for address, (device, adv) in devices.items()
+    ]
+    if not results:
+        print("Ei löytynyt BLE-laitteita.")
+        return
+    print(format_scan_table(results))
 
 
 async def cmd_discover(args: argparse.Namespace) -> None:

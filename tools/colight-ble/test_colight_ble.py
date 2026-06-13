@@ -1,4 +1,4 @@
-from colight_ble import describe_uuid, format_uuid_short
+from colight_ble import ScanResult, describe_uuid, format_scan_table, format_uuid_short
 
 
 def test_format_uuid_short_extracts_16bit_form():
@@ -32,3 +32,18 @@ def test_describe_uuid_recognizes_ffd5():
 
 def test_describe_uuid_returns_none_for_unknown():
     assert describe_uuid("0000abcd-0000-1000-8000-00805f9b34fb") is None
+
+
+def test_format_scan_table_sorts_by_rssi_descending():
+    results = [
+        ScanResult(name="Weak", address="AA:AA:AA:AA:AA:AA", rssi=-80),
+        ScanResult(name="Strong", address="BB:BB:BB:BB:BB:BB", rssi=-40),
+    ]
+    table = format_scan_table(results)
+    assert table.index("Strong") < table.index("Weak")
+
+
+def test_format_scan_table_shows_placeholder_for_unnamed_device():
+    results = [ScanResult(name=None, address="CC:CC:CC:CC:CC:CC", rssi=-60)]
+    table = format_scan_table(results)
+    assert "(nimetön)" in table
