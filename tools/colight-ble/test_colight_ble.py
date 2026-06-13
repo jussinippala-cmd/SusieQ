@@ -22,5 +22,13 @@ def test_describe_uuid_recognizes_ffd9():
     assert describe_uuid("0000ffd9-0000-1000-8000-00805f9b34fb") is not None
 
 
+def test_describe_uuid_recognizes_ffe0():
+    assert describe_uuid("0000ffe0-0000-1000-8000-00805f9b34fb") is not None
+
+
+def test_describe_uuid_recognizes_ffd5():
+    assert describe_uuid("0000ffd5-0000-1000-8000-00805f9b34fb") is not None
+
+
 def test_describe_uuid_returns_none_for_unknown():
     assert describe_uuid("0000abcd-0000-1000-8000-00805f9b34fb") is None
