@@ -62,6 +62,31 @@ def format_scan_table(results: list[ScanResult]) -> str:
     return "\n".join(rows)
 
 
+def build_discover_report(services_info: list[dict], device_address: str) -> dict:
+    """Muodostaa JSON-yhteensopivan raportin GATT-rakenteesta, lisäten
+    candidate-UUID-huomautukset (ks. describe_uuid)."""
+    report: dict = {"device_address": device_address, "services": []}
+    for service in services_info:
+        service_entry = {
+            "uuid": service["uuid"],
+            "short_uuid": format_uuid_short(service["uuid"]),
+            "note": describe_uuid(service["uuid"]),
+            "characteristics": [],
+        }
+        for char in service["characteristics"]:
+            service_entry["characteristics"].append(
+                {
+                    "uuid": char["uuid"],
+                    "short_uuid": format_uuid_short(char["uuid"]),
+                    "note": describe_uuid(char["uuid"]),
+                    "properties": char["properties"],
+                    "value_hex": char.get("value_hex"),
+                }
+            )
+        report["services"].append(service_entry)
+    return report
+
+
 async def cmd_scan(args: argparse.Namespace) -> None:
     print(f"Skannataan {SCAN_TIMEOUT:.0f} sekuntia...")
     devices = await BleakScanner.discover(timeout=SCAN_TIMEOUT, return_adv=True)
@@ -76,7 +101,40 @@ async def cmd_scan(args: argparse.Namespace) -> None:
 
 
 async def cmd_discover(args: argparse.Namespace) -> None:
-    raise NotImplementedError
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    print(f"Yhdistetään {args.address}...")
+
+    async with BleakClient(args.address) as client:
+        services_info = []
+        for service in client.services:
+            characteristics = []
+            for char in service.characteristics:
+                properties = list(char.properties)
+                value_hex = None
+                if "read" in properties:
+                    try:
+                        value = await client.read_gatt_char(char.uuid)
+                        value_hex = value.hex()
+                    except Exception as exc:
+                        value_hex = f"<virhe: {exc}>"
+                characteristics.append(
+                    {"uuid": char.uuid, "properties": properties, "value_hex": value_hex}
+                )
+            services_info.append({"uuid": service.uuid, "characteristics": characteristics})
+
+    report = build_discover_report(services_info, args.address)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    output_path = OUTPUT_DIR / f"discover_{timestamp}.json"
+    output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False))
+    print(f"Tallennettu: {output_path}")
+
+    for service in report["services"]:
+        if service["note"]:
+            print(f"  [HUOM] Palvelu {service['short_uuid']}: {service['note']}")
+        for char in service["characteristics"]:
+            if char["note"]:
+                print(f"    [HUOM] Characteristic {char['short_uuid']}: {char['note']}")
 
 
 async def cmd_monitor(args: argparse.Namespace) -> None:

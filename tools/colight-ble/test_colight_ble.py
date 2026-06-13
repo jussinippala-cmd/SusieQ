@@ -1,4 +1,10 @@
-from colight_ble import ScanResult, describe_uuid, format_scan_table, format_uuid_short
+from colight_ble import (
+    ScanResult,
+    build_discover_report,
+    describe_uuid,
+    format_scan_table,
+    format_uuid_short,
+)
 
 
 def test_format_uuid_short_extracts_16bit_form():
@@ -47,3 +53,38 @@ def test_format_scan_table_shows_placeholder_for_unnamed_device():
     results = [ScanResult(name=None, address="CC:CC:CC:CC:CC:CC", rssi=-60)]
     table = format_scan_table(results)
     assert "(nimetön)" in table
+
+
+def test_build_discover_report_annotates_candidate_uuids():
+    services_info = [
+        {
+            "uuid": "0000ffe0-0000-1000-8000-00805f9b34fb",
+            "characteristics": [
+                {
+                    "uuid": "0000ffe1-0000-1000-8000-00805f9b34fb",
+                    "properties": ["write", "notify"],
+                    "value_hex": None,
+                },
+                {
+                    "uuid": "0000abcd-0000-1000-8000-00805f9b34fb",
+                    "properties": ["read"],
+                    "value_hex": "010203",
+                },
+            ],
+        }
+    ]
+    report = build_discover_report(services_info, "AA:BB:CC:DD:EE:FF")
+
+    assert report["device_address"] == "AA:BB:CC:DD:EE:FF"
+    service = report["services"][0]
+    assert service["short_uuid"] == "ffe0"
+    assert service["note"] is not None
+
+    char_ffe1, char_abcd = service["characteristics"]
+    assert char_ffe1["short_uuid"] == "ffe1"
+    assert char_ffe1["note"] is not None
+    assert char_ffe1["properties"] == ["write", "notify"]
+
+    assert char_abcd["short_uuid"] == "abcd"
+    assert char_abcd["note"] is None
+    assert char_abcd["value_hex"] == "010203"
