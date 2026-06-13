@@ -87,6 +87,11 @@ def build_discover_report(services_info: list[dict], device_address: str) -> dic
     return report
 
 
+def format_monitor_row(timestamp: str, uuid: str, data: bytes) -> list[str]:
+    """Muotoilee yhden CSV-rivin notifikaatiolokiin."""
+    return [timestamp, format_uuid_short(uuid), data.hex()]
+
+
 async def cmd_scan(args: argparse.Namespace) -> None:
     print(f"Skannataan {SCAN_TIMEOUT:.0f} sekuntia...")
     devices = await BleakScanner.discover(timeout=SCAN_TIMEOUT, return_adv=True)
@@ -138,7 +143,43 @@ async def cmd_discover(args: argparse.Namespace) -> None:
 
 
 async def cmd_monitor(args: argparse.Namespace) -> None:
-    raise NotImplementedError
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    output_path = OUTPUT_DIR / f"monitor_{timestamp}.csv"
+    print(f"Lokitiedosto: {output_path}")
+
+    with open(output_path, "w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["timestamp", "characteristic", "value_hex"])
+
+        def handler(characteristic, data: bytearray) -> None:
+            row = format_monitor_row(
+                datetime.now(timezone.utc).isoformat(), characteristic.uuid, bytes(data)
+            )
+            writer.writerow(row)
+            csv_file.flush()
+            print(" ".join(row))
+
+        while True:
+            disconnected = asyncio.Event()
+
+            async with BleakClient(
+                args.address, disconnected_callback=lambda _c: disconnected.set()
+            ) as client:
+                subscribed = 0
+                for service in client.services:
+                    for char in service.characteristics:
+                        if "notify" in char.properties or "indicate" in char.properties:
+                            await client.start_notify(char.uuid, handler)
+                            subscribed += 1
+                print(
+                    f"Tilattu {subscribed} characteristicsia. "
+                    "Kuunnellaan (Ctrl+C lopettaa)..."
+                )
+                await disconnected.wait()
+
+            print("Yhteys katkesi, yhdistetään uudelleen 5 s kuluttua...")
+            await asyncio.sleep(5)
 
 
 def build_parser() -> argparse.ArgumentParser:

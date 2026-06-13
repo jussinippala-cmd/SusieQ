@@ -2,6 +2,7 @@ from colight_ble import (
     ScanResult,
     build_discover_report,
     describe_uuid,
+    format_monitor_row,
     format_scan_table,
     format_uuid_short,
 )
@@ -95,3 +96,8 @@ def test_build_discover_report_annotates_candidate_uuids():
 
     assert report["services"][1]["short_uuid"] == "abcd"
     assert report["services"][1]["note"] is None
+
+
+def test_format_monitor_row_returns_csv_row():
+    row = format_monitor_row("2026-06-14T12:00:00+00:00", "0000ffe1-0000-1000-8000-00805f9b34fb", b"\x01\x02")
+    assert row == ["2026-06-14T12:00:00+00:00", "ffe1", "0102"]
