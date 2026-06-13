@@ -170,8 +170,14 @@ async def cmd_monitor(args: argparse.Namespace) -> None:
                 for service in client.services:
                     for char in service.characteristics:
                         if "notify" in char.properties or "indicate" in char.properties:
-                            await client.start_notify(char.uuid, handler)
-                            subscribed += 1
+                            try:
+                                await client.start_notify(char, handler)
+                                subscribed += 1
+                            except Exception as exc:
+                                print(
+                                    f"  [varoitus] start_notify epäonnistui "
+                                    f"{format_uuid_short(char.uuid)}: {exc}"
+                                )
                 print(
                     f"Tilattu {subscribed} characteristicsia. "
                     "Kuunnellaan (Ctrl+C lopettaa)..."
