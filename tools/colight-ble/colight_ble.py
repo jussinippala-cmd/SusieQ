@@ -29,6 +29,21 @@ def format_uuid_short(uuid_str: str) -> str:
     return normalized
 
 
+CANDIDATE_UUIDS = {
+    "ffe0": "HM-10-tyylinen serial-over-BLE -palvelu",
+    "ffe1": "HM-10-tyylinen serial-over-BLE write/notify -characteristic",
+    "ffd5": "Triones-tyylinen LED-ohjauspalvelu",
+    "ffd9": "Triones-tyylinen LED-ohjaus write-characteristic (56 RR GG BB 00 F0 AA)",
+}
+
+
+def describe_uuid(uuid_str: str) -> str | None:
+    """Palauttaa kuvauksen jos UUID vastaa tunnettua candidate-UUID:ta
+    (ks. docs/superpowers/specs/2026-06-14-colight-ble-selvitys-design.md),
+    muuten None."""
+    return CANDIDATE_UUIDS.get(format_uuid_short(uuid_str))
+
+
 async def cmd_scan(args: argparse.Namespace) -> None:
     raise NotImplementedError
 
