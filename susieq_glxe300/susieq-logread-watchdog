@@ -1,0 +1,6 @@
+#!/bin/sh
+PID_FILE=/var/run/logread.1.pid
+PID=$(cat "$PID_FILE" 2>/dev/null)
+[ -n "$PID" ] && kill -0 "$PID" 2>/dev/null && exit 0
+logger -t susieq-watchdog "WARN: logread ei kaynissa, kaynnistetaan uudelleen"
+/etc/init.d/log start

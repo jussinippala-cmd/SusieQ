@@ -6,6 +6,14 @@ for i in 6 5 4 3 2 1; do
 done
 [ -f $LOG ] && mv $LOG ${LOG}.1
 touch $LOG
-kill $(cat /var/run/logread.1.pid 2>/dev/null) 2>/dev/null
+PID=$(cat /var/run/logread.1.pid 2>/dev/null)
+if [ -n "$PID" ]; then
+  kill "$PID" 2>/dev/null
+  for i in 1 2 3 4 5; do
+    kill -0 "$PID" 2>/dev/null || break
+    sleep 1
+  done
+fi
+rm -f /var/run/logread.1.pid 2>/dev/null
 /etc/init.d/log start
 find /mnt/sda1/logs -name 'system.log.*' | sort -t. -k3 -n | head -n -7 | xargs rm -f 2>/dev/null
