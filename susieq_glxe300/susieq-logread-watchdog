@@ -1,6 +1,22 @@
 #!/bin/sh
 PID_FILE=/var/run/logread.1.pid
+LOG=/mnt/sda1/logs/system.log
+
 PID=$(cat "$PID_FILE" 2>/dev/null)
-[ -n "$PID" ] && kill -0 "$PID" 2>/dev/null && exit 0
-logger -t susieq-watchdog "WARN: logread ei kaynissa, kaynnistetaan uudelleen"
-/etc/init.d/log start
+PROC_OK=0
+[ -n "$PID" ] && kill -0 "$PID" 2>/dev/null && PROC_OK=1
+
+FILE_MTIME=$(stat -c '%Y' "$LOG" 2>/dev/null)
+CURRENT_TIME=$(date +%s)
+AGE=$((CURRENT_TIME - FILE_MTIME))
+FILE_OK=0
+[ "$AGE" -lt 1200 ] && FILE_OK=1
+
+[ "$PROC_OK" -eq 1 ] && [ "$FILE_OK" -eq 1 ] && exit 0
+
+if [ "$PROC_OK" -eq 0 ]; then
+  logger -t susieq-watchdog "WARN: logread ei kaynissa, kaynnistetaan"
+else
+  logger -t susieq-watchdog "WARN: logread ei kirjoita (lokitiedosto ${AGE}s vanha), kaynnistetaan"
+fi
+/etc/init.d/log restart
