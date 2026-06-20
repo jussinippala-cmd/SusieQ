@@ -185,7 +185,7 @@
 ## TODO / Seuraavat projektit
 
 - [ ] Selvitä akun kapasiteetti ja lisätäänkö toinen akku
-- [ ] Dokumentoi COLIGHT-paneelin kytkentäkartta (mihin kytkimeen mikäkin laite)
+- [ ] Dokumentoi COLIGHT-paneelin kytkentäkartta (mihin kytkimeen mikäkin laite) — tähän mennessä tiedossa: kanava 10 = sisävalot (ks. `tools/colight-ble/FINDINGS.md`)
 - [ ] Harkitse makean veden erillissäiliötä järviveden lisäksi
 
 ---

@@ -8,6 +8,7 @@ from colight_ble import (
     format_monitor_row,
     format_scan_table,
     format_uuid_short,
+    parse_hex_bytes,
 )
 
 
@@ -117,3 +118,15 @@ def test_format_connection_error_suggests_running_scan():
     exc = BleakError("device not found")
     message = format_connection_error("AA:BB:CC:DD:EE:FF", exc)
     assert "scan" in message
+
+
+def test_parse_hex_bytes_plain():
+    assert parse_hex_bytes("aabbcc") == b"\xaa\xbb\xcc"
+
+
+def test_parse_hex_bytes_strips_colons():
+    assert parse_hex_bytes("AA:BB:CC") == b"\xaa\xbb\xcc"
+
+
+def test_parse_hex_bytes_strips_spaces_and_dashes():
+    assert parse_hex_bytes("AA BB-CC") == b"\xaa\xbb\xcc"

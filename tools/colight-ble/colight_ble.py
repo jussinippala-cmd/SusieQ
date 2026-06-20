@@ -93,6 +93,13 @@ def format_monitor_row(timestamp: str, uuid: str, data: bytes) -> list[str]:
     return [timestamp, format_uuid_short(uuid), data.hex()]
 
 
+def parse_hex_bytes(hex_str: str) -> bytes:
+    """Muuntaa hex-merkkijonon tavuiksi, hyväksyen erottimina välilyönnit,
+    kaksoispisteet ja viivat (esim. 'AA:BB CC-DD' -> b'\\xaa\\xbb\\xcc\\xdd')."""
+    cleaned = hex_str.replace(" ", "").replace(":", "").replace("-", "")
+    return bytes.fromhex(cleaned)
+
+
 def format_connection_error(address: str, exc: Exception) -> str:
     """Muotoilee selkeän virheviestin BLE-yhteyden epäonnistuessa ja
     ehdottaa 'scan'-komennon ajamista ensin."""
@@ -210,6 +217,62 @@ async def cmd_monitor(args: argparse.Namespace) -> None:
             await asyncio.sleep(5)
 
 
+async def cmd_write(args: argparse.Namespace) -> None:
+    try:
+        payload = parse_hex_bytes(args.hex_bytes)
+    except ValueError as exc:
+        print(f"Virheellinen hex-arvo '{args.hex_bytes}': {exc}")
+        return
+
+    try:
+        async with BleakClient(args.address) as client:
+            target = None
+            for service in client.services:
+                for char in service.characteristics:
+                    if format_uuid_short(char.uuid) == format_uuid_short(args.characteristic):
+                        target = char
+                        break
+                if target:
+                    break
+
+            if target is None:
+                print(f"Characteristicia '{args.characteristic}' ei löytynyt laitteesta.")
+                return
+
+            def handler(characteristic, data: bytearray) -> None:
+                row = format_monitor_row(
+                    datetime.now(timezone.utc).isoformat(), characteristic.uuid, bytes(data)
+                )
+                print("  [notify] " + " ".join(row))
+
+            subscribed = []
+            for service in client.services:
+                for char in service.characteristics:
+                    if "notify" in char.properties or "indicate" in char.properties:
+                        try:
+                            await client.start_notify(char, handler)
+                            subscribed.append(format_uuid_short(char.uuid))
+                        except Exception as exc:
+                            print(
+                                f"  [varoitus] start_notify epäonnistui "
+                                f"{format_uuid_short(char.uuid)}: {exc}"
+                            )
+            if subscribed:
+                print(f"Kuunnellaan vastauksia: {', '.join(subscribed)}")
+
+            response = "write" in target.properties
+            print(
+                f"Kirjoitetaan {payload.hex()} -> {format_uuid_short(target.uuid)} "
+                f"(response={response})..."
+            )
+            await client.write_gatt_char(target, payload, response=response)
+
+            print(f"Kuunnellaan {args.listen:.0f} sekuntia vastauksia...")
+            await asyncio.sleep(args.listen)
+    except BleakError as exc:
+        print(format_connection_error(args.address, exc))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="CoLight 12/8 Gang Switch Panel -- BLE-protokollan selvitystyökalu"
@@ -232,6 +295,23 @@ def build_parser() -> argparse.ArgumentParser:
         "address", help="BLE-laitteen osoite (esim. AA:BB:CC:DD:EE:FF)"
     )
 
+    write_parser = subparsers.add_parser(
+        "write", help="Kirjoita raaka hex-arvo characteristiciin ja kuuntele vastaukset"
+    )
+    write_parser.add_argument(
+        "address", help="BLE-laitteen osoite (esim. AA:BB:CC:DD:EE:FF)"
+    )
+    write_parser.add_argument(
+        "characteristic", help="Characteristic UUID (lyhyt tai täysi muoto)"
+    )
+    write_parser.add_argument(
+        "hex_bytes", help="Kirjoitettava data hex-muodossa (esim. 'aa01' tai 'AA:01')"
+    )
+    write_parser.add_argument(
+        "--listen", type=float, default=3.0,
+        help="Montako sekuntia kuunnellaan notifikaatioita kirjoituksen jälkeen (oletus 3)",
+    )
+
     return parser
 
 
@@ -243,6 +323,7 @@ def main() -> None:
         "scan": cmd_scan,
         "discover": cmd_discover,
         "monitor": cmd_monitor,
+        "write": cmd_write,
     }
     try:
         asyncio.run(commands[args.command](args))
