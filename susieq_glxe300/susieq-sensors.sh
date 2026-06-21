@@ -120,6 +120,23 @@ def remove_f(path):
     try: os.remove(path)
     except: pass
 
+IMPLAUSIBLE_STREAK_LIMIT = 5
+
+def check_plausible(name, value, lo, hi):
+    counter_file = f'/tmp/susieq_{name}_implausible_count'
+    notified_file = f'/tmp/susieq_{name}_implausible_notified'
+    if value is None or not (lo <= value <= hi):
+        count = int(read_f(counter_file, '0')) + 1
+        write_f(counter_file, count)
+        if count >= IMPLAUSIBLE_STREAK_LIMIT and not os.path.exists(notified_file):
+            ntfy(f'{name}-sensori antaa järjettömiä arvoja {count} kertaa peräkkäin '
+                 f'(viim. {value}) — tarkista BLE-yhteys/anturi', 'high')
+            write_f(notified_file, count)
+        return False
+    write_f(counter_file, 0)
+    remove_f(notified_file)
+    return True
+
 # ── GPS: satamasta lähtö ja paluu ─────────────────────────────────────
 gps = data.get('gps', {})
 if gps.get('fix') and gps.get('lat') is not None and gps.get('lon') is not None:
@@ -142,33 +159,35 @@ if gps.get('fix') and gps.get('lat') is not None and gps.get('lon') is not None:
 bat = data.get('battery', {})
 if bat.get('valid') and bat.get('voltage') is not None:
     v = bat['voltage']
-    if v < 12.0:
-        if not os.path.exists('/tmp/susieq_volt_notified'):
-            ntfy(f'Akku {v:.1f} V — lataa pikaisesti!', 'urgent')
-            write_f('/tmp/susieq_volt_notified', v)
-    elif v >= 12.4:
-        remove_f('/tmp/susieq_volt_notified')
+    if check_plausible('akku', v, 8.0, 16.0):
+        if v < 12.0:
+            if not os.path.exists('/tmp/susieq_volt_notified'):
+                ntfy(f'Akku {v:.1f} V — lataa pikaisesti!', 'urgent')
+                write_f('/tmp/susieq_volt_notified', v)
+        elif v >= 12.4:
+            remove_f('/tmp/susieq_volt_notified')
 
 
 # ── Polttoaine (25 L max) ─────────────────────────────────────────────
 fuel = data.get('fuel', {})
 if fuel.get('valid') and fuel.get('liters') is not None:
-    pct = (fuel['liters'] / 25.0) * 100
-    if pct < 20:
-        low_since = read_f('/tmp/susieq_fuel_low_since', '')
-        if not low_since:
-            write_f('/tmp/susieq_fuel_low_since', int(time.time()))
-        else:
-            try:
-                if int(time.time()) - int(low_since) >= 300 and not os.path.exists('/tmp/susieq_fuel_notified'):
-                    ntfy(f'Polttoaine {pct:.0f}% ({fuel["liters"]:.1f} L)', 'default')
-                    write_f('/tmp/susieq_fuel_notified', pct)
-            except ValueError:
+    if check_plausible('polttoaine', fuel['liters'], 0.0, 25.0):
+        pct = (fuel['liters'] / 25.0) * 100
+        if pct < 20:
+            low_since = read_f('/tmp/susieq_fuel_low_since', '')
+            if not low_since:
                 write_f('/tmp/susieq_fuel_low_since', int(time.time()))
-    elif pct >= 20:
-        remove_f('/tmp/susieq_fuel_low_since')
-        if pct >= 30:
-            remove_f('/tmp/susieq_fuel_notified')
+            else:
+                try:
+                    if int(time.time()) - int(low_since) >= 300 and not os.path.exists('/tmp/susieq_fuel_notified'):
+                        ntfy(f'Polttoaine {pct:.0f}% ({fuel["liters"]:.1f} L)', 'default')
+                        write_f('/tmp/susieq_fuel_notified', pct)
+                except ValueError:
+                    write_f('/tmp/susieq_fuel_low_since', int(time.time()))
+        elif pct >= 20:
+            remove_f('/tmp/susieq_fuel_low_since')
+            if pct >= 30:
+                remove_f('/tmp/susieq_fuel_notified')
 
 # ── Ankkurivahti ──────────────────────────────────────────────────────
 try:
