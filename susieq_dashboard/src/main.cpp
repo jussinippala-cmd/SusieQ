@@ -124,8 +124,16 @@ void on_ws_event(AsyncWebSocket* server, AsyncWebSocketClient* client,
     if (type == WS_EVT_CONNECT) {
         Serial.printf("[ws] client #%u connected from %s\n",
                       client->id(), client->remoteIP().toString().c_str());
-        // Send cached readings immediately on connect
-        if (cached_json.length() > 0) client->text(cached_json);
+        // Send cached readings immediately on connect.
+        // Take hx711_mutex to avoid racing loop()'s cached_json reassignment.
+        String snapshot;
+        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(50))) {
+            snapshot = cached_json;
+            xSemaphoreGive(hx711_mutex);
+        } else {
+            snapshot = cached_json;
+        }
+        if (snapshot.length() > 0) client->text(snapshot);
     } else if (type == WS_EVT_DISCONNECT) {
         Serial.printf("[ws] client #%u disconnected\n", client->id());
     }
@@ -140,7 +148,15 @@ static void setup_routes() {
 
     // JSON snapshot endpoint (for debugging without WebSocket)
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(200, "application/json", cached_json.length() > 0 ? cached_json : "{}");
+        // Take hx711_mutex to avoid racing loop()'s cached_json reassignment.
+        String snapshot;
+        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(50))) {
+            snapshot = cached_json;
+            xSemaphoreGive(hx711_mutex);
+        } else {
+            snapshot = cached_json;
+        }
+        req->send(200, "application/json", snapshot.length() > 0 ? snapshot : "{}");
     });
 
     // Tare fuel scale (call from browser or curl)
