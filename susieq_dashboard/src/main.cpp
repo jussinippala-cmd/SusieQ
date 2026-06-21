@@ -7,6 +7,7 @@
 #include <ArduinoOTA.h>
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "esp_task_wdt.h"
 
 #include "../include/config.h"
 #include "wind.h"
@@ -20,6 +21,9 @@
 // ─── Globals ──────────────────────────────────────────────────────────
 AsyncWebServer  server(80);
 AsyncWebSocket  ws("/ws");
+
+// loop() jumiutuu -> WDT ei saa reset-kutsua -> ESP buuttaa itsensä
+#define WDT_TIMEOUT_S 20
 
 static unsigned long last_sensor_read = 0;
 static String cached_json;             // cached for /data and WS connect
@@ -335,6 +339,11 @@ void setup() {
 
     start_wifi_sta();
 
+    // Hardware watchdog — buuttaa ESP:n automaattisesti jos loop() jumiutuu
+    esp_task_wdt_init(WDT_TIMEOUT_S, true);
+    esp_task_wdt_add(NULL);
+    Serial.printf("[wdt] watchdog käynnissä, timeout %d s\n", WDT_TIMEOUT_S);
+
     // OTA
     ArduinoOTA.setHostname(OTA_HOSTNAME);
     ArduinoOTA.setPassword(OTA_PASSWORD);
@@ -411,6 +420,8 @@ static void handle_serial() {
 static unsigned long _lastWifiCheck = 0;
 
 void loop() {
+    esp_task_wdt_reset();
+
     ArduinoOTA.handle();
 
     if (millis() - _lastWifiCheck > 30000) {
