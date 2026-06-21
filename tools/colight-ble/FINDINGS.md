@@ -79,7 +79,24 @@ Kaapata oikea liikenne virallisesta "Switch panel"-sovelluksesta (Guangzhou Weim
 
 ## Kytkentäkartta
 
-Ei vielä täytetty (`CC28_varustelu.md` TODO) — kanava 10 = sisävalot (vahvistettu tällä käynnillä). Loput 11 kanavaa selvittämättä.
+Täytetty 2026-06-21 paneelin painikemerkintöjen perusteella (kuva paneelista). Paneelin fyysinen järjestys (vasemmalta oikealle, ylhäältä alas) täsmää suoraan BLE-kanavanumerointiin — vahvistettu, koska kanava 10 = INTERIOR ja kanava 9 = tyhjä/merkitsemätön painike, mikä vastaa aiempaa empiiristä löydöstä ("kytkin 9, ei mitään kytkettynä").
+
+| Kanava | Painike | Huom |
+|---|---|---|
+| 1 | LOWER | (purje/ankkuri winch alas?) |
+| 2 | RAISE | (purje/ankkuri winch ylös?) |
+| 3 | HEATER | |
+| 4 | WATER | (vesipumppu?) |
+| 5 | DECK LIGHTS | |
+| 6 | STEREO | |
+| 7 | OUTLETS | (pistokkeet) |
+| 8 | RADIO | |
+| 9 | (merkitsemätön/tyhjä) | ei kytketty mihinkään (vahvistettu) |
+| 10 | INTERIOR | sisävalot (vahvistettu) |
+| 11 | NAV LIGHTS | |
+| 12 | ANCHOR LIGHT | |
+
+Paneelin vasemmassa reunassa on kolme erillistä pientä kuvaketta (virta, taustavalo/kirkkaus, RGB) — nämä ohjaavat panelin omia asetuksia (käynnistys, näppäinten taustavalon kirkkaus, RGB-tunnelmavalo), eivät erillisiä kanavia. Eivät sisälly 12 kanavan numerointiin.
 
 ## Työkalu
 
