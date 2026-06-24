@@ -25,7 +25,7 @@ AsyncWebServer  server(80);
 #define WDT_TIMEOUT_S 20
 
 static unsigned long last_sensor_read = 0;
-static String cached_json;             // cached for /data and WS connect
+static String cached_json;             // cached for /data
 static SemaphoreHandle_t hx711_mutex = nullptr;  // protects HX711 access
 
 // ─── JSON builder ─────────────────────────────────────────────────────
