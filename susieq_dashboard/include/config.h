@@ -18,7 +18,7 @@
 #define SUBNET_MASK   "255.255.255.0"
 
 // ─── Update interval ──────────────────────────────────────────────────
-#define SENSOR_INTERVAL_MS  2000       // 2 s between sensor polls
+#define SENSOR_INTERVAL_MS  1000       // 1 s — modeemi pollaa /data:a 1s välein
 
 // ─── OTA (Over The Air) firmware update ───────────────────────────────
 #define OTA_HOSTNAME   "susieq-cockpit"

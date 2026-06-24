@@ -20,7 +20,6 @@
 
 // ─── Globals ──────────────────────────────────────────────────────────
 AsyncWebServer  server(80);
-AsyncWebSocket  ws("/ws");
 
 // loop() jumiutuu -> WDT ei saa reset-kutsua -> ESP buuttaa itsensä
 #define WDT_TIMEOUT_S 20
@@ -122,32 +121,11 @@ static String build_json() {
     return out;
 }
 
-// ─── WebSocket event handler ──────────────────────────────────────────
-void on_ws_event(AsyncWebSocket* server, AsyncWebSocketClient* client,
-                 AwsEventType type, void* arg, uint8_t* data, size_t len) {
-    if (type == WS_EVT_CONNECT) {
-        Serial.printf("[ws] client #%u connected from %s\n",
-                      client->id(), client->remoteIP().toString().c_str());
-        // Send cached readings immediately on connect.
-        // Take hx711_mutex to avoid racing loop()'s cached_json reassignment.
-        String snapshot;
-        if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(50))) {
-            snapshot = cached_json;
-            xSemaphoreGive(hx711_mutex);
-        } else {
-            snapshot = cached_json;
-        }
-        if (snapshot.length() > 0) client->text(snapshot);
-    } else if (type == WS_EVT_DISCONNECT) {
-        Serial.printf("[ws] client #%u disconnected\n", client->id());
-    }
-}
-
 // ─── HTTP routes ──────────────────────────────────────────────────────
 static void setup_routes() {
-    // Serve HTML dashboard from LittleFS
+    // Dashboard siirretty modeemille — ks. susieq_glxe300/susieq-dashboard-server.py
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(LittleFS, "/index.html", "text/html");
+        req->send(200, "text/plain", "Dashboard: http://192.168.8.1:8081/");
     });
 
     // JSON snapshot endpoint (for debugging without WebSocket)
@@ -238,6 +216,12 @@ static void setup_routes() {
         }
     });
 
+    // CORS-preflight /records:lle — selain lähettää Content-Type: application/json,
+    // joka laukaisee OPTIONS-esipyynnön kun dashboard pyörii eri originissa (modeemi).
+    server.on("/records", HTTP_OPTIONS, [](AsyncWebServerRequest* req) {
+        req->send(200);
+    });
+
     // GET /records → lue /records.json LittleFS:stä
     server.on("/records", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!LittleFS.exists("/records.json")) {
@@ -264,7 +248,6 @@ static void setup_routes() {
         }
     );
 
-    server.serveStatic("/", LittleFS, "/");
     server.on("/victron-debug", HTTP_GET, [](AsyncWebServerRequest* req) {
         VictronDebug d = victron_debug_get();
         String hex = "";
@@ -359,9 +342,13 @@ void setup() {
     ArduinoOTA.begin();
     Serial.printf("[ota] ready — hostname: %s\n", OTA_HOSTNAME);
 
-    // WebSocket + web server
-    ws.onEvent(on_ws_event);
-    server.addHandler(&ws);
+    // CORS — dashboard pyörii nyt modeemilla (eri origin), kalibrointikutsut
+    // (/tare, /tare_water, /tare_rum, /records) tulevat siis cross-origin.
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    // Web server (ei enää WebSocketia — /data riittää modeemin pollaukseen)
     setup_routes();
     server.begin();
     Serial.println("[http] server started on port 80");
@@ -443,10 +430,5 @@ void loop() {
             cached_json = build_json();
             xSemaphoreGive(hx711_mutex);
         }
-        if (ws.count() > 0) {
-            ws.textAll(cached_json);
-        }
     }
-
-    ws.cleanupClients();
 }
