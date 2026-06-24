@@ -1747,54 +1747,30 @@ function windMinMax() {
 }
 
 // ─── State ────────────────────────────────────────────────────────────
-var ws;
-var reconnectDelay = 1000;
-var lastMsgTime = 0;
-var staleTimer;
-var _wsReconnecting = false;  // L: prevent onclose+onerror double-fire
+var ESP32_BASE = "http://192.168.8.100";
+var POLL_INTERVAL_MS = 1000;
 
-// ─── WebSocket connection ──────────────────────────────────────────────
-function connect() {
-  _wsReconnecting = false;
-  try {
-    var host = location.hostname || "192.168.8.100";
-    ws = new WebSocket("ws://" + host + "/ws");
-  } catch (e) {
-    console.error("WebSocket connect error", e);
-    _wsReconnecting = true;
-    var jitter = Math.random() * 500;
-    setTimeout(connect, reconnectDelay + jitter);
-    reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
-    return;
-  }
+// ─── Live data polling (modeemin /data, päivittyy 1s välein) ──────────
+function pollData() {
+  fetchWithTimeout("/data", { cache: "no-store" }, 4000)
+    .then(function(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function(d) {
+      document.getElementById("dot").classList.add("live");
+      document.getElementById("status-text").textContent = "Live";
+      update(d);
+    })
+    .catch(function(e) {
+      console.error("poll /data error", e);
+      markStale();
+    });
+}
 
-  ws.onopen = function() {
-    document.getElementById("dot").classList.add("live");
-    document.getElementById("status-text").textContent = "Live";
-    reconnectDelay = 1000;
-  };
-
-  ws.onmessage = function(evt) {
-    lastMsgTime = Date.now();
-    clearTimeout(staleTimer);
-    staleTimer = setTimeout(markStale, 8000);
-    try {
-      update(JSON.parse(evt.data));
-    } catch (e) {
-      console.error("JSON parse error", e);
-    }
-  };
-
-  ws.onclose = ws.onerror = function() {
-    if (_wsReconnecting) return;  // L: prevent double-fire
-    _wsReconnecting = true;
-    clearTimeout(staleTimer);
-    document.getElementById("dot").classList.remove("live");
-    document.getElementById("status-text").textContent = "Yhdistetään…";
-    var jitter = Math.random() * 500;
-    setTimeout(connect, reconnectDelay + jitter);
-    reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
-  };
+function startPolling() {
+  pollData();
+  setInterval(pollData, POLL_INTERVAL_MS);
 }
 
 function markStale() {
@@ -2043,7 +2019,7 @@ function fetchWithTimeout(url, options, timeoutMs) {
 // ─── Tare scales ───────────────────────────────────────────────────────
 function tareFuel() {
   if (!confirm("Aseta tyhjä kanisteri vaa'alle ja paina OK.")) return;
-  fetchWithTimeout("/tare", { method: "POST" }, 5000)
+  fetchWithTimeout(ESP32_BASE + "/tare", { method: "POST" }, 5000)
     .then(function(r) { return r.text(); })
     .then(function(t) { alert("Polttoaine tara tallennettu: " + t); })
     .catch(function(e) { alert("Virhe: " + e); });
@@ -2051,7 +2027,7 @@ function tareFuel() {
 
 function tareWater() {
   if (!confirm("Aseta tyhjä vesitankki vaa'alle ja paina OK.")) return;
-  fetchWithTimeout("/tare_water", { method: "POST" }, 5000)
+  fetchWithTimeout(ESP32_BASE + "/tare_water", { method: "POST" }, 5000)
     .then(function(r) { return r.text(); })
     .then(function(t) { alert("Vesi tara tallennettu: " + t); })
     .catch(function(e) { alert("Virhe: " + e); });
@@ -2059,7 +2035,7 @@ function tareWater() {
 
 function tareRum() {
   if (!confirm("Aseta tyhjä rommipullo vaa'alle ja paina OK.")) return;
-  fetchWithTimeout("/tare_rum", { method: "POST" }, 5000)
+  fetchWithTimeout(ESP32_BASE + "/tare_rum", { method: "POST" }, 5000)
     .then(function(r) { return r.text(); })
     .then(function(t) { alert("Rommi tara tallennettu: " + t); })
     .catch(function(e) { alert("Virhe: " + e); });
@@ -2394,7 +2370,7 @@ var _sessionMaxKn = 0;
 var _lastRecordPost = 0;
 
 function postRecords() {
-  fetchWithTimeout("/records", {
+  fetchWithTimeout(ESP32_BASE + "/records", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(_records)
@@ -2402,7 +2378,7 @@ function postRecords() {
 }
 
 function loadRecords() {
-  fetchWithTimeout("/records", {}, 5000)
+  fetchWithTimeout(ESP32_BASE + "/records", {}, 5000)
     .then(function(r) { return r.json(); })
     .then(function(j) {
       if (j && (j.best_knots || j.trips)) {
@@ -2495,7 +2471,7 @@ function rumOClockCelebrate() {
 }
 
 // ─── Boot ──────────────────────────────────────────────────────────────
-connect();
+startPolling();
 loadRecords();
 </script>
 </body>
