@@ -9,6 +9,8 @@
 #   home  → satamassa, CFUN=4
 #   (ei tiedostoa) → oletus: satamassa, CFUN=4
 
+. /etc/susieq.env
+
 STATE=$(cat /tmp/susieq_state 2>/dev/null)
 
 if [ "$STATE" = "away" ]; then
