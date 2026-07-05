@@ -17,6 +17,7 @@
 #include "gps.h"
 #include "weather.h"
 #include "rum.h"
+#include "colight.h"
 
 // ─── Globals ──────────────────────────────────────────────────────────
 AsyncWebServer  server(80);
@@ -116,6 +117,20 @@ static String build_json() {
     // System uptime (64-bit to avoid 49-day millis() overflow)
     doc["uptime_s"] = (unsigned long)(esp_timer_get_time() / 1000000ULL);
 
+    String out;
+    serializeJson(doc, out);
+    return out;
+}
+
+static String colight_result_to_json(const ColightResult& r) {
+    JsonDocument doc;
+    doc["success"] = r.success;
+    if (r.success) {
+        JsonArray arr = doc["state"].to<JsonArray>();
+        for (int i = 0; i < COLIGHT_NUM_CHANNELS; i++) arr.add(r.channels[i]);
+    } else {
+        doc["error"] = r.error;
+    }
     String out;
     serializeJson(doc, out);
     return out;
@@ -264,6 +279,28 @@ static void setup_routes() {
         req->send(200, "application/json", buf);
     });
 
+    // POST /colight?channel=<1..12>&action=on|off
+    server.on("/colight", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!req->hasParam("channel") || !req->hasParam("action")) {
+            req->send(400, "application/json", "{\"success\":false,\"error\":\"missing_params\"}");
+            return;
+        }
+        int channel = req->getParam("channel")->value().toInt();
+        String action = req->getParam("action")->value();
+        if (channel < 1 || channel > 12 || (action != "on" && action != "off")) {
+            req->send(400, "application/json", "{\"success\":false,\"error\":\"invalid_params\"}");
+            return;
+        }
+        ColightResult r = colight_send_command(channel, action == "on");
+        req->send(200, "application/json", colight_result_to_json(r));
+    });
+
+    // GET /colight/state — read-only refresh, no panel side effects
+    server.on("/colight/state", HTTP_GET, [](AsyncWebServerRequest* req) {
+        ColightResult r = colight_read_state();
+        req->send(200, "application/json", colight_result_to_json(r));
+    });
+
     server.onNotFound([](AsyncWebServerRequest* req) {
         req->send(404, "text/plain", "Not found");
     });
@@ -316,6 +353,7 @@ void setup() {
     tanks_init();
     fuel_init();
     victron_init();
+    colight_init();
     gps_init();
     weather_init();    // AHT20 + BMP280 (I2C) + DS18B20 (1-Wire)
     rum_init();
