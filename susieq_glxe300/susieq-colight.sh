@@ -61,7 +61,7 @@ def insert_state(channels):
 patch_command('processing')
 
 result = subprocess.run([
-    'curl', '-sf', '--connect-timeout', '3', '--max-time', '10', '-X', 'POST',
+    'curl', '-sf', '--connect-timeout', '3', '--max-time', '20', '-X', 'POST',
     '-H', 'Content-Type: application/json',
     f'{COCKPIT_URL}/colight?channel={channel}&action={action}'
 ], capture_output=True, text=True)
@@ -91,7 +91,7 @@ SUPABASE_KEY = os.environ['SUPABASE_SERVICE_KEY']
 COCKPIT_URL  = os.environ['COCKPIT_URL']
 
 result = subprocess.run([
-    'curl', '-sf', '--connect-timeout', '3', '--max-time', '10',
+    'curl', '-sf', '--connect-timeout', '3', '--max-time', '20',
     f'{COCKPIT_URL}/colight/state'
 ], capture_output=True, text=True)
 

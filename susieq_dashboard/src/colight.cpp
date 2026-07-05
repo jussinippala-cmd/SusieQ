@@ -6,20 +6,35 @@
 #include <freertos/timers.h>
 #include <cstring>
 
-// colight_run() is called synchronously from an HTTP request handler, so it
-// must never block indefinitely — the ESP32 has a 20s hardware watchdog and
-// a stuck handler will trip a reboot.
+// colight_run() is called synchronously from an HTTP request handler
+// (ESPAsyncWebServer's AsyncTCP task), so it must never block indefinitely.
+// Note this is NOT the loop() task: main.cpp's setup() calls
+// esp_task_wdt_add(NULL), which only subscribes the calling (loop) task to
+// the ESP32's hardware watchdog. The AsyncTCP task this code runs on is not
+// subscribed, so a truly stuck BLE operation here would NOT trigger a
+// watchdog reboot — it would just leave the HTTP server and Victron scan
+// stuck with no automatic recovery. The real backstop against that is the
+// COLIGHT_DISCOVERY_TIMEOUT_MS forced-disconnect timer armed inside
+// colight_run() itself (see below), which guarantees the otherwise-unbounded
+// GATT discovery calls return within a bounded window.
 //
 // Worst-case bound with every step maxed out:
 //   scan (~3.5s) + connect (~6s, setConnectTimeout(5) + NimBLE's internal
 //   +1000ms grace) + GATT discovery (~3s max, force-aborted by the watchdog
 //   timer below) + notify-wait (~3s) + write delay (~0.3s)
-//   ≈ ~15.8s worst case — finite and bounded, under the 20s watchdog.
+//   ≈ ~15.8s worst case — finite and bounded.
 //
 // This is higher than the original design target of ~6-8s. Further
 // tightening (shorter scan/connect timeouts) is a possible follow-up if
 // 15.8s proves too slow in practice on the boat, but a bounded ~16s is the
 // priority fix here, not hitting 6-8s exactly.
+//
+// Because this whole operation runs synchronously on the AsyncTCP task, all
+// other HTTP endpoints (/data, /victron-debug, etc.) are also blocked for up
+// to ~16s while a CoLight operation is in progress. This is an accepted
+// trade-off: the router-side daemon only ever runs one CoLight operation at
+// a time, but a future maintainer should not assume other endpoints stay
+// responsive during a slow CoLight command.
 #define COLIGHT_DEVICE_NAME    "MG-P1C-12P"
 #define COLIGHT_SERVICE_UUID   "0003cbbb-0000-1000-8000-00805f9beff0"
 #define COLIGHT_CHAR_UUID      "0003cbbb-0000-1000-8000-00805f9beffa"
@@ -179,7 +194,10 @@ static ColightResult colight_run(int channel, bool turn_on) {
 
     if (channel != 0) {
         colight_set_channel(frame, channel, turn_on);
-        if (!chr->writeValue(frame, 6, false)) {
+        uint8_t out[7];
+        out[0] = 0xf5;
+        memcpy(out + 1, frame, 6);
+        if (!chr->writeValue(out, 7, false)) {
             client->disconnect();
             NimBLEDevice::deleteClient(client);
             result.error = "write_failed";
