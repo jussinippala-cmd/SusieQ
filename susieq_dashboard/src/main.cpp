@@ -377,6 +377,12 @@ void setup() {
     ArduinoOTA.onError([](ota_error_t err) {
         Serial.printf("[ota] error %u\n", err);
     });
+    // Feed the hardware watchdog on every OTA chunk, not just once per loop()
+    // iteration — a slow/weak WiFi link can make a single ArduinoOTA.handle()
+    // call block long enough on its own to trip the 20s watchdog mid-transfer.
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        esp_task_wdt_reset();
+    });
     ArduinoOTA.begin();
     Serial.printf("[ota] ready — hostname: %s\n", OTA_HOSTNAME);
 
