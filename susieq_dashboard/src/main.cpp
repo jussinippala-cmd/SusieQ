@@ -125,6 +125,8 @@ static String build_json() {
 static String colight_result_to_json(const ColightResult& r) {
     JsonDocument doc;
     doc["success"] = r.success;
+    doc["connected"] = r.connected;
+    doc["last_updated_ms"] = r.last_updated_ms;
     if (r.success) {
         JsonArray arr = doc["state"].to<JsonArray>();
         for (int i = 0; i < COLIGHT_NUM_CHANNELS; i++) arr.add(r.channels[i]);
