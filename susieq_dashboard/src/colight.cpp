@@ -147,11 +147,24 @@ static void colight_task_fn(void* pvParameters) {
         bool ok = colight_connect_once(&new_client, &new_chr);
         victron_resume_scan();
 
+        // colight_connect_once() can succeed and then the panel can drop the
+        // link before we get here (e.g. right after subscribe). If that
+        // happens, ColightClientCB::onDisconnect() already ran and set
+        // connected=false, but since it ran *before* this task published
+        // new_client/new_chr into colight_cache, no further onDisconnect will
+        // ever fire for this client — publishing it as "connected" here would
+        // leave the cache permanently stuck on a dead connection. Re-check
+        // liveness under the same mutex acquisition that publishes the
+        // result so the two can never race.
         xSemaphoreTake(colight_mutex, portMAX_DELAY);
-        colight_cache.connected = ok;
-        if (ok) {
+        colight_cache.connected = ok && new_client->isConnected();
+        if (colight_cache.connected) {
             colight_cache.client = new_client;
             colight_cache.chr = new_chr;
+        } else if (ok) {
+            // Connected during colight_connect_once() but already dropped by
+            // the time we got the mutex — discard it rather than leaking it.
+            NimBLEDevice::deleteClient(new_client);
         }
         xSemaphoreGive(colight_mutex);
 
@@ -206,6 +219,11 @@ ColightResult colight_send_command(int channel, bool turn_on) {
     out[0] = 0xf5;
     memcpy(out + 1, frame, 6);
 
+    // write-without-response (last arg false): returns as soon as the local
+    // stack accepts the write, no host-task round-trip, so it's safe to hold
+    // colight_mutex across this call. If this is ever changed to request a
+    // response, this becomes a blocking round-trip and would stall any
+    // concurrent /colight/state read for the duration.
     bool written = colight_cache.chr->writeValue(out, 7, false);
 
     if (!written) {
