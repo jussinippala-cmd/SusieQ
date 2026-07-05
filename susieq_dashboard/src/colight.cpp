@@ -158,15 +158,19 @@ static void colight_task_fn(void* pvParameters) {
         // result so the two can never race.
         xSemaphoreTake(colight_mutex, portMAX_DELAY);
         colight_cache.connected = ok && new_client->isConnected();
+        NimBLEClient* client_to_discard = nullptr;
         if (colight_cache.connected) {
             colight_cache.client = new_client;
             colight_cache.chr = new_chr;
         } else if (ok) {
             // Connected during colight_connect_once() but already dropped by
             // the time we got the mutex — discard it rather than leaking it.
-            NimBLEDevice::deleteClient(new_client);
+            client_to_discard = new_client;
         }
         xSemaphoreGive(colight_mutex);
+        if (client_to_discard) {
+            NimBLEDevice::deleteClient(client_to_discard);
+        }
 
         if (!ok) {
             vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
