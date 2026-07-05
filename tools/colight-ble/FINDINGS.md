@@ -53,9 +53,41 @@ Vahvistettu empiirisesti kääntämällä kaikki 12 kytkintä yksi kerrallaan (k
 
 Ei tehty erikseen suunnitellulla tavalla (puhelimen CoLight-sovellus + Mac samanaikaisesti), mutta sivuhavaintona: **kaksi samanaikaista `BleakClient`-yhteyttä Macilta samaan laitteeseen toimi ongelmitta** (yksi pitkäkestoinen `monitor`-prosessi + erilliset lyhyet `write`-yhteydet rinnakkain). Viittaa siihen, että laite/CoreBluetooth sallii useamman keskusyksikön, mutta tätä ei ole vahvistettu puhelinsovelluksen kanssa.
 
-## Write-komentojen tunnistus — EI ONNISTUNUT tällä käynnillä
+## Write-komennot — RATKAISTU 2026-07-05
 
-Testattu kanava 10 (sisävalo), fyysinen kytkin pidetty ON-asennossa koko ajan. **Yhtäkään seuraavista ei havaittu vaikuttavan valoon:**
+Aiemmat sokkona-arvailut (alla, historiallinen dokumentaatio) epäonnistuivat koska oikea komento käyttää täysin eri kehysmuotoa. Ratkaisu löytyi kaappaamalla oikean CoLight-sovelluksen liikenne Android-puhelimen (Samsung Galaxy A32) `adb bugreport`-komennolla — **ei dumpsys bluetooth_manager -yhteenveto** (se jättää ACL/GATT-datan aina pois yksityisyyssyistä riippumatta snoop-tilasta), vaan `adb bugreport bugreport.zip` sisältää oikean täyden `FS/data/log/bt/btsnoop_hci.log`-tiedoston suoraan zipissä, standardimuodossa (ei btsnooz-purkua tarvita, suoraan tsharkiin).
+
+Prosessi: `adb shell settings put global bluetooth_btsnoop_default_mode full` → kierrätä Bluetooth (`adb shell svc bluetooth disable && adb shell svc bluetooth enable`) → tee toiminto CoLight-sovelluksella → `adb bugreport bugreport.zip` → pura `FS/data/log/bt/btsnoop_hci.log` → `tshark -r btsnoop_hci.log -Y "btatt.opcode==0x52"`.
+
+**Kirjoitus-characteristic:** `0003cbbb-0000-1000-8000-00805f9beffa` (sama kuin tilaraportointi, GATT handle 0x000b), write-without-response (opcode 0x52).
+
+**Kehysmuoto:** `f5 G1 G2 G3 G4 G5 G6` (7 tavua), missä G1..G6 vastaavat suoraan tilaraportoinnin tavu-indeksejä 1-6 (ks. yllä oleva taulukko) — **paitsi G1:n lepoarvo on `0x22`** (ei `0x00` kuten G2-G6). Kanavan N kytkeminen päälle = lisää `+0x10` (pariton kanava) tai `+0x01` (parillinen kanava) kyseisen ryhmän tavuun. Kaikkien kanavien pois päältä = pelkkä lepoarvo `f5220000000000`.
+
+**Live-vahvistettu** (Macilta suoraan `colight_ble.py write`-komennolla, käyttäjä näki fyysisen vaikutuksen): kanava 10 (INTERIOR) päälle/pois molemmat toimivat.
+
+**Täysi kanavataulukko** (johdettu kaavasta + kaapatusta liikenteestä kun kaikki 12 painiketta painettiin sovelluksesta läpi):
+
+| Kanava | Painike | Komento (ON) | Vahvistustapa |
+|---|---|---|---|
+| 1 | LOWER | `f5320000000000` | kaapattu (käyttäjä painoi fyysisesti, "rommikaappi kiinni") |
+| 2 | RAISE | `f5230000000000` | kaapattu |
+| 3 | HEATER | `f5221000000000` | kaapattu |
+| 4 | WATER | `f5220100000000` | kaapattu |
+| 5 | DECK LIGHTS | `f5220010000000` | kaapattu |
+| 6 | STEREO | `f5220001000000` | kaapattu |
+| 7 | OUTLETS | `f5220000100000` | kaapattu |
+| 8 | RADIO | `f5220000010000` | kaapattu |
+| 9 | (tyhjä) | `f5220000001000` | **johdettu kaavasta, ei kaapattu eikä testattu** |
+| 10 | INTERIOR | `f5220000000100` | kaapattu JA live-vahvistettu fyysisesti (Mac→paneeli) |
+| 11 | NAV LIGHTS | `f5220000000010` | kaapattu |
+| 12 | ANCHOR LIGHT | `f5220000000001` | kaapattu |
+| kaikki | POIS | `f5220000000000` | kaapattu (baseline-kehys jokaisen ON-testin jälkeen) |
+
+**VAHVISTETTU 2026-07-05 (live-testi Macilta) — kirjoitus on koko tilan snapshot, EI delta:** kirjoitettiin DECK LIGHTS (ch5) päälle (`f5220010000000`), sitten STEREO (ch6) päälle (`f5220001000000`) — DECK LIGHTS **sammui**, koska sen bitti ei ollut mukana toisessa kirjoituksessa. Yhden kanavan ohjaus on siis aina rakennettava lukemalla ensin nykyinen kokonaistila (f9-notifikaatiosta) ja säilyttämällä kaikkien muiden kanavien bitit muuttumattomina — muuten komento nollaa/ylikirjoittaa kaikki muut samanaikaisesti päällä olevat kanavat. Tämä on pakollinen arkkitehtuurivaatimus mille tahansa ohjaustoteutukselle (myös susieq-remoten web-ohjaukselle).
+
+### Historia: aiemmat epäonnistuneet arvailut (2026-06-20, ennen läpimurtoa)
+
+Testattu kanava 10 (sisävalo), fyysinen kytkin pidetty ON-asennossa koko ajan. Yhtäkään seuraavista ei havaittu vaikuttavan valoon:
 
 | Characteristic | Payloadit testattu |
 |---|---|
@@ -67,15 +99,7 @@ Testattu kanava 10 (sisävalo), fyysinen kytkin pidetty ON-asennossa koko ajan. 
 | `...beff4` | `01`, `00`, `0001`, `000100`, `0a01` |
 | `92e86c7a-...` | `01`, `00`, `0001`, `0a01` |
 
-`e3dd50bf-...` vastasi kaikkiin kirjoituksiin yhden tavun `00`-indikaatiolla — todennäköisesti yleinen ACK riippumatta sisällöstä, ei vahvistus oikeasta komentomuodosta.
-
-**Johtopäätös:** protokolla ei ole yksinkertainen `[kanava, tila]`-tavupari eikä kuvasta suoraan tilaraportoinnin kehysmuotoa. Sokkona arvailu ei ole tehokasta jatkoa.
-
-### Suositeltu jatkotapa
-
-Kaapata oikea liikenne virallisesta "Switch panel"-sovelluksesta (Guangzhou Weiming) kun kytkintä painetaan sovelluksesta:
-- **iPhone (käytössä):** Apple **PacketLogger** (osa "Additional Tools for Xcode", ilmainen Apple Developer -tili riittää). Vaatii ison latauksen — kannattaa tehdä kotona hyvällä netillä, ei veneellä 4G:llä.
-- Kytke iPhone Maciin, käynnistä PacketLogger, paina kytkintä 10 sovelluksessa, suodata HCI-lokista GATT Write -paketit laitteen osoitteelle/handleille jotka vastaavat `e3dd50bf`/`92e86c7a`/`beff1-4`.
+`e3dd50bf-...` vastasi kaikkiin kirjoituksiin yhden tavun `00`-indikaatiolla — todennäköisesti yleinen ACK riippumatta sisällöstä, ei vahvistus oikeasta komentomuodosta. Syy epäonnistumiseen: oikea komento käyttää `f5`-alkuista kehystä, jota ei arvattu.
 
 ## Kytkentäkartta
 
