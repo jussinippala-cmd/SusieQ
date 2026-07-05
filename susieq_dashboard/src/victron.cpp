@@ -184,6 +184,19 @@ void victron_init() {
     Serial.println("[victron] BLE scan started (AES-CTR)");
 }
 
+void victron_pause_scan() {
+    NimBLEDevice::getScan()->stop();
+}
+
+void victron_resume_scan() {
+    NimBLEScan* scan = NimBLEDevice::getScan();
+    scan->setAdvertisedDeviceCallbacks(&advCB, true);
+    scan->setActiveScan(false);
+    scan->setInterval(100);
+    scan->setWindow(99);
+    scan->start(0, nullptr, false);
+}
+
 VictronData victron_get() {
     portENTER_CRITICAL(&victron_mux);
     VictronData copy = latest;
@@ -212,5 +225,7 @@ void victron_init() {
 }
 VictronData victron_get() { return VictronData{}; }
 VictronDebug victron_debug_get() { return VictronDebug{}; }
+void victron_pause_scan() {}
+void victron_resume_scan() {}
 
 #endif

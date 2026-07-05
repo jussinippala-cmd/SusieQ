@@ -26,5 +26,12 @@ void victron_init();
 VictronData victron_get();
 VictronDebug victron_debug_get();
 
+// Temporarily stops the Victron background scan so another BLE central
+// operation (colight.cpp) can use the radio exclusively. Always pair with
+// victron_resume_scan() — Victron data will stop updating (and eventually
+// go stale) if the scan is left paused.
+void victron_pause_scan();
+void victron_resume_scan();
+
 // 12V lead-acid/AGM voltage → SOC estimation (used with Victron battery voltage)
 float battery_voltage_to_soc(float v);
