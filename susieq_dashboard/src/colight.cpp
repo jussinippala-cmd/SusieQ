@@ -3,51 +3,39 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/timers.h>
+#include <freertos/task.h>
 #include <cstring>
 
-// colight_run() is called synchronously from an HTTP request handler
-// (ESPAsyncWebServer's AsyncTCP task), so it must never block indefinitely.
-// Note this is NOT the loop() task: main.cpp's setup() calls
-// esp_task_wdt_add(NULL), which only subscribes the calling (loop) task to
-// the ESP32's hardware watchdog. The AsyncTCP task this code runs on is not
-// subscribed, so a truly stuck BLE operation here would NOT trigger a
-// watchdog reboot — it would just leave the HTTP server and Victron scan
-// stuck with no automatic recovery. The real backstop against that is the
-// COLIGHT_DISCOVERY_TIMEOUT_MS forced-disconnect timer armed inside
-// colight_run() itself (see below), which guarantees the otherwise-unbounded
-// GATT discovery calls return within a bounded window.
-//
-// Worst-case bound with every step maxed out:
-//   scan (~3.5s) + connect (~6s, setConnectTimeout(5) + NimBLE's internal
-//   +1000ms grace) + GATT discovery (~3s max, force-aborted by the watchdog
-//   timer below) + notify-wait (~3s) + write delay (~0.3s)
-//   ≈ ~15.8s worst case — finite and bounded.
-//
-// This is higher than the original design target of ~6-8s. Further
-// tightening (shorter scan/connect timeouts) is a possible follow-up if
-// 15.8s proves too slow in practice on the boat, but a bounded ~16s is the
-// priority fix here, not hitting 6-8s exactly.
-//
-// Because this whole operation runs synchronously on the AsyncTCP task, all
-// other HTTP endpoints (/data, /victron-debug, etc.) are also blocked for up
-// to ~16s while a CoLight operation is in progress. This is an accepted
-// trade-off: the router-side daemon only ever runs one CoLight operation at
-// a time, but a future maintainer should not assume other endpoints stay
-// responsive during a slow CoLight command.
-#define COLIGHT_DEVICE_NAME    "MG-P1C-12P"
-#define COLIGHT_SERVICE_UUID   "0003cbbb-0000-1000-8000-00805f9beff0"
-#define COLIGHT_CHAR_UUID      "0003cbbb-0000-1000-8000-00805f9beffa"
-#define COLIGHT_SCAN_S         3
-#define COLIGHT_NOTIFY_WAIT_MS 3000
+// colight_task_fn maintains a single persistent NimBLE connection to the
+// panel for the whole firmware lifetime. Live BLE testing on the boat
+// (2026-07-05, see docs/superpowers/specs/2026-07-05-colight-persistent-
+// ble-cache-design.md) showed the panel only ever sends a state
+// notification (0xf9 ...) in response to a physical switch change — never
+// on connect/subscribe, and there is no known "query current state"
+// command. A connect-per-request model can therefore never reliably read
+// state. Instead this task stays connected (reconnecting automatically if
+// dropped) and caches the last-seen frame in colight_cache; main.cpp's HTTP
+// handlers only ever read/write that cache through colight_read_state()/
+// colight_send_command() below — they never touch BLE directly and never
+// block waiting for a notification.
+#define COLIGHT_DEVICE_NAME          "MG-P1C-12P"
+#define COLIGHT_SERVICE_UUID         "0003cbbb-0000-1000-8000-00805f9beff0"
+#define COLIGHT_CHAR_UUID            "0003cbbb-0000-1000-8000-00805f9beffa"
+#define COLIGHT_SCAN_S               3
+#define COLIGHT_RECONNECT_DELAY_MS   5000
+#define COLIGHT_IDLE_POLL_MS         1000
 
-// getService()/getCharacteristic()/subscribe() internally wait on NimBLE
-// task notifications with portMAX_DELAY and are NOT bounded by any
-// existing timeout. A forced-disconnect watchdog timer (armed just before
-// these calls) is the only thing that guarantees they return within this
-// window if the panel connects but then stops answering GATT requests.
-#define COLIGHT_DISCOVERY_TIMEOUT_MS 3000
+struct ColightCache {
+    bool valid = false;              // has any real frame ever been seen?
+    uint8_t frame[6] = {};
+    uint32_t last_updated_ms = 0;
+    bool connected = false;
+    NimBLEClient* client = nullptr;
+    NimBLERemoteCharacteristic* chr = nullptr;
+};
 
+static SemaphoreHandle_t colight_mutex = nullptr;
+static ColightCache colight_cache;
 static NimBLEAdvertisedDevice* colight_found_device = nullptr;
 
 class ColightScanCB : public NimBLEAdvertisedDeviceCallbacks {
@@ -60,61 +48,40 @@ class ColightScanCB : public NimBLEAdvertisedDeviceCallbacks {
 };
 static ColightScanCB colight_scan_cb;
 
-static volatile bool colight_notify_ok = false;
-static uint8_t colight_notify_frame[6];
+// Runs on NimBLE's host task when the panel drops the connection (out of
+// range, power cycle, etc). Only flips the flag under the mutex — the
+// actual client cleanup and reconnect happen in colight_task_fn, not here.
+class ColightClientCB : public NimBLEClientCallbacks {
+    void onDisconnect(NimBLEClient* client) override {
+        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        colight_cache.connected = false;
+        xSemaphoreGive(colight_mutex);
+    }
+};
+static ColightClientCB colight_client_cb;
 
+// Runs on NimBLE's host task for every notification/indication on the
+// subscribed characteristic. Only f9 frames (state reports) are real state
+// — f1-f4 are other frame types the panel also sends in the same burst,
+// ignored here (see tools/colight-ble/FINDINGS.md).
 static void colight_notify_handler(NimBLERemoteCharacteristic* c, uint8_t* pData,
                                     size_t length, bool isNotify) {
     if (length >= 7 && pData[0] == 0xf9) {
-        memcpy(colight_notify_frame, pData + 1, 6);
-        colight_notify_ok = true;
+        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        memcpy(colight_cache.frame, pData + 1, 6);
+        colight_cache.valid = true;
+        colight_cache.last_updated_ms = millis();
+        xSemaphoreGive(colight_mutex);
     }
 }
 
-void colight_init() {
-    // NimBLE stack is already initialized by victron_init() in setup().
-}
-
-// Forced-disconnect watchdog for the unbounded GATT discovery calls
-// (getService/getCharacteristic/subscribe). If discovery doesn't complete
-// within COLIGHT_DISCOVERY_TIMEOUT_MS, the timer callback calls
-// client->disconnect(), which unblocks NimBLE's internal
-// ulTaskNotifyTake(pdTRUE, portMAX_DELAY) waits (with a failure result),
-// letting colight_run()'s normal error paths take over instead of hanging
-// forever.
-static portMUX_TYPE colight_watchdog_mux = portMUX_INITIALIZER_UNLOCKED;
-static NimBLEClient* colight_watchdog_client = nullptr;
-
-static void colight_arm_watchdog(NimBLEClient* client) {
-    portENTER_CRITICAL(&colight_watchdog_mux);
-    colight_watchdog_client = client;
-    portEXIT_CRITICAL(&colight_watchdog_mux);
-}
-
-// Reads and clears the armed client atomically. Returns it (or nullptr if
-// already disarmed/never armed) so the caller can act on it outside the lock.
-static NimBLEClient* colight_disarm_watchdog() {
-    portENTER_CRITICAL(&colight_watchdog_mux);
-    NimBLEClient* c = colight_watchdog_client;
-    colight_watchdog_client = nullptr;
-    portEXIT_CRITICAL(&colight_watchdog_mux);
-    return c;
-}
-
-static void colight_watchdog_cb(TimerHandle_t timer) {
-    NimBLEClient* c = colight_disarm_watchdog();
-    if (c) {
-        c->disconnect();  // called outside the critical section — never call NimBLE APIs while holding portENTER_CRITICAL
-    }
-}
-
-// channel == 0 means "read only, do not write anything".
-static ColightResult colight_run(int channel, bool turn_on) {
-    ColightResult result;
+// Scans for the panel, connects, discovers the service/characteristic, and
+// subscribes to notifications. On success, returns true with *out_client/
+// *out_chr set. On any failure, cleans up its own partial state (deletes
+// the client it created, if any) and returns false with both outputs left
+// untouched — caller retries after a delay.
+static bool colight_connect_once(NimBLEClient** out_client, NimBLERemoteCharacteristic** out_chr) {
     uint32_t started = millis();
-
-    victron_pause_scan();
-
     colight_found_device = nullptr;
     NimBLEScan* scan = NimBLEDevice::getScan();
     scan->setAdvertisedDeviceCallbacks(&colight_scan_cb, true);
@@ -122,104 +89,137 @@ static ColightResult colight_run(int channel, bool turn_on) {
     scan->start(COLIGHT_SCAN_S, nullptr, false);
 
     while (!colight_found_device && millis() - started < (uint32_t)(COLIGHT_SCAN_S * 1000 + 500)) {
-        delay(20);
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
-
-    if (!colight_found_device) {
-        result.error = "scan_timeout";
-        victron_resume_scan();
-        return result;
-    }
+    if (!colight_found_device) return false;
 
     NimBLEClient* client = NimBLEDevice::createClient();
+    client->setClientCallbacks(&colight_client_cb, false);
     client->setConnectTimeout(5);
 
     if (!client->connect(colight_found_device)) {
         NimBLEDevice::deleteClient(client);
-        result.error = "connect_failed";
-        victron_resume_scan();
-        return result;
+        return false;
     }
-
-    TimerHandle_t discovery_timer = xTimerCreate("colight_wd", pdMS_TO_TICKS(COLIGHT_DISCOVERY_TIMEOUT_MS),
-                                                  pdFALSE, nullptr, colight_watchdog_cb);
-    colight_arm_watchdog(client);
-    xTimerStart(discovery_timer, 0);
 
     NimBLERemoteService* svc = client->getService(COLIGHT_SERVICE_UUID);
     NimBLERemoteCharacteristic* chr = svc ? svc->getCharacteristic(COLIGHT_CHAR_UUID) : nullptr;
-    bool subscribed = false;
-    if (chr) {
-        colight_notify_ok = false;
-        subscribed = chr->subscribe(true, colight_notify_handler);
-    }
-
-    // The risky window is over one way or another — disarm before anything
-    // else, so a late-firing timer never races a later deleteClient() call.
-    xTimerStop(discovery_timer, pdMS_TO_TICKS(200));
-    xTimerDelete(discovery_timer, pdMS_TO_TICKS(200));
-    colight_disarm_watchdog();  // no-op if the callback already fired and cleared it
-
-    if (!chr) {
+    if (!chr || !chr->subscribe(true, colight_notify_handler)) {
         client->disconnect();
         NimBLEDevice::deleteClient(client);
-        result.error = "characteristic_not_found";
-        victron_resume_scan();
-        return result;
+        return false;
     }
 
-    if (!subscribed) {
-        client->disconnect();
-        NimBLEDevice::deleteClient(client);
-        result.error = "subscribe_failed";
-        victron_resume_scan();
-        return result;
-    }
+    *out_client = client;
+    *out_chr = chr;
+    return true;
+}
 
-    uint32_t wait_start = millis();
-    while (!colight_notify_ok && millis() - wait_start < COLIGHT_NOTIFY_WAIT_MS) {
-        delay(20);
-    }
+// Background task body: while connected, idles (all real work happens in
+// the notify/disconnect callbacks above, which run on NimBLE's own host
+// task). While disconnected, cleans up any stale client, pauses Victron's
+// scan for the duration of one (re)connect attempt, and retries every
+// COLIGHT_RECONNECT_DELAY_MS on failure.
+static void colight_task_fn(void* pvParameters) {
+    for (;;) {
+        bool connected;
+        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        connected = colight_cache.connected;
+        xSemaphoreGive(colight_mutex);
 
-    if (!colight_notify_ok) {
-        client->disconnect();
-        NimBLEDevice::deleteClient(client);
-        result.error = "no_state_notification";
-        victron_resume_scan();
-        return result;
-    }
-
-    uint8_t frame[6];
-    memcpy(frame, colight_notify_frame, 6);
-
-    if (channel != 0) {
-        colight_set_channel(frame, channel, turn_on);
-        uint8_t out[7];
-        out[0] = 0xf5;
-        memcpy(out + 1, frame, 6);
-        if (!chr->writeValue(out, 7, false)) {
-            client->disconnect();
-            NimBLEDevice::deleteClient(client);
-            result.error = "write_failed";
-            victron_resume_scan();
-            return result;
+        if (connected) {
+            vTaskDelay(pdMS_TO_TICKS(COLIGHT_IDLE_POLL_MS));
+            continue;
         }
-        delay(300);  // let the panel process the command
-    }
 
-    client->disconnect();
-    NimBLEDevice::deleteClient(client);
-    victron_resume_scan();
+        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        NimBLEClient* stale_client = colight_cache.client;
+        colight_cache.client = nullptr;
+        colight_cache.chr = nullptr;
+        xSemaphoreGive(colight_mutex);
+        if (stale_client) {
+            NimBLEDevice::deleteClient(stale_client);
+        }
+
+        victron_pause_scan();
+        NimBLEClient* new_client = nullptr;
+        NimBLERemoteCharacteristic* new_chr = nullptr;
+        bool ok = colight_connect_once(&new_client, &new_chr);
+        victron_resume_scan();
+
+        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        colight_cache.connected = ok;
+        if (ok) {
+            colight_cache.client = new_client;
+            colight_cache.chr = new_chr;
+        }
+        xSemaphoreGive(colight_mutex);
+
+        if (!ok) {
+            vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
+        }
+    }
+}
+
+void colight_init() {
+    colight_mutex = xSemaphoreCreateMutex();
+    xTaskCreate(colight_task_fn, "colight_task", 8192, nullptr, 1, nullptr);
+}
+
+ColightResult colight_read_state() {
+    ColightResult result;
+    xSemaphoreTake(colight_mutex, portMAX_DELAY);
+    result.connected = colight_cache.connected;
+    result.last_updated_ms = colight_cache.last_updated_ms;
+    bool valid = colight_cache.valid;
+    uint8_t frame[6];
+    memcpy(frame, colight_cache.frame, 6);
+    xSemaphoreGive(colight_mutex);
+
+    if (!valid) {
+        result.error = "unknown_state";
+        return result;
+    }
 
     colight_decode(frame, result.channels);
     result.success = true;
     return result;
 }
 
-ColightResult colight_read_state() {
-    return colight_run(0, false);
-}
-
 ColightResult colight_send_command(int channel, bool turn_on) {
-    return colight_run(channel, turn_on);
+    ColightResult result;
+    xSemaphoreTake(colight_mutex, portMAX_DELAY);
+    result.connected = colight_cache.connected;
+    result.last_updated_ms = colight_cache.last_updated_ms;
+
+    if (!colight_cache.valid || !colight_cache.connected || !colight_cache.chr) {
+        xSemaphoreGive(colight_mutex);
+        result.error = "not_ready";
+        return result;
+    }
+
+    uint8_t frame[6];
+    memcpy(frame, colight_cache.frame, 6);
+    colight_set_channel(frame, channel, turn_on);
+
+    uint8_t out[7];
+    out[0] = 0xf5;
+    memcpy(out + 1, frame, 6);
+
+    bool written = colight_cache.chr->writeValue(out, 7, false);
+
+    if (!written) {
+        xSemaphoreGive(colight_mutex);
+        result.error = "write_failed";
+        return result;
+    }
+
+    memcpy(colight_cache.frame, frame, 6);
+    colight_cache.last_updated_ms = millis();
+    result.last_updated_ms = colight_cache.last_updated_ms;
+    xSemaphoreGive(colight_mutex);
+
+    colight_decode(frame, result.channels);
+    result.success = true;
+    return result;
 }
