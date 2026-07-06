@@ -100,7 +100,12 @@ if result.returncode == 0 and result.stdout:
         body = json.loads(result.stdout)
     except ValueError:
         body = {'success': False}
-    if body.get('success'):
+    # connected-vahti: ESP32 palauttaa success=true myös pelkästä
+    # välimuistista BLE-yhteyden ollessa poikki — silloin kehys voi olla
+    # tuntien takainen eikä sitä saa kirjata Supabaseen valid:true.
+    # Oletus True säilyttää yhteensopivuuden vanhaan firmwareen, jonka
+    # vastauksessa connected-kenttää ei vielä ole.
+    if body.get('success') and body.get('connected', True):
         subprocess.run([
             'curl', '-s', '--connect-timeout', '5', '--max-time', '10', '-X', 'POST',
             '-H', f'apikey: {SUPABASE_KEY}',
