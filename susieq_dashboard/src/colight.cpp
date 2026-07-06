@@ -130,7 +130,11 @@ static bool colight_connect_once(NimBLEClient** out_client, NimBLERemoteCharacte
 static void colight_task_fn(void* pvParameters) {
     for (;;) {
         bool connected;
-        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+            Serial.println("[colight] task: mutex timeout reading connected, retrying");
+            vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
+            continue;
+        }
         connected = colight_cache.connected;
         xSemaphoreGive(colight_mutex);
 
@@ -139,7 +143,11 @@ static void colight_task_fn(void* pvParameters) {
             continue;
         }
 
-        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+            Serial.println("[colight] task: mutex timeout cleaning stale client, retrying");
+            vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
+            continue;
+        }
         NimBLEClient* stale_client = colight_cache.client;
         colight_cache.client = nullptr;
         colight_cache.chr = nullptr;
@@ -163,7 +171,15 @@ static void colight_task_fn(void* pvParameters) {
         // leave the cache permanently stuck on a dead connection. Re-check
         // liveness under the same mutex acquisition that publishes the
         // result so the two can never race.
-        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+            Serial.println("[colight] task: mutex timeout publishing result, discarding connection");
+            if (ok) {
+                new_client->disconnect();
+                NimBLEDevice::deleteClient(new_client);
+            }
+            vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
+            continue;
+        }
         colight_cache.connected = ok && new_client->isConnected();
         NimBLEClient* client_to_discard = nullptr;
         if (colight_cache.connected) {
