@@ -9,6 +9,7 @@
 #include "esp_wifi.h"
 #include "esp_task_wdt.h"
 #include "esp_system.h"
+#include "esp_attr.h"
 
 #include "../include/config.h"
 #include "wind.h"
@@ -31,7 +32,17 @@ AsyncWebServer  server(80);
 // ei näe koska loop() jatkaa tikitystä normaalisti). Jos /data ei ole
 // vastannut tähän aikaan WiFi:n ollessa yhä yhdistettynä eikä OTA käynnissä,
 // laite bootataan itse.
+//
+// Reboot-silmukkasuoja: koska tämä nojaa ULKOISEEN /data-pollaukseen
+// (susieq-sensors.sh cron modeemilla), pollauksen pysähtyminen WiFi:n
+// pysyessä ylhäällä bootittaisi tervettä laitetta 180 s välein loputtomasti.
+// RTC-muistissa säilyvä laskuri sallii enintään LIVENESS_RESTART_LIMIT
+// peräkkäistä liveness-boottia; sen jälkeen laite jää käyntiin (hardware WDT
+// suojaa yhä loop()-jumit) ja laskuri nollautuu vasta kun /data-pyyntö taas
+// saapuu tai virrat katkaistaan.
 #define HTTP_LIVENESS_TIMEOUT_MS 180000
+#define LIVENESS_RESTART_LIMIT   3
+RTC_NOINIT_ATTR static uint32_t liveness_restart_count;
 static volatile uint32_t last_data_request_ms = 0;
 static volatile bool ota_active = false;
 
@@ -135,8 +146,15 @@ static String build_json() {
 static String colight_result_to_json(const ColightResult& r) {
     JsonDocument doc;
     doc["success"] = r.success;
-    doc["connected"] = r.connected;
-    doc["last_updated_ms"] = r.last_updated_ms;
+    // "busy" tarkoittaa ettei välimuistia päästy lukemaan — silloin
+    // connected/last_updated_ms olisivat structin oletusarvoja (false/0),
+    // mikä näyttäisi kutsujalle identtiseltä "ei koskaan yhdistetty"-tilalta.
+    // Jätetään kentät pois, jotta hetkellinen kilpailutilanne ei väitä
+    // yhteyden olevan poikki.
+    if (strcmp(r.error, "busy") != 0) {
+        doc["connected"] = r.connected;
+        doc["last_updated_ms"] = r.last_updated_ms;
+    }
     if (r.success) {
         JsonArray arr = doc["state"].to<JsonArray>();
         for (int i = 0; i < COLIGHT_NUM_CHANNELS; i++) arr.add(r.channels[i]);
@@ -158,6 +176,7 @@ static void setup_routes() {
     // JSON snapshot endpoint (for debugging without WebSocket)
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* req) {
         last_data_request_ms = millis();
+        liveness_restart_count = 0;  // pollaus elää — nollaa reboot-silmukkasuoja
         // Take hx711_mutex to avoid racing loop()'s cached_json reassignment.
         String snapshot;
         if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(50))) {
@@ -357,6 +376,12 @@ void setup() {
     delay(500);
     Serial.println("\n[SusieQ] starting up...");
 
+    // RTC-noinit-muisti on satunnaista kylmäkäynnistyksen jälkeen — laskuri
+    // on luotettava vain ohjelmallisen resetin (esp_restart) yli.
+    if (esp_reset_reason() != ESP_RST_SW) {
+        liveness_restart_count = 0;
+    }
+
     // Filesystem
     if (!LittleFS.begin(true)) {
         Serial.println("[fs] LittleFS mount failed!");
@@ -492,17 +517,25 @@ void loop() {
     // (esim. AsyncTCP/colight_mutex-deadlock), joita hardware WDT ei näe
     // koska tämä silmukka jatkaa tikitystä normaalisti sellaisen aikana.
     // Huom: tämä nojaa siihen että jokin ulkopuolinen taho (susieq-sensors.sh
-    // cron / modeemin dashboard-palvelin) pollaa /data:a säännöllisesti — jos
-    // WiFi pysyy yhdistettynä mutta pollaus itsessään pysähtyy modeemin
-    // puolella, tämä ESP32 restartoi itseään toistuvasti ~180s välein vaikka
-    // laite olisi täysin terve. Hyväksytty kompromissi koska pollaus on
-    // luotettava eikä hyökkääjä SusieQ-Net-verkosta voi laukaista tätä
-    // pelkällä /colight-liikenteellä (/data ei koske colight_mutex:iin).
+    // cron / modeemin dashboard-palvelin) pollaa /data:a säännöllisesti —
+    // liveness_restart_count rajaa vahingon jos pollaus itsessään pysähtyy
+    // modeemin puolella (ks. määrittelyn kommentti ylempänä). Hyökkääjä
+    // SusieQ-Net-verkosta ei voi laukaista tätä pelkällä
+    // /colight-liikenteellä (/data ei koske colight_mutex:iin).
     if (WiFi.status() == WL_CONNECTED && !ota_active &&
         millis() - last_data_request_ms > HTTP_LIVENESS_TIMEOUT_MS) {
-        Serial.println("[watchdog] ei /data-vastausta 180s WiFi:n ollessa yhdistettynä — restart");
-        Serial.flush();
-        esp_restart();
+        if (liveness_restart_count < LIVENESS_RESTART_LIMIT) {
+            liveness_restart_count++;
+            Serial.printf("[watchdog] ei /data-pyyntoa 180s WiFi:n ollessa yhdistettynä — restart (%u/%d)\n",
+                          liveness_restart_count, LIVENESS_RESTART_LIMIT);
+            Serial.flush();
+            esp_restart();
+        }
+        static bool liveness_gave_up_logged = false;
+        if (!liveness_gave_up_logged) {
+            liveness_gave_up_logged = true;
+            Serial.println("[watchdog] liveness-restart-raja täynnä — pollaus lienee poikki modeemin päässä, ei enää boottailla");
+        }
     }
 
     handle_serial();

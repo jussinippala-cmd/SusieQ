@@ -23,6 +23,7 @@
 #define COLIGHT_CHAR_UUID            "0003cbbb-0000-1000-8000-00805f9beffa"
 #define COLIGHT_SCAN_S               3
 #define COLIGHT_RECONNECT_DELAY_MS   5000
+#define COLIGHT_RECONNECT_MAX_MS     60000
 #define COLIGHT_IDLE_POLL_MS         1000
 #define COLIGHT_MUTEX_TIMEOUT_MS     2000
 #define COLIGHT_LOG_CAPACITY         40
@@ -70,6 +71,22 @@ static void colight_log(const char* msg) {
     xSemaphoreGive(colight_log_mutex);
 }
 
+// Takes colight_mutex with the standard bounded wait. Returns false on
+// timeout — or if the mutex was never created (allocation failure in
+// colight_init) — and logs the failing site to both Serial and the debug
+// ring buffer, so a missed acquisition is visible in /colight-debug, not
+// just on USB-serial. Logging goes through colight_log_mutex, never
+// colight_mutex, so this can never deadlock with the state hot path.
+static bool colight_lock(const char* where) {
+    if (colight_mutex && xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+        return true;
+    }
+    char msg[COLIGHT_LOG_MSG_LEN];
+    snprintf(msg, sizeof(msg), "%s: mutex timeout", where);
+    colight_log(msg);
+    return false;
+}
+
 class ColightScanCB : public NimBLEAdvertisedDeviceCallbacks {
     void onResult(NimBLEAdvertisedDevice* dev) override {
         if (dev->haveName() && dev->getName() == COLIGHT_DEVICE_NAME) {
@@ -85,8 +102,10 @@ static ColightScanCB colight_scan_cb;
 // actual client cleanup and reconnect happen in colight_task_fn, not here.
 class ColightClientCB : public NimBLEClientCallbacks {
     void onDisconnect(NimBLEClient* client) override {
-        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
-            Serial.println("[colight] onDisconnect: mutex timeout, skipping");
+        // On lock timeout the flag update is skipped; colight_task_fn's
+        // idle-branch reconciliation (isConnected() check) is the backstop
+        // that eventually notices the dead link and reconnects.
+        if (!colight_lock("onDisconnect")) {
             return;
         }
         colight_cache.connected = false;
@@ -103,9 +122,8 @@ static ColightClientCB colight_client_cb;
 static void colight_notify_handler(NimBLERemoteCharacteristic* c, uint8_t* pData,
                                     size_t length, bool isNotify) {
     if (length >= 7 && pData[0] == 0xf9) {
-        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
-            Serial.println("[colight] notify_handler: mutex timeout, dropping frame");
-            return;
+        if (!colight_lock("notify_handler")) {
+            return;  // frame dropped; panel resends on the next state change
         }
         memcpy(colight_cache.frame, pData + 1, 6);
         colight_cache.valid = true;
@@ -163,16 +181,19 @@ static bool colight_connect_once(NimBLEClient** out_client, NimBLERemoteCharacte
     return true;
 }
 
-// Background task body: while connected, idles (all real work happens in
+// Background task body: while connected, idles and reconciles the cached
+// connected flag against the real link state (all real work happens in
 // the notify/disconnect callbacks above, which run on NimBLE's own host
 // task). While disconnected, cleans up any stale client, pauses Victron's
-// scan for the duration of one (re)connect attempt, and retries every
-// COLIGHT_RECONNECT_DELAY_MS on failure.
+// scan for the duration of one (re)connect attempt, and retries with
+// exponential backoff (COLIGHT_RECONNECT_DELAY_MS doubling up to
+// COLIGHT_RECONNECT_MAX_MS) so an absent panel doesn't keep interrupting
+// Victron's scan every few seconds indefinitely.
 static void colight_task_fn(void* pvParameters) {
+    uint32_t reconnect_delay_ms = COLIGHT_RECONNECT_DELAY_MS;
     for (;;) {
         bool connected;
-        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
-            Serial.println("[colight] task: mutex timeout reading connected, retrying");
+        if (!colight_lock("task read")) {
             vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
             continue;
         }
@@ -181,11 +202,27 @@ static void colight_task_fn(void* pvParameters) {
 
         if (connected) {
             vTaskDelay(pdMS_TO_TICKS(COLIGHT_IDLE_POLL_MS));
+            // Reconciliation backstop: if onDisconnect ever misses its
+            // bounded mutex wait, connected stays true with no reconnect —
+            // permanently, since NimBLE fires onDisconnect only once. Verify
+            // the flag against the real link state on every idle poll.
+            // isConnected() only reads the connection handle, no BLE I/O.
+            bool desynced = false;
+            if (colight_lock("task reconcile")) {
+                if (colight_cache.connected && colight_cache.client &&
+                    !colight_cache.client->isConnected()) {
+                    colight_cache.connected = false;
+                    desynced = true;
+                }
+                xSemaphoreGive(colight_mutex);
+            }
+            if (desynced) {
+                colight_log("reconcile: link down, cache said connected");
+            }
             continue;
         }
 
-        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
-            Serial.println("[colight] task: mutex timeout cleaning stale client, retrying");
+        if (!colight_lock("task clean stale")) {
             vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
             continue;
         }
@@ -212,8 +249,7 @@ static void colight_task_fn(void* pvParameters) {
         // leave the cache permanently stuck on a dead connection. Re-check
         // liveness under the same mutex acquisition that publishes the
         // result so the two can never race.
-        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
-            Serial.println("[colight] task: mutex timeout publishing result, discarding connection");
+        if (!colight_lock("task publish")) {
             if (ok) {
                 new_client->disconnect();
                 NimBLEDevice::deleteClient(new_client);
@@ -221,9 +257,10 @@ static void colight_task_fn(void* pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
             continue;
         }
-        colight_cache.connected = ok && new_client->isConnected();
+        bool published = ok && new_client->isConnected();
+        colight_cache.connected = published;
         NimBLEClient* client_to_discard = nullptr;
-        if (colight_cache.connected) {
+        if (published) {
             colight_cache.client = new_client;
             colight_cache.chr = new_chr;
         } else if (ok) {
@@ -236,8 +273,14 @@ static void colight_task_fn(void* pvParameters) {
             NimBLEDevice::deleteClient(client_to_discard);
         }
 
-        if (!ok) {
-            vTaskDelay(pdMS_TO_TICKS(COLIGHT_RECONNECT_DELAY_MS));
+        if (published) {
+            reconnect_delay_ms = COLIGHT_RECONNECT_DELAY_MS;
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(reconnect_delay_ms));
+            reconnect_delay_ms *= 2;
+            if (reconnect_delay_ms > COLIGHT_RECONNECT_MAX_MS) {
+                reconnect_delay_ms = COLIGHT_RECONNECT_MAX_MS;
+            }
         }
     }
 }
@@ -245,6 +288,14 @@ static void colight_task_fn(void* pvParameters) {
 void colight_init() {
     colight_mutex = xSemaphoreCreateMutex();
     colight_log_mutex = xSemaphoreCreateMutex();
+    if (!colight_mutex || !colight_log_mutex) {
+        // Without the mutexes every cache access would pass a NULL handle to
+        // xSemaphoreTake and crash — degrade to "colight disabled" instead.
+        // colight_lock() and colight_log() both tolerate a null handle, and
+        // read_state/send_command then report "busy"/"not_ready".
+        Serial.println("[colight] FATAL: mutex allocation failed, colight disabled");
+        return;
+    }
     xTaskCreate(colight_task_fn, "colight_task", 8192, nullptr, 1, nullptr);
 }
 
@@ -252,26 +303,26 @@ String colight_get_log() {
     if (!colight_log_mutex || !xSemaphoreTake(colight_log_mutex, pdMS_TO_TICKS(COLIGHT_LOG_MUTEX_TIMEOUT_MS))) {
         return "busy";
     }
-    int start = (colight_log_head - colight_log_count + COLIGHT_LOG_CAPACITY) % COLIGHT_LOG_CAPACITY;
-    int count = colight_log_count;
-    ColightLogEntry entries[COLIGHT_LOG_CAPACITY];
-    for (int i = 0; i < count; i++) {
-        entries[i] = colight_log_buf[(start + i) % COLIGHT_LOG_CAPACITY];
-    }
-    xSemaphoreGive(colight_log_mutex);
-
+    // Formats directly from the ring buffer while holding the mutex — the
+    // work is bounded (≤40 short lines, well under colight_log's 100 ms
+    // timeout) and it avoids both a ~2 KB stack copy on the AsyncTCP task
+    // and repeated String reallocations (reserve() makes it one allocation).
     String out;
+    out.reserve(colight_log_count * (COLIGHT_LOG_MSG_LEN + 16));
+    int start = (colight_log_head - colight_log_count + COLIGHT_LOG_CAPACITY) % COLIGHT_LOG_CAPACITY;
     char line[COLIGHT_LOG_MSG_LEN + 16];
-    for (int i = 0; i < count; i++) {
-        snprintf(line, sizeof(line), "%lu %s\n", (unsigned long)entries[i].ms, entries[i].msg);
+    for (int i = 0; i < colight_log_count; i++) {
+        const ColightLogEntry& e = colight_log_buf[(start + i) % COLIGHT_LOG_CAPACITY];
+        snprintf(line, sizeof(line), "%lu %s\n", (unsigned long)e.ms, e.msg);
         out += line;
     }
+    xSemaphoreGive(colight_log_mutex);
     return out;
 }
 
 ColightResult colight_read_state() {
     ColightResult result;
-    if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+    if (!colight_lock("read_state")) {
         result.error = "busy";
         return result;
     }
@@ -294,7 +345,7 @@ ColightResult colight_read_state() {
 
 ColightResult colight_send_command(int channel, bool turn_on) {
     ColightResult result;
-    if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+    if (!colight_lock("send_command")) {
         result.error = "busy";
         return result;
     }
