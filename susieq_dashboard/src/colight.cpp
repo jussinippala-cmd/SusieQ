@@ -24,6 +24,7 @@
 #define COLIGHT_SCAN_S               3
 #define COLIGHT_RECONNECT_DELAY_MS   5000
 #define COLIGHT_IDLE_POLL_MS         1000
+#define COLIGHT_MUTEX_TIMEOUT_MS     2000
 
 struct ColightCache {
     bool valid = false;              // has any real frame ever been seen?
@@ -53,7 +54,10 @@ static ColightScanCB colight_scan_cb;
 // actual client cleanup and reconnect happen in colight_task_fn, not here.
 class ColightClientCB : public NimBLEClientCallbacks {
     void onDisconnect(NimBLEClient* client) override {
-        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+            Serial.println("[colight] onDisconnect: mutex timeout, skipping");
+            return;
+        }
         colight_cache.connected = false;
         xSemaphoreGive(colight_mutex);
     }
@@ -67,7 +71,10 @@ static ColightClientCB colight_client_cb;
 static void colight_notify_handler(NimBLERemoteCharacteristic* c, uint8_t* pData,
                                     size_t length, bool isNotify) {
     if (length >= 7 && pData[0] == 0xf9) {
-        xSemaphoreTake(colight_mutex, portMAX_DELAY);
+        if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+            Serial.println("[colight] notify_handler: mutex timeout, dropping frame");
+            return;
+        }
         memcpy(colight_cache.frame, pData + 1, 6);
         colight_cache.valid = true;
         colight_cache.last_updated_ms = millis();
