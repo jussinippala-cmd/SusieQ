@@ -485,9 +485,17 @@ void loop() {
     // HTTP-vasteaika-watchdog: kattaa hangit loop()-tehtävän ulkopuolella
     // (esim. AsyncTCP/colight_mutex-deadlock), joita hardware WDT ei näe
     // koska tämä silmukka jatkaa tikitystä normaalisti sellaisen aikana.
+    // Huom: tämä nojaa siihen että jokin ulkopuolinen taho (susieq-sensors.sh
+    // cron / modeemin dashboard-palvelin) pollaa /data:a säännöllisesti — jos
+    // WiFi pysyy yhdistettynä mutta pollaus itsessään pysähtyy modeemin
+    // puolella, tämä ESP32 restartoi itseään toistuvasti ~180s välein vaikka
+    // laite olisi täysin terve. Hyväksytty kompromissi koska pollaus on
+    // luotettava eikä hyökkääjä SusieQ-Net-verkosta voi laukaista tätä
+    // pelkällä /colight-liikenteellä (/data ei koske colight_mutex:iin).
     if (WiFi.status() == WL_CONNECTED && !ota_active &&
         millis() - last_data_request_ms > HTTP_LIVENESS_TIMEOUT_MS) {
         Serial.println("[watchdog] ei /data-vastausta 180s WiFi:n ollessa yhdistettynä — restart");
+        Serial.flush();
         esp_restart();
     }
 
