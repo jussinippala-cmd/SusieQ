@@ -395,7 +395,7 @@ void setup() {
     });
     // Feed the hardware watchdog on every OTA chunk, not just once per loop()
     // iteration — a slow/weak WiFi link can make a single ArduinoOTA.handle()
-    // call block long enough on its own to trip the 20s watchdog mid-transfer.
+    // call block long enough on its own to trip the 70s watchdog mid-transfer.
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
         esp_task_wdt_reset();
     });
