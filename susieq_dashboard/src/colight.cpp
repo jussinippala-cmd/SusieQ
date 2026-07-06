@@ -208,7 +208,10 @@ void colight_init() {
 
 ColightResult colight_read_state() {
     ColightResult result;
-    xSemaphoreTake(colight_mutex, portMAX_DELAY);
+    if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+        result.error = "busy";
+        return result;
+    }
     result.connected = colight_cache.connected;
     result.last_updated_ms = colight_cache.last_updated_ms;
     bool valid = colight_cache.valid;
@@ -228,7 +231,10 @@ ColightResult colight_read_state() {
 
 ColightResult colight_send_command(int channel, bool turn_on) {
     ColightResult result;
-    xSemaphoreTake(colight_mutex, portMAX_DELAY);
+    if (!xSemaphoreTake(colight_mutex, pdMS_TO_TICKS(COLIGHT_MUTEX_TIMEOUT_MS))) {
+        result.error = "busy";
+        return result;
+    }
     result.connected = colight_cache.connected;
     result.last_updated_ms = colight_cache.last_updated_ms;
 
