@@ -8,6 +8,7 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "esp_task_wdt.h"
+#include "esp_system.h"
 
 #include "../include/config.h"
 #include "wind.h"
@@ -23,7 +24,16 @@
 AsyncWebServer  server(80);
 
 // loop() jumiutuu -> WDT ei saa reset-kutsua -> ESP buuttaa itsensä
-#define WDT_TIMEOUT_S 20
+#define WDT_TIMEOUT_S 70
+
+// Sovellustason varmistus loop()-tehtävän ULKOPUOLISILLE hangeille (esim.
+// AsyncTCP/colight_mutex-tyyppinen deadlock, jota edellä oleva hardware WDT
+// ei näe koska loop() jatkaa tikitystä normaalisti). Jos /data ei ole
+// vastannut tähän aikaan WiFi:n ollessa yhä yhdistettynä eikä OTA käynnissä,
+// laite bootataan itse.
+#define HTTP_LIVENESS_TIMEOUT_MS 180000
+static volatile uint32_t last_data_request_ms = 0;
+static volatile bool ota_active = false;
 
 static unsigned long last_sensor_read = 0;
 static String cached_json;             // cached for /data
@@ -147,6 +157,7 @@ static void setup_routes() {
 
     // JSON snapshot endpoint (for debugging without WebSocket)
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* req) {
+        last_data_request_ms = millis();
         // Take hx711_mutex to avoid racing loop()'s cached_json reassignment.
         String snapshot;
         if (xSemaphoreTake(hx711_mutex, pdMS_TO_TICKS(50))) {
@@ -371,12 +382,15 @@ void setup() {
     ArduinoOTA.setHostname(OTA_HOSTNAME);
     ArduinoOTA.setPassword(OTA_PASSWORD);
     ArduinoOTA.onStart([]() {
+        ota_active = true;
         Serial.println("[ota] update starting...");
     });
     ArduinoOTA.onEnd([]() {
+        ota_active = false;
         Serial.println("\n[ota] update complete — rebooting");
     });
     ArduinoOTA.onError([](ota_error_t err) {
+        ota_active = false;
         Serial.printf("[ota] error %u\n", err);
     });
     // Feed the hardware watchdog on every OTA chunk, not just once per loop()
@@ -398,6 +412,7 @@ void setup() {
     setup_routes();
     server.begin();
     Serial.println("[http] server started on port 80");
+    last_data_request_ms = millis();  // baseline for HTTP-liveness watchdog
 
     Serial.printf("[SusieQ] ready — open http://%s on device\n", STATIC_IP);
 }
@@ -465,6 +480,15 @@ void loop() {
         } else {
             esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
         }
+    }
+
+    // HTTP-vasteaika-watchdog: kattaa hangit loop()-tehtävän ulkopuolella
+    // (esim. AsyncTCP/colight_mutex-deadlock), joita hardware WDT ei näe
+    // koska tämä silmukka jatkaa tikitystä normaalisti sellaisen aikana.
+    if (WiFi.status() == WL_CONNECTED && !ota_active &&
+        millis() - last_data_request_ms > HTTP_LIVENESS_TIMEOUT_MS) {
+        Serial.println("[watchdog] ei /data-vastausta 180s WiFi:n ollessa yhdistettynä — restart");
+        esp_restart();
     }
 
     handle_serial();
