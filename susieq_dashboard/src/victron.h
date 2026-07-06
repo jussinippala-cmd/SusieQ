@@ -6,6 +6,7 @@ struct VictronData {
     float battery_current = 0.0f;  // A
     float pv_power_w      = 0.0f;  // W from solar panel
     float pv_voltage      = 0.0f;  // V panel voltage
+    float yield_today_wh  = 0.0f;  // Wh charged today (MPPT resets at midnight)
     uint8_t charge_state  = 0;     // 0=off 2=fault 3=bulk 4=absorb 5=float
     bool  valid           = false;
     unsigned long last_seen_ms = 0;

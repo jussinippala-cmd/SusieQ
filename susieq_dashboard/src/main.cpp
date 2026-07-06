@@ -78,9 +78,10 @@ static String build_json() {
     // Solar (Victron only)
     doc["solar"]["valid"] = victron.valid;
     if (victron.valid) {
-        doc["solar"]["pv_power"]   = victron.pv_power_w;
-        doc["solar"]["pv_voltage"] = victron.pv_voltage;
-        doc["solar"]["state"]      = victron.charge_state;
+        doc["solar"]["pv_power"]       = victron.pv_power_w;
+        doc["solar"]["pv_voltage"]     = victron.pv_voltage;
+        doc["solar"]["yield_today_wh"] = victron.yield_today_wh;
+        doc["solar"]["state"]          = victron.charge_state;
     }
 
     // Water tank

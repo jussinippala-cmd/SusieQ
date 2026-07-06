@@ -20,7 +20,7 @@
 //   [1]     charger_error
 //   [2:4]   battery_voltage  int16 LE, ÷100 → V
 //   [4:6]   battery_current  int16 LE, ÷10  → A
-//   [6:8]   yield_today      uint16 LE, ÷100 → Wh
+//   [6:8]   yield_today      uint16 LE, 0.01 kWh/bit → ×10 = Wh
 //   [8:10]  pv_power         uint16 LE, W
 //   [10:12] load_current     uint16 LE, ÷10  → A
 
@@ -151,14 +151,16 @@ class VictronAdvCB : public NimBLEAdvertisedDeviceCallbacks {
         portENTER_CRITICAL(&victron_mux); dbg.decrypt_ok++; portEXIT_CRITICAL(&victron_mux);
 
         // Parse fixed binary struct
-        int16_t raw_batt_v = (int16_t)(plain[2] | (plain[3] << 8));
-        int16_t raw_batt_i = (int16_t)(plain[4] | (plain[5] << 8));
-        uint16_t raw_pv_p  = plain[8] | (plain[9] << 8);
+        int16_t raw_batt_v  = (int16_t)(plain[2] | (plain[3] << 8));
+        int16_t raw_batt_i  = (int16_t)(plain[4] | (plain[5] << 8));
+        uint16_t raw_yield  = plain[6] | (plain[7] << 8);
+        uint16_t raw_pv_p   = plain[8] | (plain[9] << 8);
 
         portENTER_CRITICAL(&victron_mux);
         latest.charge_state    = plain[0];
         latest.battery_voltage = raw_batt_v / 100.0f;
         latest.battery_current = raw_batt_i / 10.0f;
+        latest.yield_today_wh  = raw_yield * 10.0f;
         latest.pv_power_w      = (float)raw_pv_p;
         latest.pv_voltage      = 0.0f;  // not in this packet format
         latest.valid           = true;
