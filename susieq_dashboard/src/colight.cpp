@@ -25,6 +25,9 @@
 #define COLIGHT_RECONNECT_DELAY_MS   5000
 #define COLIGHT_IDLE_POLL_MS         1000
 #define COLIGHT_MUTEX_TIMEOUT_MS     2000
+#define COLIGHT_LOG_CAPACITY         40
+#define COLIGHT_LOG_MSG_LEN          48
+#define COLIGHT_LOG_MUTEX_TIMEOUT_MS 100
 
 struct ColightCache {
     bool valid = false;              // has any real frame ever been seen?
@@ -38,6 +41,34 @@ struct ColightCache {
 static SemaphoreHandle_t colight_mutex = nullptr;
 static ColightCache colight_cache;
 static NimBLEAdvertisedDevice* colight_found_device = nullptr;
+
+// Small in-memory ring buffer of connect/disconnect/scan events, readable
+// over HTTP (/colight-debug) so the reconnect behaviour can be inspected
+// from a phone/laptop without a USB-serial connection to the ESP32. Guarded
+// by its own mutex (never colight_mutex) so a slow log write can never
+// contend with the state read/write hot path.
+struct ColightLogEntry {
+    uint32_t ms = 0;
+    char msg[COLIGHT_LOG_MSG_LEN] = {};
+};
+static SemaphoreHandle_t colight_log_mutex = nullptr;
+static ColightLogEntry colight_log_buf[COLIGHT_LOG_CAPACITY];
+static int colight_log_head = 0;   // next slot to write
+static int colight_log_count = 0;  // valid entries, caps at COLIGHT_LOG_CAPACITY
+
+static void colight_log(const char* msg) {
+    Serial.printf("[colight] %s\n", msg);
+    if (!colight_log_mutex || !xSemaphoreTake(colight_log_mutex, pdMS_TO_TICKS(COLIGHT_LOG_MUTEX_TIMEOUT_MS))) {
+        return;
+    }
+    ColightLogEntry& e = colight_log_buf[colight_log_head];
+    e.ms = millis();
+    strncpy(e.msg, msg, COLIGHT_LOG_MSG_LEN - 1);
+    e.msg[COLIGHT_LOG_MSG_LEN - 1] = '\0';
+    colight_log_head = (colight_log_head + 1) % COLIGHT_LOG_CAPACITY;
+    if (colight_log_count < COLIGHT_LOG_CAPACITY) colight_log_count++;
+    xSemaphoreGive(colight_log_mutex);
+}
 
 class ColightScanCB : public NimBLEAdvertisedDeviceCallbacks {
     void onResult(NimBLEAdvertisedDevice* dev) override {
@@ -60,6 +91,7 @@ class ColightClientCB : public NimBLEClientCallbacks {
         }
         colight_cache.connected = false;
         xSemaphoreGive(colight_mutex);
+        colight_log("disconnected");
     }
 };
 static ColightClientCB colight_client_cb;
@@ -98,13 +130,20 @@ static bool colight_connect_once(NimBLEClient** out_client, NimBLERemoteCharacte
     while (!colight_found_device && millis() - started < (uint32_t)(COLIGHT_SCAN_S * 1000 + 500)) {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
-    if (!colight_found_device) return false;
+    if (!colight_found_device) {
+        colight_log("scan: panel not found (not advertising?)");
+        return false;
+    }
+    char found_msg[COLIGHT_LOG_MSG_LEN];
+    snprintf(found_msg, sizeof(found_msg), "scan: found panel, rssi=%d", colight_found_device->getRSSI());
+    colight_log(found_msg);
 
     NimBLEClient* client = NimBLEDevice::createClient();
     client->setClientCallbacks(&colight_client_cb, false);
     client->setConnectTimeout(5);
 
     if (!client->connect(colight_found_device)) {
+        colight_log("connect: gatt connect failed");
         NimBLEDevice::deleteClient(client);
         return false;
     }
@@ -112,11 +151,13 @@ static bool colight_connect_once(NimBLEClient** out_client, NimBLERemoteCharacte
     NimBLERemoteService* svc = client->getService(COLIGHT_SERVICE_UUID);
     NimBLERemoteCharacteristic* chr = svc ? svc->getCharacteristic(COLIGHT_CHAR_UUID) : nullptr;
     if (!chr || !chr->subscribe(true, colight_notify_handler)) {
+        colight_log("connect: service/characteristic/subscribe failed");
         client->disconnect();
         NimBLEDevice::deleteClient(client);
         return false;
     }
 
+    colight_log("connect: connected and subscribed");
     *out_client = client;
     *out_chr = chr;
     return true;
@@ -203,7 +244,29 @@ static void colight_task_fn(void* pvParameters) {
 
 void colight_init() {
     colight_mutex = xSemaphoreCreateMutex();
+    colight_log_mutex = xSemaphoreCreateMutex();
     xTaskCreate(colight_task_fn, "colight_task", 8192, nullptr, 1, nullptr);
+}
+
+String colight_get_log() {
+    if (!colight_log_mutex || !xSemaphoreTake(colight_log_mutex, pdMS_TO_TICKS(COLIGHT_LOG_MUTEX_TIMEOUT_MS))) {
+        return "busy";
+    }
+    int start = (colight_log_head - colight_log_count + COLIGHT_LOG_CAPACITY) % COLIGHT_LOG_CAPACITY;
+    int count = colight_log_count;
+    ColightLogEntry entries[COLIGHT_LOG_CAPACITY];
+    for (int i = 0; i < count; i++) {
+        entries[i] = colight_log_buf[(start + i) % COLIGHT_LOG_CAPACITY];
+    }
+    xSemaphoreGive(colight_log_mutex);
+
+    String out;
+    char line[COLIGHT_LOG_MSG_LEN + 16];
+    for (int i = 0; i < count; i++) {
+        snprintf(line, sizeof(line), "%lu %s\n", (unsigned long)entries[i].ms, entries[i].msg);
+        out += line;
+    }
+    return out;
 }
 
 ColightResult colight_read_state() {

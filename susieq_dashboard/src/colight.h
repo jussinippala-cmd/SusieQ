@@ -1,5 +1,6 @@
 #pragma once
 #include "colight_protocol.h"
+#include <Arduino.h>
 #include <cstdint>
 
 struct ColightResult {
@@ -34,3 +35,11 @@ ColightResult colight_read_state();
 // there is no cached baseline yet or the connection is currently down, or
 // error=="write_failed" if the GATT write itself fails.
 ColightResult colight_send_command(int channel, bool turn_on);
+
+// Returns the last COLIGHT_LOG_CAPACITY connect/disconnect/scan events
+// (oldest first, one per line, "<millis> <message>") for /colight-debug.
+// Diagnostic only, no BLE side effects. Added to tell apart "panel stopped
+// advertising, needs a physical touch to wake" from "panel is advertising
+// but the ESP32 isn't reconnecting to it" after an in-the-field connection
+// drop — see project memory project_colight_ble_findings for context.
+String colight_get_log();

@@ -314,6 +314,12 @@ static void setup_routes() {
         req->send(200, "application/json", colight_result_to_json(r));
     });
 
+    // GET /colight-debug — last connect/disconnect/scan events, plain text,
+    // one per line. Diagnostic only, readable from any browser without USB.
+    server.on("/colight-debug", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "text/plain", colight_get_log());
+    });
+
     server.onNotFound([](AsyncWebServerRequest* req) {
         req->send(404, "text/plain", "Not found");
     });
