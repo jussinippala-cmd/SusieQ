@@ -46,6 +46,55 @@ RTC_NOINIT_ATTR static uint32_t liveness_restart_count;
 static volatile uint32_t last_data_request_ms = 0;
 static volatile bool ota_active = false;
 
+// Boottidiagnostiikka /data-JSON:iin: reset-syy + boottilaskuri, jotta
+// odottamattoman bootin syy (task_wdt/panic/brownout/sw) selviää etänä
+// ilman USB-sarjaporttia. Laskuri elää RTC-muistissa lämpimien boottien
+// yli; magic-sentinel erottaa kylmäkäynnistyksen satunnaisesta RTC-datasta.
+#define BOOT_COUNT_MAGIC 0x5B007C47
+RTC_NOINIT_ATTR static uint32_t boot_count;
+RTC_NOINIT_ATTR static uint32_t boot_count_magic;
+
+// Kuka kutsui esp_restart()? Shutdown-handler ajetaan vain esp_restart-
+// polulla (ei panicissa/WDT:ssä) ja tallentaa kutsuvan taskin nimen RTC-
+// muistiin. Omat tunnetut restart-paikat (liveness, OTA) kirjoittavat
+// tarkemman selitteen ennen restartia, jolloin handler ei ylikirjoita.
+// Tyhjä note sw-bootin jälkeen = restart tuli ohi esp_restart():in
+// (esim. tupla-exception, jonka hint-mappaus näyttää sw:ltä).
+#define RESTART_NOTE_MAGIC 0xC0FFEE01
+RTC_NOINIT_ATTR static char restart_note[120];
+RTC_NOINIT_ATTR static uint32_t restart_note_magic;
+static char last_restart_note[120] = "";
+
+static void note_restart(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(restart_note, sizeof(restart_note), fmt, args);
+    va_end(args);
+    restart_note_magic = RESTART_NOTE_MAGIC;
+}
+
+static void restart_shutdown_handler(void) {
+    if (restart_note_magic != RESTART_NOTE_MAGIC) {
+        note_restart("esp_restart task=%s uptime=%lus",
+                     pcTaskGetName(NULL), (unsigned long)(millis() / 1000));
+    }
+}
+
+static const char* reset_reason_str() {
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON:   return "poweron";
+        case ESP_RST_SW:        return "sw";
+        case ESP_RST_PANIC:     return "panic";
+        case ESP_RST_INT_WDT:   return "int_wdt";
+        case ESP_RST_TASK_WDT:  return "task_wdt";
+        case ESP_RST_WDT:       return "wdt";
+        case ESP_RST_BROWNOUT:  return "brownout";
+        case ESP_RST_DEEPSLEEP: return "deepsleep";
+        case ESP_RST_SDIO:      return "sdio";
+        default:                return "unknown";
+    }
+}
+
 static unsigned long last_sensor_read = 0;
 static String cached_json;             // cached for /data
 static SemaphoreHandle_t hx711_mutex = nullptr;  // protects HX711 access
@@ -138,6 +187,9 @@ static String build_json() {
 
     // System uptime (64-bit to avoid 49-day millis() overflow)
     doc["uptime_s"] = (unsigned long)(esp_timer_get_time() / 1000000ULL);
+    doc["reset_reason"] = reset_reason_str();
+    doc["boot_count"]   = boot_count;
+    doc["restart_note"] = last_restart_note;
 
     String out;
     serializeJson(doc, out);
@@ -382,6 +434,19 @@ void setup() {
     if (esp_reset_reason() != ESP_RST_SW) {
         liveness_restart_count = 0;
     }
+    if (boot_count_magic != BOOT_COUNT_MAGIC) {
+        boot_count_magic = BOOT_COUNT_MAGIC;
+        boot_count = 0;
+    }
+    boot_count++;
+    if (restart_note_magic == RESTART_NOTE_MAGIC) {
+        restart_note[sizeof(restart_note) - 1] = '\0';
+        strncpy(last_restart_note, restart_note, sizeof(last_restart_note));
+        restart_note_magic = 0;  // kulutettu — seuraava bootti aloittaa puhtaalta
+    }
+    esp_register_shutdown_handler(restart_shutdown_handler);
+    Serial.printf("[boot] reset_reason=%s boot_count=%u note='%s'\n", reset_reason_str(),
+                  (unsigned)boot_count, last_restart_note);
 
     // Filesystem
     if (!LittleFS.begin(true)) {
@@ -398,7 +463,14 @@ void setup() {
     tanks_init();
     fuel_init();
     victron_init();
+    // Diagnostiikkatoggle: -DCOLIGHT_DISABLED_FOR_DIAGNOSIS build-lipulla saa
+    // buildin, jossa CoLight-yhteyttä ei alusteta mutta Victron-BLE-skannaus
+    // jää päälle (A/B-vikaeristys; endpointit palauttavat silloin "busy").
+#if !defined(COLIGHT_DISABLED_FOR_DIAGNOSIS)
     colight_init();
+#else
+    Serial.println("[colight] POIS PÄÄLTÄ (diagnostiikkakoe)");
+#endif
     gps_init();
     weather_init();    // AHT20 + BMP280 (I2C) + DS18B20 (1-Wire)
     rum_init();
@@ -419,6 +491,7 @@ void setup() {
     });
     ArduinoOTA.onEnd([]() {
         ota_active = false;
+        note_restart("ota done");
         Serial.println("\n[ota] update complete — rebooting");
     });
     ArduinoOTA.onError([](ota_error_t err) {
@@ -529,6 +602,9 @@ void loop() {
             liveness_restart_count++;
             Serial.printf("[watchdog] ei /data-pyyntoa 180s WiFi:n ollessa yhdistettynä — restart (%u/%d)\n",
                           liveness_restart_count, LIVENESS_RESTART_LIMIT);
+            note_restart("liveness millis=%lu last_req=%lu count=%u",
+                         (unsigned long)millis(), (unsigned long)last_data_request_ms,
+                         (unsigned)liveness_restart_count);
             Serial.flush();
             esp_restart();
         }
