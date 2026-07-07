@@ -596,14 +596,22 @@ void loop() {
     // modeemin puolella (ks. määrittelyn kommentti ylempänä). Hyökkääjä
     // SusieQ-Net-verkosta ei voi laukaista tätä pelkällä
     // /colight-liikenteellä (/data ei koske colight_mutex:iin).
+    // last_data_request_ms LUETAAN ENNEN millis()-näytettä: /data-käsittelijä
+    // (AsyncTCP-task, toinen core) voi kirjoittaa muuttujaan uudemman arvon
+    // kuin jo otettu millis-näyte, jolloin unsigned-erotus alivuotaa ~4,29
+    // miljardiin ja terve laite boottaa itsensä (juurisyy 2026-07-05..07
+    // boottailuun, todistettu restart_notella: millis=512204 last_req=512202).
+    // Tässä järjestyksessä luettu last on aina ≤ sen jälkeen otettu millis.
+    uint32_t liveness_last = last_data_request_ms;
+    uint32_t liveness_now  = millis();
     if (WiFi.status() == WL_CONNECTED && !ota_active &&
-        millis() - last_data_request_ms > HTTP_LIVENESS_TIMEOUT_MS) {
+        liveness_now - liveness_last > HTTP_LIVENESS_TIMEOUT_MS) {
         if (liveness_restart_count < LIVENESS_RESTART_LIMIT) {
             liveness_restart_count++;
             Serial.printf("[watchdog] ei /data-pyyntoa 180s WiFi:n ollessa yhdistettynä — restart (%u/%d)\n",
                           liveness_restart_count, LIVENESS_RESTART_LIMIT);
             note_restart("liveness millis=%lu last_req=%lu count=%u",
-                         (unsigned long)millis(), (unsigned long)last_data_request_ms,
+                         (unsigned long)liveness_now, (unsigned long)liveness_last,
                          (unsigned)liveness_restart_count);
             Serial.flush();
             esp_restart();
