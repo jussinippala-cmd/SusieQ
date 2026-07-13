@@ -138,21 +138,37 @@ def check_plausible(name, value, lo, hi):
     return True
 
 # ── GPS: satamasta lähtö ja paluu ─────────────────────────────────────
+# Tila tallennetaan SD-kortille /tmp:n sijaan, jotta se säilyy modeemin
+# rebootin yli — /tmp on tmpfs ja tyhjenee jokaisessa käynnistyksessä.
+STATE_DIR = '/mnt/sda1/susieq-state'
+os.makedirs(STATE_DIR, exist_ok=True)
+STATE_FILE = f'{STATE_DIR}/susieq_state'
+NEAR_COUNT_FILE = f'{STATE_DIR}/susieq_near_count'
+
 gps = data.get('gps', {})
 if gps.get('fix') and gps.get('lat') is not None and gps.get('lon') is not None:
     dist = haversine_m(gps['lat'], gps['lon'], HOME_LAT, HOME_LON)
-    state = read_f('/tmp/susieq_state', 'home')
+    state_raw = read_f(STATE_FILE, '')
+
+    if not state_raw:
+        # Ensimmäinen ajo tai tila kadonnut (esim. reboot ennen tätä korjausta)
+        # — pääteltävä tila suoraan sijainnista sen sijaan että oletetaan
+        # 'home' ja lähetetään virheellinen lähtöilmoitus.
+        state = 'away' if dist > 300 else 'home'
+        write_f(STATE_FILE, state)
+    else:
+        state = state_raw
 
     if dist > 300:
-        write_f('/tmp/susieq_near_count', 0)
+        write_f(NEAR_COUNT_FILE, 0)
         if state == 'home':
-            write_f('/tmp/susieq_state', 'away')
+            write_f(STATE_FILE, 'away')
             ntfy('SusieQ lähtenyt satamasta ⛵', 'high')
     else:
-        count = int(read_f('/tmp/susieq_near_count', '0')) + 1
-        write_f('/tmp/susieq_near_count', count)
+        count = int(read_f(NEAR_COUNT_FILE, '0')) + 1
+        write_f(NEAR_COUNT_FILE, count)
         if count >= 3 and state == 'away':
-            write_f('/tmp/susieq_state', 'home')
+            write_f(STATE_FILE, 'home')
             ntfy('SusieQ takaisin satamassa ⚓', 'default')
 
 # ── Akku ──────────────────────────────────────────────────────────────
