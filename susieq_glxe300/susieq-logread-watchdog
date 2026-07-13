@@ -6,7 +6,7 @@ PID=$(cat "$PID_FILE" 2>/dev/null)
 PROC_OK=0
 [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null && PROC_OK=1
 
-FILE_MTIME=$(stat -c '%Y' "$LOG" 2>/dev/null)
+FILE_MTIME=$(date -r "$LOG" +%s 2>/dev/null)
 CURRENT_TIME=$(date +%s)
 AGE=$((CURRENT_TIME - FILE_MTIME))
 FILE_OK=0
