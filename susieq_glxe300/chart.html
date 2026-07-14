@@ -1338,11 +1338,19 @@ function inLake(lat, lon) {
   return false;
 }
 
+let groundingBeepTimer = null;
+
 function showGroundingAlert(danger) {
   if (danger === groundingActive) return;
   groundingActive = danger;
   document.getElementById('grounding-alert').style.display = danger ? 'block' : 'none';
-  if (danger) playBeep();
+  if (danger) {
+    playBeep();
+    groundingBeepTimer = setInterval(playBeep, 2000);
+  } else if (groundingBeepTimer) {
+    clearInterval(groundingBeepTimer);
+    groundingBeepTimer = null;
+  }
 }
 
 // ── Hälytysääni ──────────────────────────────────────────────────────────────
