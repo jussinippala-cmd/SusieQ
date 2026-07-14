@@ -4,14 +4,17 @@
 # Asennus: /usr/bin/susieq-sleep.sh  (chmod +x)
 # Cron:    0 22 * * * /usr/bin/susieq-sleep.sh
 #
-# Tarkastaa /tmp/susieq_state ennen sammutusta:
+# Tarkastaa /mnt/sda1/susieq-state/susieq_state ennen sammutusta:
 #   away  → vene merellä, ohitetaan lepotila
 #   home  → satamassa, CFUN=4
 #   (ei tiedostoa) → oletus: satamassa, CFUN=4
+#
+# Tila kirjoitetaan SD-kortille susieq-sensors.sh:ssä (commit 301f1a3),
+# ei /tmp:iin, koska /tmp on tmpfs ja tyhjenee modeemin rebootissa.
 
 . /etc/susieq.env
 
-STATE=$(cat /tmp/susieq_state 2>/dev/null)
+STATE=$(cat /mnt/sda1/susieq-state/susieq_state 2>/dev/null)
 
 if [ "$STATE" = "away" ]; then
     logger -t susieq-sleep "Ohitettu: vene poissa kotisatamasta — 4G pysyy päällä"
