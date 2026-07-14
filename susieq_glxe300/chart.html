@@ -919,7 +919,8 @@ function updateRoutePanel() {
   }
 
   const vmcEl = document.getElementById('route-total-vmc');
-  const vmc = currentPos ? instantVmcKn(currentPos[0], currentPos[1]) : null;
+  let vmc = currentPos ? instantVmcKn(currentPos[0], currentPos[1]) : null;
+  if (vmc !== null && Math.abs(vmc) < 0.05) vmc = 0;
   vmcEl.textContent = vmc !== null ? 'VMC ' + vmc.toFixed(1) + ' kn' : 'VMC —';
 
   nextBtn.style.display = routeActive ? 'block' : 'none';
@@ -986,6 +987,7 @@ function renderRouteOnMap() {
     });
 
     m.on('dragend', function() {
+      resetProgress();
       const p = m.getLatLng();
       route[i] = { lat: p.lat, lon: p.lng };
       renderRouteOnMap();
