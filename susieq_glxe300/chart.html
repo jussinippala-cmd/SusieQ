@@ -347,7 +347,7 @@ html, body, #map {
   font-weight: 600;
 }
 
-#route-total-eta {
+#route-total-eta, #route-total-vmc {
   font-size: 10px;
   color: #8b949e;
   margin-top: 2px;
@@ -475,6 +475,7 @@ html, body, #map {
     <div class="lbl">Koko reitti</div>
     <div id="route-total-dist">—</div>
     <div id="route-total-eta">—</div>
+    <div id="route-total-vmc">VMC —</div>
   </div>
 </div>
 
@@ -871,7 +872,8 @@ function updateRoutePanel() {
       const d = distNm(currentPos[0], currentPos[1], wp.lat, wp.lon);
       const brg = Math.round(bearing(currentPos[0], currentPos[1], wp.lat, wp.lon)) % 360;
       distTxt = d.toFixed(2) + ' nm · ' + String(brg).padStart(3, '0') + '°';
-      if (_lastSog > 0.2) distTxt += '<br>' + Math.round(d / _lastSog * 60) + ' min';
+      const legSp = activeLegSpeedKn();
+      if (legSp !== null) distTxt += '<br>' + Math.round(d / legSp * 60) + ' min';
     } else if (i > 0 && (!routeActive || i > currentWpIdx)) {
       distTxt = distNm(route[i-1].lat, route[i-1].lon, wp.lat, wp.lon).toFixed(2) + ' nm';
     }
@@ -890,12 +892,20 @@ function updateRoutePanel() {
     const rem = calcRemainingRoute(currentPos[0], currentPos[1]);
     if (rem !== null) {
       distEl.textContent = rem.toFixed(1) + ' nm';
-      if (_lastSog > 0.2) {
-        const m = rem / _lastSog * 60;
-        etaEl.textContent = 'ETA: ' + (m < 60 ? Math.round(m) + ' min' : (m/60).toFixed(1) + ' h');
-      } else {
-        etaEl.textContent = '—';
+      const awp = route[currentWpIdx];
+      const dActive = distNm(currentPos[0], currentPos[1], awp.lat, awp.lon);
+      const dRest = rem - dActive;
+      const legSp = activeLegSpeedKn();
+      let restSp = tripAvgSogKn();
+      if (restSp === null || restSp < MIN_SPEED_KN)
+        restSp = _lastSog > MIN_SPEED_KN ? _lastSog : null;
+      let etaMin = null;
+      if (legSp !== null) {
+        etaMin = dActive / legSp * 60;
+        if (dRest > 0.001)
+          etaMin = restSp !== null ? etaMin + dRest / restSp * 60 : null;
       }
+      etaEl.textContent = etaMin !== null ? 'ETA: ' + formatEtaMin(etaMin) : '—';
     }
   } else if (route.length > 1) {
     let total = 0;
@@ -907,6 +917,10 @@ function updateRoutePanel() {
     distEl.textContent = '—';
     etaEl.textContent = '—';
   }
+
+  const vmcEl = document.getElementById('route-total-vmc');
+  const vmc = currentPos ? instantVmcKn(currentPos[0], currentPos[1]) : null;
+  vmcEl.textContent = vmc !== null ? 'VMC ' + vmc.toFixed(1) + ' kn' : 'VMC —';
 
   nextBtn.style.display = routeActive ? 'block' : 'none';
   nextBtn.disabled = !routeActive || currentWpIdx >= route.length - 1;
