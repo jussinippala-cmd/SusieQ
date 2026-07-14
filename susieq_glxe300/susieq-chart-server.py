@@ -11,7 +11,7 @@ import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 PORT = 8080
 STATIC_DIR = Path("/usr/share/susieq-chart")
@@ -83,7 +83,11 @@ class ChartHandler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             self._static("index.html", "text/html; charset=utf-8")
         elif path.startswith("/static/"):
-            name = path[8:]
+            # unquote: selain URL-koodaa ei-ASCII-nimet (esim. nasijärvi.geojson)
+            name = unquote(path[8:])
+            if ".." in name or name.startswith("/"):
+                self.send_error(404)
+                return
             self._static(name, _mime(name))
         elif path == "/gps":
             with _gps_lock:
