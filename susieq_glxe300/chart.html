@@ -984,6 +984,7 @@ function renderRouteOnMap() {
 }
 
 function addRouteWp(lat, lon) {
+  resetProgress();
   route.push({ lat, lon });
   renderRouteOnMap();
   updateRoutePanel();
@@ -991,6 +992,7 @@ function addRouteWp(lat, lon) {
 }
 
 function removeRouteWp(idx) {
+  resetProgress();
   route.splice(idx, 1);
   if (routeActive) {
     if (idx < currentWpIdx) {
@@ -1007,6 +1009,7 @@ function removeRouteWp(idx) {
 
 function clearRoute() {
   if (!confirm('Tyhjennetäänkö reitti?')) return;
+  resetProgress();
   route = [];
   routeActive = false;
   currentWpIdx = 0;
@@ -1034,14 +1037,18 @@ function startRoute() {
   if (!route.length) return;
   routeActive = true;
   currentWpIdx = 0;
+  resetProgress();
+  _tripSogSum = 0;
+  _tripSogCount = 0;
   renderRouteOnMap();
   updateRoutePanel();
   closeSettings();
   postRouteToServer();
 }
 
-function advanceToNextWp() {
+function advanceToNextWp(auto) {
   if (!routeActive) return;
+  if (auto !== true) resetProgress();
   currentWpIdx++;
   if (currentWpIdx >= route.length) {
     routeActive = false;
@@ -1056,7 +1063,7 @@ function checkAutoAdvance(lat, lon) {
   if (!routeActive || !autoAdvance || currentWpIdx >= route.length) return;
   const wp = route[currentWpIdx];
   if (distNm(lat, lon, wp.lat, wp.lon) < advanceRadiusNm) {
-    advanceToNextWp();
+    advanceToNextWp(true);
   }
 }
 
@@ -1232,6 +1239,13 @@ async function pollGPS() {
       const { lat, lon } = gps;
       const cog = gps.cog_deg || 0, sog = gps.sog_knots || 0;
       _lastSog = sog;
+      _lastCog = cog;
+      if (routeActive && currentWpIdx < route.length) {
+        const rem = calcRemainingRoute(lat, lon);
+        if (rem !== null) recordProgress(rem);
+        _tripSogSum += sog;
+        _tripSogCount++;
+      }
       updateBoat(lat, lon, cog);
       updateMinuteLine(lat, lon, cog, sog);
       checkAutoAdvance(lat, lon);
