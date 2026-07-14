@@ -775,6 +775,15 @@ let routeMarkers = [];    // L.marker-instanssit kartalla
 let routeLine = null;     // L.polyline reittilinjalle
 let currentLegLine = null; // viiva veneen sijainnista seuraavaan WP:hen
 let _lastSog = 0;         // viimeisin SOG (knots) routePanel-laskentaa varten
+let _lastCog = 0;         // viimeisin COG (deg) VMC-laskentaa varten
+let _progressBuf = [];    // {t: ms, rem: nm} — jäljellä oleva reittimatka
+let _tripSogSum = 0;      // SOG-näytteiden summa reitin aloituksesta
+let _tripSogCount = 0;    // SOG-näytteiden määrä reitin aloituksesta
+
+const PROGRESS_WINDOW_MS   = 6 * 60 * 1000; // lähestymisvauhdin ikkuna
+const PROGRESS_MIN_SPAN_MS = 60 * 1000;     // minimi-ikkuna ennen tasoitettua ETAa
+const TRIP_MIN_SAMPLES     = 30;            // ~60 s @ 2 s pollaus
+const MIN_SPEED_KN         = 0.2;           // tämän alle ETA = "—"
 
 // ── Anchor Watch ─────────────────────────────────────────────────────────────
 let anchorActive = false;
@@ -791,6 +800,56 @@ function calcRemainingRoute(lat, lon) {
     nm += distNm(route[i].lat, route[i].lon, route[i + 1].lat, route[i + 1].lon);
   }
   return nm;
+}
+
+function recordProgress(remNm) {
+  const now = Date.now();
+  _progressBuf.push({ t: now, rem: remNm });
+  while (_progressBuf.length && now - _progressBuf[0].t > PROGRESS_WINDOW_MS)
+    _progressBuf.shift();
+}
+
+function resetProgress() {
+  _progressBuf = [];
+}
+
+// Tasoitettu lähestymisvauhti (kn): jäljellä olevan reittimatkan
+// lyheneminen puskurin ikkunassa. null jos dataa alle 60 s.
+function closingSpeedKn() {
+  if (_progressBuf.length < 2) return null;
+  const first = _progressBuf[0];
+  const last  = _progressBuf[_progressBuf.length - 1];
+  const spanMs = last.t - first.t;
+  if (spanMs < PROGRESS_MIN_SPAN_MS) return null;
+  return (first.rem - last.rem) / (spanMs / 3600000);
+}
+
+// Aktiivisen legin ETA-vauhti: tasoitettu jos saatavilla, muuten
+// SOG-fallback (kuten vanha laskenta). null = näytä "—".
+function activeLegSpeedKn() {
+  const cs = closingSpeedKn();
+  if (cs === null) return _lastSog > MIN_SPEED_KN ? _lastSog : null;
+  return cs >= MIN_SPEED_KN ? cs : null;
+}
+
+// Matkan keskivauhti (kn) reitin aloituksesta. null jos dataa alle ~60 s.
+function tripAvgSogKn() {
+  if (_tripSogCount < TRIP_MIN_SAMPLES) return null;
+  return _tripSogSum / _tripSogCount;
+}
+
+// Hetkellinen VMC (kn) kohti aktiivista reittipistettä.
+// Negatiivinen = etäännytään. null jos ei laskettavissa.
+function instantVmcKn(lat, lon) {
+  if (!routeActive || currentWpIdx >= route.length) return null;
+  if (_lastSog <= MIN_SPEED_KN) return null;
+  const wp = route[currentWpIdx];
+  const brg = bearing(lat, lon, wp.lat, wp.lon);
+  return _lastSog * Math.cos((brg - _lastCog) * Math.PI / 180);
+}
+
+function formatEtaMin(m) {
+  return m < 60 ? Math.round(m) + ' min' : (m / 60).toFixed(1) + ' h';
 }
 
 function updateRoutePanel() {
