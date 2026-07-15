@@ -5,6 +5,9 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <cstring>
+#include "colight_rtc.h"
+#include <esp_attr.h>
+#include <esp_system.h>
 
 // colight_task_fn maintains a single persistent NimBLE connection to the
 // panel for the whole firmware lifetime. Live BLE testing on the boat
@@ -32,6 +35,7 @@
 
 struct ColightCache {
     bool valid = false;              // has any real frame ever been seen?
+    bool restored = false;           // frame came from RTC after a warm reboot
     uint8_t frame[6] = {};
     uint32_t last_updated_ms = 0;
     bool connected = false;
@@ -42,6 +46,23 @@ struct ColightCache {
 static SemaphoreHandle_t colight_mutex = nullptr;
 static ColightCache colight_cache;
 static NimBLEAdvertisedDevice* colight_found_device = nullptr;
+
+// The last-seen state frame survives warm (sw/wdt/panic) reboots in RTC
+// memory — same magic-sentinel pattern as main.cpp's boot_count/
+// restart_note. Poweron/brownout leaves RTC undefined AND power-cycles the
+// panel itself (shared main switch), so restore is gated on reset reason in
+// colight_init(). Validation logic lives in colight_rtc.cpp (unit-tested).
+RTC_NOINIT_ATTR static uint8_t  colight_rtc_frame[6];
+RTC_NOINIT_ATTR static uint32_t colight_rtc_magic;
+RTC_NOINIT_ATTR static uint32_t colight_rtc_check;
+
+// Call with colight_mutex held, in the same critical section that updates
+// colight_cache.frame — RTC can then never lag the cache.
+static void colight_rtc_save(const uint8_t frame[6]) {
+    memcpy(colight_rtc_frame, frame, 6);
+    colight_rtc_check = colight_rtc_checksum(frame);
+    colight_rtc_magic = COLIGHT_RTC_MAGIC;
+}
 
 // Small in-memory ring buffer of connect/disconnect/scan events, readable
 // over HTTP (/colight-debug) so the reconnect behaviour can be inspected
@@ -127,7 +148,9 @@ static void colight_notify_handler(NimBLERemoteCharacteristic* c, uint8_t* pData
         }
         memcpy(colight_cache.frame, pData + 1, 6);
         colight_cache.valid = true;
+        colight_cache.restored = false;  // a real frame supersedes a restored one
         colight_cache.last_updated_ms = millis();
+        colight_rtc_save(colight_cache.frame);
         xSemaphoreGive(colight_mutex);
     }
 }
@@ -296,6 +319,25 @@ void colight_init() {
         Serial.println("[colight] FATAL: mutex allocation failed, colight disabled");
         return;
     }
+
+    // Warm reboot (sw/wdt/panic) preserves RTC memory: restore the last
+    // frame so the panel state (and remote control) survives the reboot.
+    // Poweron/brownout resets the panel too (shared main switch) — start
+    // from unknown_state exactly as before this feature.
+    esp_reset_reason_t rr = esp_reset_reason();
+    bool rtc_preserved = (rr == ESP_RST_SW || rr == ESP_RST_TASK_WDT ||
+                          rr == ESP_RST_INT_WDT || rr == ESP_RST_WDT ||
+                          rr == ESP_RST_PANIC);
+    if (rtc_preserved &&
+        colight_rtc_frame_valid(colight_rtc_magic, colight_rtc_check, colight_rtc_frame)) {
+        memcpy(colight_cache.frame, colight_rtc_frame, 6);
+        colight_cache.valid = true;
+        colight_cache.restored = true;
+        colight_log("boot: state restored from RTC");
+    } else {
+        colight_rtc_magic = 0;  // cold boot / garbage: never trust it later
+    }
+
     xTaskCreate(colight_task_fn, "colight_task", 8192, nullptr, 1, nullptr);
 }
 
@@ -328,6 +370,7 @@ ColightResult colight_read_state() {
     }
     result.connected = colight_cache.connected;
     result.last_updated_ms = colight_cache.last_updated_ms;
+    result.restored = colight_cache.restored;
     bool valid = colight_cache.valid;
     uint8_t frame[6];
     memcpy(frame, colight_cache.frame, 6);
@@ -351,6 +394,7 @@ ColightResult colight_send_command(int channel, bool turn_on) {
     }
     result.connected = colight_cache.connected;
     result.last_updated_ms = colight_cache.last_updated_ms;
+    result.restored = colight_cache.restored;
 
     if (!colight_cache.valid || !colight_cache.connected || !colight_cache.chr) {
         xSemaphoreGive(colight_mutex);
@@ -381,6 +425,7 @@ ColightResult colight_send_command(int channel, bool turn_on) {
 
     memcpy(colight_cache.frame, frame, 6);
     colight_cache.last_updated_ms = millis();
+    colight_rtc_save(frame);
     result.last_updated_ms = colight_cache.last_updated_ms;
     xSemaphoreGive(colight_mutex);
 

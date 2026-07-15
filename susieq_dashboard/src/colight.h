@@ -9,6 +9,8 @@ struct ColightResult {
     const char* error = "";        // set only when success == false
     bool connected = false;        // is the persistent BLE connection currently up?
     uint32_t last_updated_ms = 0;  // millis() of the last cached frame update
+    bool restored = false;         // state came from RTC memory after a warm
+                                   // reboot; cleared once a real f9 frame arrives
 };
 
 // Starts colight_task, the background FreeRTOS task that maintains a

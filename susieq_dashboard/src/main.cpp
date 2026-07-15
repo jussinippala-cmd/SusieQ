@@ -207,6 +207,10 @@ static String colight_result_to_json(const ColightResult& r) {
     if (strcmp(r.error, "busy") != 0) {
         doc["connected"] = r.connected;
         doc["last_updated_ms"] = r.last_updated_ms;
+        // Läsnä vain kun tila on RTC-palautettu eikä aitoa kehystä ole vielä
+        // nähty — susieq.net voi halutessaan näyttää tämän; modeemin daemon
+        // ei lue kenttää.
+        if (r.restored) doc["restored"] = true;
     }
     if (r.success) {
         JsonArray arr = doc["state"].to<JsonArray>();
