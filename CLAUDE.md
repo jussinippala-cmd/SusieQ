@@ -85,10 +85,10 @@ Yhdistä kannettava **SusieQ-Net**-verkkoon, sitten:
 
 ```bash
 # Cockpit
-pio run -e susieq-ota -t upload        # susieq_dashboard/
+pio run -e esp32dev-ota -t upload      # susieq_dashboard/
 
 # Bow
-pio run -e bow-ota -t upload           # susieq_bow/
+pio run -e esp32cam-ota -t upload      # susieq_bow/
 
 # Mastokamerat
 pio run -e keula-ota -t upload         # susieq_masto/
