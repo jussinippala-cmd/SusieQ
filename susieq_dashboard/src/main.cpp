@@ -211,6 +211,9 @@ static String colight_result_to_json(const ColightResult& r) {
         // nähty — susieq.net voi halutessaan näyttää tämän; modeemin daemon
         // ei lue kenttää.
         if (r.restored) doc["restored"] = true;
+        // Läsnä vain kun tila on virtakierron jälkeinen kaikki pois -oletus
+        // eikä aitoa kehystä ole vielä nähty.
+        if (r.assumed) doc["assumed"] = true;
     }
     if (r.success) {
         JsonArray arr = doc["state"].to<JsonArray>();

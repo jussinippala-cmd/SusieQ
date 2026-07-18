@@ -11,6 +11,9 @@ struct ColightResult {
     uint32_t last_updated_ms = 0;  // millis() of the last cached frame update
     bool restored = false;         // state came from RTC memory after a warm
                                    // reboot; cleared once a real f9 frame arrives
+    bool assumed = false;          // state is the all-off baseline assumed after a
+                                   // power cycle (the panel shares the main switch
+                                   // and always boots all-off); cleared like restored
 };
 
 // Starts colight_task, the background FreeRTOS task that maintains a

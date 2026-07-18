@@ -12,3 +12,13 @@ uint32_t colight_rtc_checksum(const uint8_t frame[6]) {
 bool colight_rtc_frame_valid(uint32_t magic, uint32_t check, const uint8_t frame[6]) {
     return magic == COLIGHT_RTC_MAGIC && check == colight_rtc_checksum(frame);
 }
+
+ColightBootAction colight_boot_action(bool warm, bool rtc_valid, bool power_cycle) {
+    if (power_cycle) {
+        return COLIGHT_BOOT_ASSUME_OFF;
+    }
+    if (warm && rtc_valid) {
+        return COLIGHT_BOOT_RESTORE;
+    }
+    return COLIGHT_BOOT_UNKNOWN;
+}

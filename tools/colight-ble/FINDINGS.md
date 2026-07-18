@@ -49,6 +49,10 @@ Vahvistettu empiirisesti kääntämällä kaikki 12 kytkintä yksi kerrallaan (k
 
 **Tämä riittää susieq-remoten "tilannekuva"-osuuden toteutukseen** — ei vaadi write-puolen ratkaisua.
 
+## Käynnistystila virtakatkon jälkeen (vahvistettu 2026-07-18)
+
+Paneeli **ei muista tilaansa virtakatkon yli** — päävirtojen kierron jälkeen kaikki 12 kanavaa ovat aina POIS (käyttäjä vahvisti fyysisesti kahdella kierrolla). Tämän varaan rakentuu cockpit-firmwaren kylmäboottioletus: koska paneeli ja ESP32 ovat saman pääkytkimen takana, ESP32:n `poweron`/`brownout`-bootissa välimuisti alustetaan suoraan "kaikki pois" -peruskehyksellä (`colight_boot_action()` → `COLIGHT_BOOT_ASSUME_OFF`, `/colight/state`-JSON:issa `assumed:true` kunnes ensimmäinen aito f9-kehys nähdään). Etäohjaus toimii siis heti virtakierron jälkeen ilman fyysistä painallusta.
+
 ## Yhteysrajoitustesti
 
 Ei tehty erikseen suunnitellulla tavalla (puhelimen CoLight-sovellus + Mac samanaikaisesti), mutta sivuhavaintona: **kaksi samanaikaista `BleakClient`-yhteyttä Macilta samaan laitteeseen toimi ongelmitta** (yksi pitkäkestoinen `monitor`-prosessi + erilliset lyhyet `write`-yhteydet rinnakkain). Viittaa siihen, että laite/CoreBluetooth sallii useamman keskusyksikön, mutta tätä ei ole vahvistettu puhelinsovelluksen kanssa.

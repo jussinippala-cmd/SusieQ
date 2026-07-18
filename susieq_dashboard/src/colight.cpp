@@ -36,6 +36,8 @@
 struct ColightCache {
     bool valid = false;              // has any real frame ever been seen?
     bool restored = false;           // frame came from RTC after a warm reboot
+    bool assumed = false;            // frame is the assumed all-off baseline
+                                     // seeded after a power cycle
     uint8_t frame[6] = {};
     uint32_t last_updated_ms = 0;
     bool connected = false;
@@ -149,6 +151,7 @@ static void colight_notify_handler(NimBLERemoteCharacteristic* c, uint8_t* pData
         memcpy(colight_cache.frame, pData + 1, 6);
         colight_cache.valid = true;
         colight_cache.restored = false;  // a real frame supersedes a restored one
+        colight_cache.assumed = false;   // ...and an assumed one
         colight_cache.last_updated_ms = millis();
         colight_rtc_save(colight_cache.frame);
         xSemaphoreGive(colight_mutex);
@@ -322,20 +325,35 @@ void colight_init() {
 
     // Warm reboot (sw/wdt/panic) preserves RTC memory: restore the last
     // frame so the panel state (and remote control) survives the reboot.
-    // Poweron/brownout resets the panel too (shared main switch) — start
-    // from unknown_state exactly as before this feature.
+    // Poweron/brownout resets the panel too (shared main switch), and the
+    // panel always boots with every channel off — seed the all-off baseline
+    // so remote control works immediately, without waiting for a physical
+    // switch touch. Other reset reasons (ext, unknown): the panel may not
+    // have rebooted, so start from unknown_state.
     esp_reset_reason_t rr = esp_reset_reason();
-    bool rtc_preserved = (rr == ESP_RST_SW || rr == ESP_RST_TASK_WDT ||
-                          rr == ESP_RST_INT_WDT || rr == ESP_RST_WDT ||
-                          rr == ESP_RST_PANIC);
-    if (rtc_preserved &&
-        colight_rtc_frame_valid(colight_rtc_magic, colight_rtc_check, colight_rtc_frame)) {
-        memcpy(colight_cache.frame, colight_rtc_frame, 6);
-        colight_cache.valid = true;
-        colight_cache.restored = true;
-        colight_log("boot: state restored from RTC");
-    } else {
-        colight_rtc_magic = 0;  // cold boot / garbage: never trust it later
+    bool warm = (rr == ESP_RST_SW || rr == ESP_RST_TASK_WDT ||
+                 rr == ESP_RST_INT_WDT || rr == ESP_RST_WDT ||
+                 rr == ESP_RST_PANIC);
+    bool power_cycle = (rr == ESP_RST_POWERON || rr == ESP_RST_BROWNOUT);
+    bool rtc_valid =
+        colight_rtc_frame_valid(colight_rtc_magic, colight_rtc_check, colight_rtc_frame);
+    switch (colight_boot_action(warm, rtc_valid, power_cycle)) {
+        case COLIGHT_BOOT_RESTORE:
+            memcpy(colight_cache.frame, colight_rtc_frame, 6);
+            colight_cache.valid = true;
+            colight_cache.restored = true;
+            colight_log("boot: state restored from RTC");
+            break;
+        case COLIGHT_BOOT_ASSUME_OFF:
+            colight_baseline_frame(colight_cache.frame);
+            colight_cache.valid = true;
+            colight_cache.assumed = true;
+            colight_rtc_magic = 0;  // RTC is garbage after power loss
+            colight_log("boot: power cycle, assuming all-off state");
+            break;
+        default:
+            colight_rtc_magic = 0;  // garbage: never trust it later
+            break;
     }
 
     xTaskCreate(colight_task_fn, "colight_task", 8192, nullptr, 1, nullptr);
@@ -371,6 +389,7 @@ ColightResult colight_read_state() {
     result.connected = colight_cache.connected;
     result.last_updated_ms = colight_cache.last_updated_ms;
     result.restored = colight_cache.restored;
+    result.assumed = colight_cache.assumed;
     bool valid = colight_cache.valid;
     uint8_t frame[6];
     memcpy(frame, colight_cache.frame, 6);
@@ -395,6 +414,7 @@ ColightResult colight_send_command(int channel, bool turn_on) {
     result.connected = colight_cache.connected;
     result.last_updated_ms = colight_cache.last_updated_ms;
     result.restored = colight_cache.restored;
+    result.assumed = colight_cache.assumed;
 
     if (!colight_cache.valid || !colight_cache.connected || !colight_cache.chr) {
         xSemaphoreGive(colight_mutex);
