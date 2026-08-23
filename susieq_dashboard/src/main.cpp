@@ -10,6 +10,8 @@
 #include "esp_task_wdt.h"
 #include "esp_system.h"
 #include "esp_attr.h"
+#include "esp_sleep.h"
+#include "driver/rtc_io.h"
 
 #include "../include/config.h"
 #include "wind.h"
@@ -498,6 +500,14 @@ void setup() {
     Serial.printf("[boot] reset_reason=%s boot_count=%u note='%s'\n", reset_reason_str(),
                   (unsigned)boot_count, last_restart_note);
 
+    // Deep sleepin jäljiltä MAX485:n DE-pinni on yhä RTC-lukossa (ks.
+    // enter_deep_sleep). Lukitus on purettava ennen kuin wind_init() ottaa
+    // pinnin käyttöön, muuten Modbus-luku ei toimi koko päivänä.
+    if (esp_reset_reason() == ESP_RST_DEEPSLEEP) {
+        rtc_gpio_hold_dis((gpio_num_t)WIND_DE_PIN);
+        Serial.println("[sleep] herätty deep sleepistä, DE-pinnin lukitus purettu");
+    }
+
     // Filesystem
     if (!LittleFS.begin(true)) {
         Serial.println("[fs] LittleFS mount failed!");
@@ -619,6 +629,32 @@ static void handle_serial() {
     }
 }
 
+// Suorittaa deep sleepin. Kutsutaan vain loop():ista, ei koskaan HTTP-
+// käsittelijästä. Paluuta ei ole — laite herää tästä setup():iin.
+static void enter_deep_sleep(uint32_t seconds) {
+    // Selite RTC-muistiin, jotta aamun /data kertoo miksi laite buuttasi.
+    // note_restart() asettaa myös magicin, joten esp_deep_sleep_start():in
+    // mahdollisesti ajama shutdown-handler ei ylikirjoita tätä.
+    note_restart("deepsleep %lus cmd=modem", (unsigned long)seconds);
+    Serial.printf("[sleep] deep sleep %lu s\n", (unsigned long)seconds);
+
+    // Deep sleepissä tavallinen GPIO menee korkeaimpedanssiseksi. Jos MAX485:n
+    // DE kelluu ylös, lähetin ajaa RS485-väylää koko yön — turhaa kulutusta ja
+    // väyläkonflikti. GPIO4 on RTC-GPIO, joten tila voidaan lukita.
+    digitalWrite(WIND_DE_PIN, LOW);
+    rtc_gpio_hold_en((gpio_num_t)WIND_DE_PIN);
+
+    // HX711:n SCK-pinnit (18, 23) eivät ole RTC-GPIO:ita eikä niitä voi lukita.
+    // Vaa'at jäävät normaalitilaan — muutaman milliampeerin kustannus.
+
+    WiFi.disconnect(true);
+    esp_wifi_stop();
+
+    esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
+    Serial.flush();
+    esp_deep_sleep_start();
+}
+
 // ─── Loop ─────────────────────────────────────────────────────────────
 static unsigned long _lastWifiCheck = 0;
 
@@ -626,6 +662,16 @@ void loop() {
     esp_task_wdt_reset();
 
     ArduinoOTA.handle();
+
+    // Unipyynnön määräaika. Erotus lasketaan etumerkillisenä, jotta millis()-
+    // kierähdys ei laukaise unta ennenaikaisesti (sama sudenkuoppa kuin
+    // liveness-watchdogissa alempana).
+    if (sleep_at_ms != 0 && (int32_t)(millis() - sleep_at_ms) >= 0) {
+        uint32_t s = pending_sleep_s;
+        sleep_at_ms     = 0;
+        pending_sleep_s = 0;
+        enter_deep_sleep(s);   // ei palaa
+    }
 
     if (millis() - _lastWifiCheck > 30000) {
         _lastWifiCheck = millis();
