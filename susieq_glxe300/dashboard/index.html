@@ -1758,6 +1758,15 @@ function pollData() {
       return r.json();
     })
     .then(function(d) {
+      // Proxy palauttaa aina 200 ja viimeisimmän onnistuneen datan, myös kun
+      // cockpit on yölepotilassa. Ilman ikätarkistusta tila näyttäisi
+      // "Live"-vihreältä vaikka data olisi tuntien vanhaa. proxy_age_s === null
+      // tarkoittaa ettei proxy ole vielä saanut dataa kertaakaan.
+      var age = d.proxy_age_s;
+      if (age == null || age > 120) {
+        markStale(age);
+        return;
+      }
       document.getElementById("dot").classList.add("live");
       document.getElementById("status-text").textContent = "Live";
       update(d);
@@ -1773,9 +1782,14 @@ function startPolling() {
   setInterval(pollData, POLL_INTERVAL_MS);
 }
 
-function markStale() {
+function markStale(ageS) {
   document.getElementById("dot").classList.remove("live");
-  document.getElementById("status-text").textContent = "Vanhentunut";
+  var txt = "Vanhentunut";
+  if (ageS != null) {
+    var mins = Math.round(ageS / 60);
+    if (mins >= 1) txt = "Vanhentunut — " + mins + " min";
+  }
+  document.getElementById("status-text").textContent = txt;
 }
 
 // ─── Main data update ──────────────────────────────────────────────────
