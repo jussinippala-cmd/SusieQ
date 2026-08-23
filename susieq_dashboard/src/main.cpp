@@ -500,11 +500,15 @@ void setup() {
     Serial.printf("[boot] reset_reason=%s boot_count=%u note='%s'\n", reset_reason_str(),
                   (unsigned)boot_count, last_restart_note);
 
-    // Deep sleepin jäljiltä MAX485:n DE-pinni on yhä RTC-lukossa (ks.
-    // enter_deep_sleep). Lukitus on purettava ennen kuin wind_init() ottaa
-    // pinnin käyttöön, muuten Modbus-luku ei toimi koko päivänä.
+    // Deep sleepin jäljiltä MAX485:n DE-pinni on RTC-lukossa (ks. enter_deep_sleep).
+    // Lukitus puretaan EHDOITTA joka bootilla, ei vain deep sleep -heräyksessä:
+    // RTC-pinnin hold elää RTC-verkkotunnuksessa eikä nollaudu tavallisessa
+    // resetissä, joten heräyksen ja tämän rivin välissä sattuva brownout tai
+    // panic jättäisi pinnin pysyvään lukkoon — tuulilukema kuolisi hiljaa eikä
+    // OTA tai esp_restart() palauttaisi sitä, vain päävirtakytkimen kierto.
+    // Kutsu on turvallinen jokaisella bootilla: se vain nollaa hold-bitin.
+    rtc_gpio_hold_dis((gpio_num_t)WIND_DE_PIN);
     if (esp_reset_reason() == ESP_RST_DEEPSLEEP) {
-        rtc_gpio_hold_dis((gpio_num_t)WIND_DE_PIN);
         Serial.println("[sleep] herätty deep sleepistä, DE-pinnin lukitus purettu");
     }
 
