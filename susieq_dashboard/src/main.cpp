@@ -10,6 +10,8 @@
 #include "esp_task_wdt.h"
 #include "esp_system.h"
 #include "esp_attr.h"
+#include "esp_sleep.h"
+#include "driver/rtc_io.h"
 
 #include "../include/config.h"
 #include "wind.h"
@@ -20,6 +22,7 @@
 #include "weather.h"
 #include "rum.h"
 #include "colight.h"
+#include "sleep_policy.h"
 
 // ─── Globals ──────────────────────────────────────────────────────────
 AsyncWebServer  server(80);
@@ -45,6 +48,18 @@ AsyncWebServer  server(80);
 RTC_NOINIT_ATTR static uint32_t liveness_restart_count;
 static volatile uint32_t last_data_request_ms = 0;
 static volatile bool ota_active = false;
+
+// ── Yölepotila ────────────────────────────────────────────────────────
+// Modeemin susieq-sleep.sh kutsuu POST /sleep -endpointia klo 22 kaikkien
+// omien porttiensa (away / no_sleep / Supabase sleep_enabled) läpäisyn ja
+// onnistuneen AT+CFUN=4:n jälkeen. ESP32 ei tiedä kellonaikaa eikä satamatilaa,
+// joten kesto tulee pyynnön mukana.
+//
+// Uni EI tapahdu HTTP-käsittelijässä: se ajetaan AsyncTCP-taskissa, joka ei
+// ehtisi lähettää vastausta ennen kuin laite katoaa. Käsittelijä asettaa nämä
+// ja loop() suorittaa unen 2 s myöhemmin.
+static volatile uint32_t pending_sleep_s = 0;
+static volatile uint32_t sleep_at_ms     = 0;
 
 // Boottidiagnostiikka /data-JSON:iin: reset-syy + boottilaskuri, jotta
 // odottamattoman bootin syy (task_wdt/panic/brownout/sw) selviää etänä
@@ -399,6 +414,36 @@ static void setup_routes() {
         req->send(200, "text/plain", colight_get_log());
     });
 
+    // Yölepotila — ks. docs/superpowers/specs/2026-08-23-esp32-yolepotila-design.md
+    server.on("/sleep", HTTP_POST, [](AsyncWebServerRequest* req) {
+        // Modeemi lähettää POST /sleep?seconds=N ilman runkoa, joten parametri
+        // luetaan query-stringistä (getParam:in oletus on post=false).
+        uint32_t seconds = 0;
+        if (req->hasParam("seconds")) {
+            seconds = (uint32_t)strtoul(req->getParam("seconds")->value().c_str(), nullptr, 10);
+        }
+
+        SleepVerdict v = sleep_policy_check(millis(), ota_active, seconds);
+        if (v != SLEEP_OK) {
+            int code = (v == SLEEP_BAD_DURATION) ? 400 : 409;
+            char body[80];
+            snprintf(body, sizeof(body), "{\"ok\":false,\"error\":\"%s\"}",
+                     sleep_verdict_error(v));
+            Serial.printf("[sleep] hylätty: %s (seconds=%lu)\n",
+                          sleep_verdict_error(v), (unsigned long)seconds);
+            req->send(code, "application/json", body);
+            return;
+        }
+
+        pending_sleep_s = seconds;
+        sleep_at_ms     = millis() + 2000;
+        char body[64];
+        snprintf(body, sizeof(body), "{\"ok\":true,\"seconds\":%lu}",
+                 (unsigned long)seconds);
+        Serial.printf("[sleep] hyväksytty: %lu s\n", (unsigned long)seconds);
+        req->send(200, "application/json", body);
+    });
+
     server.onNotFound([](AsyncWebServerRequest* req) {
         req->send(404, "text/plain", "Not found");
     });
@@ -454,6 +499,18 @@ void setup() {
     esp_register_shutdown_handler(restart_shutdown_handler);
     Serial.printf("[boot] reset_reason=%s boot_count=%u note='%s'\n", reset_reason_str(),
                   (unsigned)boot_count, last_restart_note);
+
+    // Deep sleepin jäljiltä MAX485:n DE-pinni on RTC-lukossa (ks. enter_deep_sleep).
+    // Lukitus puretaan EHDOITTA joka bootilla, ei vain deep sleep -heräyksessä:
+    // RTC-pinnin hold elää RTC-verkkotunnuksessa eikä nollaudu tavallisessa
+    // resetissä, joten heräyksen ja tämän rivin välissä sattuva brownout tai
+    // panic jättäisi pinnin pysyvään lukkoon — tuulilukema kuolisi hiljaa eikä
+    // OTA tai esp_restart() palauttaisi sitä, vain päävirtakytkimen kierto.
+    // Kutsu on turvallinen jokaisella bootilla: se vain nollaa hold-bitin.
+    rtc_gpio_hold_dis((gpio_num_t)WIND_DE_PIN);
+    if (esp_reset_reason() == ESP_RST_DEEPSLEEP) {
+        Serial.println("[sleep] herätty deep sleepistä, DE-pinnin lukitus purettu");
+    }
 
     // Filesystem
     if (!LittleFS.begin(true)) {
@@ -576,6 +633,32 @@ static void handle_serial() {
     }
 }
 
+// Suorittaa deep sleepin. Kutsutaan vain loop():ista, ei koskaan HTTP-
+// käsittelijästä. Paluuta ei ole — laite herää tästä setup():iin.
+static void enter_deep_sleep(uint32_t seconds) {
+    // Selite RTC-muistiin, jotta aamun /data kertoo miksi laite buuttasi.
+    // note_restart() asettaa myös magicin, joten esp_deep_sleep_start():in
+    // mahdollisesti ajama shutdown-handler ei ylikirjoita tätä.
+    note_restart("deepsleep %lus cmd=modem", (unsigned long)seconds);
+    Serial.printf("[sleep] deep sleep %lu s\n", (unsigned long)seconds);
+
+    // Deep sleepissä tavallinen GPIO menee korkeaimpedanssiseksi. Jos MAX485:n
+    // DE kelluu ylös, lähetin ajaa RS485-väylää koko yön — turhaa kulutusta ja
+    // väyläkonflikti. GPIO4 on RTC-GPIO, joten tila voidaan lukita.
+    digitalWrite(WIND_DE_PIN, LOW);
+    rtc_gpio_hold_en((gpio_num_t)WIND_DE_PIN);
+
+    // HX711:n SCK-pinnit (18 vesi, 14 polttoaine, 23 rommi) eivät ole
+    // RTC-GPIO:ita eikä niitä voi lukita. Vaa'at jäävät normaalitilaan —
+    // muutaman milliampeerin kustannus.
+
+    WiFi.disconnect(true);
+
+    esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
+    Serial.flush();
+    esp_deep_sleep_start();
+}
+
 // ─── Loop ─────────────────────────────────────────────────────────────
 static unsigned long _lastWifiCheck = 0;
 
@@ -583,6 +666,23 @@ void loop() {
     esp_task_wdt_reset();
 
     ArduinoOTA.handle();
+
+    // Unipyynnön määräaika. Erotus lasketaan etumerkillisenä, jotta millis()-
+    // kierähdys ei laukaise unta ennenaikaisesti — sama vertailumuoto kuin
+    // liveness-watchdogissa alempana, mutta eri syystä: siellä bugi oli
+    // lukujärjestyksessä (näyte otettiin ennen vertailtavan arvon lukua),
+    // tässä sleep_at_ms on kiinteä määräaika eikä liikkuva näyte, joten
+    // vastaavaa vaaraa ei ole.
+    if (sleep_at_ms != 0 && (int32_t)(millis() - sleep_at_ms) >= 0) {
+        uint32_t s = pending_sleep_s;
+        sleep_at_ms     = 0;
+        pending_sleep_s = 0;
+        if (ota_active) {                     // OTA alkoi vastauksen jälkeen
+            Serial.println("[sleep] peruttu: OTA käynnistyi odotusikkunassa");
+            return;
+        }
+        enter_deep_sleep(s);   // ei palaa
+    }
 
     if (millis() - _lastWifiCheck > 30000) {
         _lastWifiCheck = millis();

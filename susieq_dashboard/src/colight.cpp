@@ -331,9 +331,13 @@ void colight_init() {
     // switch touch. Other reset reasons (ext, unknown): the panel may not
     // have rebooted, so start from unknown_state.
     esp_reset_reason_t rr = esp_reset_reason();
+    // ESP_RST_DEEPSLEEP luetaan lämpimäksi bootiksi: paneeli on veneen
+    // päävirtakytkimen takana eikä menetä virtaa ESP32:n yöunen aikana, joten
+    // RTC-muistiin tallennettu kehys on herätessä yhä tosi. Ilman tätä
+    // yölepotila nollaisi juuri kenttäverifioidun tilapalautuksen joka aamu.
     bool warm = (rr == ESP_RST_SW || rr == ESP_RST_TASK_WDT ||
                  rr == ESP_RST_INT_WDT || rr == ESP_RST_WDT ||
-                 rr == ESP_RST_PANIC);
+                 rr == ESP_RST_PANIC || rr == ESP_RST_DEEPSLEEP);
     bool power_cycle = (rr == ESP_RST_POWERON || rr == ESP_RST_BROWNOUT);
     bool rtc_valid =
         colight_rtc_frame_valid(colight_rtc_magic, colight_rtc_check, colight_rtc_frame);
