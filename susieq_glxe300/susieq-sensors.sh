@@ -36,6 +36,41 @@ if [ "$UPTIME_S" -lt 600 ]; then
     exit 0
 fi
 
+# ESP32:n yölepotila: kun cockpit nukkuu susieq-sleep.sh:n käskystä, sen
+# vaikeneminen on odotettua eikä siitä saa hälyttää. Merkkitiedosto on
+# SD-kortilla eikä /tmp:ssä, koska modeemi voi buutata kesken yön (havaittu
+# 2026-08-23 klo 13:28) ja tmpfs tyhjenisi — sama vikaluokka kuin commitissa
+# 7547532.
+ESP_SLEEP_FILE=/mnt/sda1/susieq-state/esp32_sleep_until
+if [ -f "$ESP_SLEEP_FILE" ]; then
+    WAKE_AT=$(cat "$ESP_SLEEP_FILE" 2>/dev/null || echo 0)
+    # Heräysajan ajautumavara. ESP32-WROOM-32:ssa ei ole 32 kHz kidettä, joten
+    # deep sleep -timer käy sisäisellä RC-oskillaattorilla: 8 h unessa se
+    # ajautuu helposti 10-25 min. WAKE_AT on laskettu modeemin tarkalla
+    # kellolla, joten pelkkä kelloon perustuva merkin poisto lähettäisi väärän
+    # "cockpit offline" -hälytyksen joka aamu kun ESP32 herää myöhässä.
+    GRACE_UNTIL=$(( WAKE_AT + 1800 ))
+    # Nollataan aikaleima ja offline-lippu joka kierroksella unen aikana, jotta
+    # valvonta aseistuu uudelleen vasta heräyshetkestä: jos ESP32 ei tule
+    # takaisin, aito hälytys lähtee 5 min kuluttua kun 4G on jälleen ylhäällä.
+    echo "$NOW" > "$LAST_OK_FILE"
+    rm -f "$OFFLINE_FLAG"
+    if [ "$NOW" -lt "$WAKE_AT" ]; then
+        exit 0
+    fi
+    # Nimellinen heräysaika ohitettu. Merkki poistetaan vasta kun ESP32
+    # tosiasiassa vastaa — tai kun kova takaraja umpeutuu, jolloin aito
+    # hälytys pääsee läpi eikä hiljainen vika jää huomaamatta.
+    if curl -s --connect-timeout 3 --max-time 5 -o /dev/null "$COCKPIT_URL"; then
+        rm -f "$ESP_SLEEP_FILE"
+    elif [ "$NOW" -ge "$GRACE_UNTIL" ]; then
+        logger -t susieq-sensors "ESP32 ei herännyt ${GRACE_UNTIL}-takarajaan mennessä — valvonta takaisin päälle"
+        rm -f "$ESP_SLEEP_FILE"
+    else
+        exit 0
+    fi
+fi
+
 # ── 1. Hae sensordata cockpitilta ────────────────────────────────────
 DATA=$(curl -s --connect-timeout 5 --max-time 10 "$COCKPIT_URL")
 if [ $? -ne 0 ] || [ -z "$DATA" ]; then

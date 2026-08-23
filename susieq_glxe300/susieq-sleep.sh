@@ -38,4 +38,49 @@ if [ "$SLEEP_ENABLED" = "False" ]; then
 fi
 
 logger -t susieq-sleep "Vene kotisatamassa (tila: ${STATE:-home}) — 4G lepotilaan"
-gl_modem AT AT+CFUN=4 && touch /tmp/susieq_slept
+
+STATE_DIR=/mnt/sda1/susieq-state
+DECISION_LOG="$STATE_DIR/sleep_decision.log"
+SLEEP_UNTIL="$STATE_DIR/esp32_sleep_until"
+
+if ! gl_modem AT AT+CFUN=4; then
+    logger -t susieq-sleep "VIRHE: CFUN=4 epäonnistui — ESP32 jää hereille"
+    echo "$(date -Iseconds) modem=failed esp32=skipped" >> "$DECISION_LOG"
+    exit 1
+fi
+touch /tmp/susieq_slept
+
+# ESP32 nukkuu vain jos modeemi tosiasiassa nukkui. Kesto lasketaan klo 05:45:een.
+# Laskenta awk:lla eikä shell-aritmetiikalla: ash tulkitsee "08" ja "09"
+# oktaaliluvuiksi, jolloin $(( $(date +%H) * 3600 )) hajoaisi aamukahdeksalta.
+SLEEP_S=$(date +%H:%M:%S | awk -F: '{
+    n = $1*3600 + $2*60 + $3
+    t = 5*3600 + 45*60
+    s = 86400 - n + t
+    if (s > 86400) s -= 86400
+    if (s > 28800) s = 28800
+    print s
+}')
+
+RESP=$(curl -s --connect-timeout 5 --max-time 10 \
+    -o /tmp/susieq_sleep_resp -w "%{http_code}" \
+    -X POST "http://192.168.8.100/sleep?seconds=${SLEEP_S}")
+BODY=$(cat /tmp/susieq_sleep_resp 2>/dev/null)
+rm -f /tmp/susieq_sleep_resp
+
+if [ "$RESP" = "200" ]; then
+    WAKE_AT=$(( $(date +%s) + SLEEP_S ))
+    echo "$WAKE_AT" > "$SLEEP_UNTIL"
+    logger -t susieq-sleep "ESP32 nukkumaan ${SLEEP_S}s"
+    echo "$(date -Iseconds) modem=slept esp32=ok seconds=$SLEEP_S http=200" >> "$DECISION_LOG"
+else
+    # Fail-open: ESP32 jää hereille, ei merkkitiedostoa. Offline-vaimennus
+    # (susieq-sensors.sh) ei siis käynnisty, ja aito valvonta jatkuu.
+    logger -t susieq-sleep "ESP32 ei nukahtanut (http=$RESP) — jää hereille"
+    echo "$(date -Iseconds) modem=slept esp32=fail http=$RESP body=$BODY" >> "$DECISION_LOG"
+fi
+
+# Päätösloki kirjoitetaan SD-kortille, koska modeemin logread-putki katkeaa
+# öisin (aukot 22:00-02:51 ja 02:59-05:52 havaittu 2026-08-23) eikä loggerin
+# viesteihin voi luottaa juuri sinä yönä kun jotain menee pieleen.
+tail -50 "$DECISION_LOG" > "$DECISION_LOG.tmp" && mv "$DECISION_LOG.tmp" "$DECISION_LOG"
