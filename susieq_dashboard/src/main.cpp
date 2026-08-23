@@ -20,6 +20,7 @@
 #include "weather.h"
 #include "rum.h"
 #include "colight.h"
+#include "sleep_policy.h"
 
 // ─── Globals ──────────────────────────────────────────────────────────
 AsyncWebServer  server(80);
@@ -45,6 +46,18 @@ AsyncWebServer  server(80);
 RTC_NOINIT_ATTR static uint32_t liveness_restart_count;
 static volatile uint32_t last_data_request_ms = 0;
 static volatile bool ota_active = false;
+
+// ── Yölepotila ────────────────────────────────────────────────────────
+// Modeemin susieq-sleep.sh kutsuu POST /sleep -endpointia klo 22 kaikkien
+// omien porttiensa (away / no_sleep / Supabase sleep_enabled) läpäisyn ja
+// onnistuneen AT+CFUN=4:n jälkeen. ESP32 ei tiedä kellonaikaa eikä satamatilaa,
+// joten kesto tulee pyynnön mukana.
+//
+// Uni EI tapahdu HTTP-käsittelijässä: se ajetaan AsyncTCP-taskissa, joka ei
+// ehtisi lähettää vastausta ennen kuin laite katoaa. Käsittelijä asettaa nämä
+// ja loop() suorittaa unen 2 s myöhemmin.
+static volatile uint32_t pending_sleep_s = 0;
+static volatile uint32_t sleep_at_ms     = 0;
 
 // Boottidiagnostiikka /data-JSON:iin: reset-syy + boottilaskuri, jotta
 // odottamattoman bootin syy (task_wdt/panic/brownout/sw) selviää etänä
@@ -397,6 +410,36 @@ static void setup_routes() {
     // one per line. Diagnostic only, readable from any browser without USB.
     server.on("/colight-debug", HTTP_GET, [](AsyncWebServerRequest* req) {
         req->send(200, "text/plain", colight_get_log());
+    });
+
+    // Yölepotila — ks. docs/superpowers/specs/2026-08-23-esp32-yolepotila-design.md
+    server.on("/sleep", HTTP_POST, [](AsyncWebServerRequest* req) {
+        // Modeemi lähettää POST /sleep?seconds=N ilman runkoa, joten parametri
+        // luetaan query-stringistä (getParam:in oletus on post=false).
+        uint32_t seconds = 0;
+        if (req->hasParam("seconds")) {
+            seconds = (uint32_t)strtoul(req->getParam("seconds")->value().c_str(), nullptr, 10);
+        }
+
+        SleepVerdict v = sleep_policy_check(millis(), ota_active, seconds);
+        if (v != SLEEP_OK) {
+            int code = (v == SLEEP_BAD_DURATION) ? 400 : 409;
+            char body[80];
+            snprintf(body, sizeof(body), "{\"ok\":false,\"error\":\"%s\"}",
+                     sleep_verdict_error(v));
+            Serial.printf("[sleep] hylätty: %s (seconds=%lu)\n",
+                          sleep_verdict_error(v), (unsigned long)seconds);
+            req->send(code, "application/json", body);
+            return;
+        }
+
+        pending_sleep_s = seconds;
+        sleep_at_ms     = millis() + 2000;
+        char body[64];
+        snprintf(body, sizeof(body), "{\"ok\":true,\"seconds\":%lu}",
+                 (unsigned long)seconds);
+        Serial.printf("[sleep] hyväksytty: %lu s\n", (unsigned long)seconds);
+        req->send(200, "application/json", body);
     });
 
     server.onNotFound([](AsyncWebServerRequest* req) {
