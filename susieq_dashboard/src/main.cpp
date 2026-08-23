@@ -644,11 +644,11 @@ static void enter_deep_sleep(uint32_t seconds) {
     digitalWrite(WIND_DE_PIN, LOW);
     rtc_gpio_hold_en((gpio_num_t)WIND_DE_PIN);
 
-    // HX711:n SCK-pinnit (18, 23) eivät ole RTC-GPIO:ita eikä niitä voi lukita.
-    // Vaa'at jäävät normaalitilaan — muutaman milliampeerin kustannus.
+    // HX711:n SCK-pinnit (18 vesi, 14 polttoaine, 23 rommi) eivät ole
+    // RTC-GPIO:ita eikä niitä voi lukita. Vaa'at jäävät normaalitilaan —
+    // muutaman milliampeerin kustannus.
 
     WiFi.disconnect(true);
-    esp_wifi_stop();
 
     esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
     Serial.flush();
@@ -664,12 +664,19 @@ void loop() {
     ArduinoOTA.handle();
 
     // Unipyynnön määräaika. Erotus lasketaan etumerkillisenä, jotta millis()-
-    // kierähdys ei laukaise unta ennenaikaisesti (sama sudenkuoppa kuin
-    // liveness-watchdogissa alempana).
+    // kierähdys ei laukaise unta ennenaikaisesti — sama vertailumuoto kuin
+    // liveness-watchdogissa alempana, mutta eri syystä: siellä bugi oli
+    // lukujärjestyksessä (näyte otettiin ennen vertailtavan arvon lukua),
+    // tässä sleep_at_ms on kiinteä määräaika eikä liikkuva näyte, joten
+    // vastaavaa vaaraa ei ole.
     if (sleep_at_ms != 0 && (int32_t)(millis() - sleep_at_ms) >= 0) {
         uint32_t s = pending_sleep_s;
         sleep_at_ms     = 0;
         pending_sleep_s = 0;
+        if (ota_active) {                     // OTA alkoi vastauksen jälkeen
+            Serial.println("[sleep] peruttu: OTA käynnistyi odotusikkunassa");
+            return;
+        }
         enter_deep_sleep(s);   // ei palaa
     }
 
