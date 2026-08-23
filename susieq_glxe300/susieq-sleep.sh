@@ -40,12 +40,13 @@ fi
 logger -t susieq-sleep "Vene kotisatamassa (tila: ${STATE:-home}) — 4G lepotilaan"
 
 STATE_DIR=/mnt/sda1/susieq-state
+mkdir -p "$STATE_DIR"
 DECISION_LOG="$STATE_DIR/sleep_decision.log"
 SLEEP_UNTIL="$STATE_DIR/esp32_sleep_until"
 
 if ! gl_modem AT AT+CFUN=4; then
     logger -t susieq-sleep "VIRHE: CFUN=4 epäonnistui — ESP32 jää hereille"
-    echo "$(date -Iseconds) modem=failed esp32=skipped" >> "$DECISION_LOG"
+    echo "$(date +%Y-%m-%dT%H:%M:%S) modem=failed esp32=skipped" >> "$DECISION_LOG"
     exit 1
 fi
 touch /tmp/susieq_slept
@@ -72,12 +73,12 @@ if [ "$RESP" = "200" ]; then
     WAKE_AT=$(( $(date +%s) + SLEEP_S ))
     echo "$WAKE_AT" > "$SLEEP_UNTIL"
     logger -t susieq-sleep "ESP32 nukkumaan ${SLEEP_S}s"
-    echo "$(date -Iseconds) modem=slept esp32=ok seconds=$SLEEP_S http=200" >> "$DECISION_LOG"
+    echo "$(date +%Y-%m-%dT%H:%M:%S) modem=slept esp32=ok seconds=$SLEEP_S http=200" >> "$DECISION_LOG"
 else
     # Fail-open: ESP32 jää hereille, ei merkkitiedostoa. Offline-vaimennus
     # (susieq-sensors.sh) ei siis käynnisty, ja aito valvonta jatkuu.
     logger -t susieq-sleep "ESP32 ei nukahtanut (http=$RESP) — jää hereille"
-    echo "$(date -Iseconds) modem=slept esp32=fail http=$RESP body=$BODY" >> "$DECISION_LOG"
+    echo "$(date +%Y-%m-%dT%H:%M:%S) modem=slept esp32=fail http=$RESP body=$BODY" >> "$DECISION_LOG"
 fi
 
 # Päätösloki kirjoitetaan SD-kortille, koska modeemin logread-putki katkeaa
