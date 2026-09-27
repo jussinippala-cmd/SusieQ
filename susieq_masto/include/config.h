@@ -23,8 +23,14 @@
 #define OTA_PASSWORD  "susieq_ota"
 
 // ─── Kamera ──────────────────────────────────────────────────────────
-#define CAM_FRAMESIZE  FRAMESIZE_QVGA
-#define CAM_QUALITY    25
+#define CAM_FRAMESIZE  FRAMESIZE_UXGA   // 1600×1200 (PSRAM)
+#define CAM_QUALITY    12               // 0–63, pienempi = parempi
+// Kamera on kotelossa ylösalaisin → vflip + hmirror = 180° kierto
+#define CAM_VFLIP      1
+#define CAM_HMIRROR    1
+// Heräämisen jälkeen hylätään framet, kunnes valotus ja valkotasapaino
+// ovat asettuneet — muuten ensimmäinen kuva on tumma ja vihertävä
+#define CAM_SETTLE_MS  1500
 
 // ─── Virrankulutus: pehmeä unitila ───────────────────────────────────
 // Kamera sammutetaan 30s idle-ajan jälkeen; WiFi STA pysyy päällä.

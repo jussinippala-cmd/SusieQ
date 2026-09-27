@@ -66,7 +66,7 @@ for cmd in json.loads(os.environ['RESPONSE']):
     fname = f'/tmp/susieq_{camera}_{ts}.jpg'
 
     r = subprocess.run([
-        'curl', '-sf', '--connect-timeout', '5', '--max-time', '15',
+        'curl', '-sf', '--connect-timeout', '5', '--max-time', '30',
         f'http://{ip}/capture', '-o', fname
     ])
 

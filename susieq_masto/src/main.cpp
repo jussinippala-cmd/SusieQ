@@ -83,7 +83,18 @@ static bool init_camera() {
         return false;
     }
     sensor_t* s = esp_camera_sensor_get();
-    if (s != NULL) s->set_raw_gma(s, 1);
+    if (s != NULL) {
+        s->set_raw_gma(s, 1);
+        s->set_vflip(s, CAM_VFLIP);
+        s->set_hmirror(s, CAM_HMIRROR);
+    }
+
+    // Valotus/AWB asettuu vain kuvia ottamalla → hylätään framet settle-ajan
+    unsigned long t0 = millis();
+    while (millis() - t0 < CAM_SETTLE_MS) {
+        camera_fb_t* fb = esp_camera_fb_get();
+        if (fb) esp_camera_fb_return(fb);
+    }
 
     _cameraOk = true;
     return true;
