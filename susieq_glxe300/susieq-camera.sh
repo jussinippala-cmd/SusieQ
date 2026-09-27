@@ -7,7 +7,8 @@
 # camera_commands: dashboard lisää rivin {camera: masto1|masto2, status: pending},
 # tämä skripti hakee kuvan kameralta, lataa sen yksityiseen kamerat-bucketiin
 # ja kirjoittaa image_url-kenttään objektin polun (esim. masto1/1790000000.jpg).
-# Dashboard muodostaa polusta signed URL:n.
+# Dashboard muodostaa polusta signed URL:n. Yli 7 pv vanhat kuvat poistetaan
+# bucketista onnistuneen latauksen jälkeen (cleanup).
 
 # set -a: Python-osa lukee muuttujat os.environista
 set -a
@@ -33,6 +34,7 @@ import json, subprocess, os, time
 SUPABASE_URL = os.environ['SUPABASE_URL']
 SUPABASE_KEY = os.environ['SUPABASE_SERVICE_KEY']
 BUCKET       = 'kamerat'
+KEEP_S       = 7 * 24 * 3600   # kuvien säilytysaika bucketissa
 CAM_IP       = {
     'masto1': os.environ.get('MASTO1_IP', '192.168.8.101'),  # keula
     'masto2': os.environ.get('MASTO2_IP', '192.168.8.102'),  # perä
@@ -50,6 +52,41 @@ def patch(cmd_id, payload):
         '-d', json.dumps(payload),
         f'{SUPABASE_URL}/rest/v1/camera_commands?id=eq.{cmd_id}'
     ], capture_output=True)
+
+def cleanup(camera, now):
+    # Poistaa bucketista yli KEEP_S vanhat kuvat. Tiedostonimi on epoch-aika
+    # (masto1/1790000000.jpg), joten ikä luetaan nimestä. Vanhoja kuvia ei
+    # näytetä missään: camera_commands-rivit siivotaan jo 24 h jälkeen.
+    r = subprocess.run([
+        'curl', '-sf', '--max-time', '15', '-X', 'POST',
+        '-H', f'apikey: {SUPABASE_KEY}',
+        '-H', f'Authorization: Bearer {SUPABASE_KEY}',
+        '-H', 'Content-Type: application/json',
+        '-d', json.dumps({'prefix': camera, 'limit': 1000}),
+        f'{SUPABASE_URL}/storage/v1/object/list/{BUCKET}'
+    ], capture_output=True)
+    if r.returncode != 0:
+        log(f'siivous {camera}: listaus epäonnistui, curl={r.returncode}')
+        return
+    old = []
+    for obj in json.loads(r.stdout or b'[]'):
+        stem = obj.get('name', '').split('.')[0]
+        if stem.isdigit() and now - int(stem) > KEEP_S:
+            old.append(f"{camera}/{obj['name']}")
+    if not old:
+        return
+    d = subprocess.run([
+        'curl', '-sf', '--max-time', '15', '-X', 'DELETE',
+        '-H', f'apikey: {SUPABASE_KEY}',
+        '-H', f'Authorization: Bearer {SUPABASE_KEY}',
+        '-H', 'Content-Type: application/json',
+        '-d', json.dumps({'prefixes': old}),
+        f'{SUPABASE_URL}/storage/v1/object/{BUCKET}'
+    ], capture_output=True)
+    if d.returncode == 0:
+        log(f'siivous {camera}: poistettu {len(old)} yli 7 pv vanhaa kuvaa')
+    else:
+        log(f'siivous {camera}: poisto epäonnistui, curl={d.returncode}')
 
 for cmd in json.loads(os.environ['RESPONSE']):
     cmd_id = cmd['id']
@@ -96,5 +133,6 @@ for cmd in json.loads(os.environ['RESPONSE']):
 
     patch(cmd_id, {'status': 'done', 'image_url': obj_path})
     log(f'#{cmd_id}: {obj_path} ok')
+    cleanup(camera, ts)
 
 PYEOF
